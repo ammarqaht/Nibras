@@ -23,6 +23,7 @@ const roleMapAr: Record<string, string> = {
 export default function SupervisorsPage() {
   const [supervisors, setSupervisors] = useState<Supervisor[]>([]);
   const [loading, setLoading] = useState(true);
+  const [authorized, setAuthorized] = useState(true);
 
   // Form states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -37,9 +38,15 @@ export default function SupervisorsPage() {
     setLoading(true);
     try {
       const res = await fetch('/api/supervisor/supervisors');
+      if (res.status === 401) {
+        setAuthorized(false);
+        return;
+      }
       const data = await res.json();
       if (res.ok) {
         setSupervisors(data.supervisors || []);
+      } else {
+        setAuthorized(false);
       }
     } catch (err) {
       console.error(err);
@@ -109,6 +116,16 @@ export default function SupervisorsPage() {
       alert('حدث خطأ في الشبكة');
     }
   };
+
+  if (!authorized) {
+    return (
+      <div className="card p-8 bg-red-50 border border-red-200 text-center max-w-xl mx-auto mt-12 font-body">
+        <span className="text-4xl">⚠️</span>
+        <h2 className="font-display text-xl text-red-800 mt-3 mb-2">غير مصرح بالدخول</h2>
+        <p className="text-red-600 text-sm">عذراً، هذه الصفحة مخصصة فقط للمدير العام (admin).</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
