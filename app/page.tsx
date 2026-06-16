@@ -198,14 +198,14 @@ export default async function LandingPage() {
       <section className="px-6 py-24">
         <div
           className="reveal mx-auto max-w-4xl rounded-3xl px-8 py-16 text-center relative overflow-hidden"
-          style={{ background: 'var(--ink)', color: '#fff' }}
+          style={{ background: 'linear-gradient(135deg, #1E5BA8 0%, #113669 100%)', color: '#fff' }}
         >
           <div
             aria-hidden
             className="absolute inset-0 pointer-events-none opacity-90"
             style={{
               background:
-                'radial-gradient(40rem 20rem at 80% 0%, rgba(245,166,35,0.22), transparent 60%), radial-gradient(30rem 20rem at 10% 100%, rgba(43,175,217,0.18), transparent 60%)'
+                'radial-gradient(circle at 80% 10%, rgba(245,166,35,0.2) 0%, transparent 50%), radial-gradient(circle at 20% 90%, rgba(43,175,217,0.3) 0%, transparent 60%)'
             }}
           />
           <div className="relative">
