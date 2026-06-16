@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import SiteHeader from '@/components/SiteHeader';
 import Footer from '@/components/Footer';
@@ -14,6 +14,11 @@ const onlyDigits = (v: string) => v.replace(/\D/g, '');
 
 export default function RegisterPage() {
   const router = useRouter();
+
+  useEffect(() => {
+    // Force browser scroll to top on mount / refresh
+    window.scrollTo(0, 0);
+  }, []);
 
   const [studentName, setStudentName] = useState('');
   const [nationalId, setNationalId] = useState('');
