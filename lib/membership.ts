@@ -34,18 +34,24 @@ export type RegistrationResult = {
  * DATABASE_URL / DIRECT_URL + `npm run db:push` to enable real persistence.
  */
 export async function createRegistration(input: RegistrationInput): Promise<RegistrationResult> {
-  if (hasDatabase) {
-    const prisma = getPrisma()!;
-    // Create first to obtain the autoincrement id, then derive the membership number.
-    const created = await prisma.registration.create({
-      data: { ...input, membershipNo: 0 }
-    });
-    const membershipNo = membership.base + created.id;
-    await prisma.registration.update({
-      where: { id: created.id },
-      data: { membershipNo }
-    });
-    return { membershipNo, mode: 'database' };
+  let useDb = hasDatabase;
+  if (useDb) {
+    try {
+      const prisma = getPrisma()!;
+      // Create first to obtain the autoincrement id, then derive the membership number.
+      const created = await prisma.registration.create({
+        data: { ...input, membershipNo: 0 }
+      });
+      const membershipNo = membership.base + created.id;
+      await prisma.registration.update({
+        where: { id: created.id },
+        data: { membershipNo }
+      });
+      return { membershipNo, mode: 'database' };
+    } catch (dbErr) {
+      console.error("Database registration failed, falling back to JSON:", dbErr);
+      useDb = false;
+    }
   }
 
   return localFallback(input);
@@ -53,12 +59,15 @@ export async function createRegistration(input: RegistrationInput): Promise<Regi
 
 /* ---------------- local run-now fallback ---------------- */
 
-const DATA_DIR = path.join(process.cwd(), '.data');
+const isVercel = !!process.env.VERCEL || process.env.NODE_ENV === 'production';
+const DATA_DIR = isVercel ? '/tmp' : path.join(process.cwd(), '.data');
 const COUNTER_FILE = path.join(DATA_DIR, 'membership-counter.json');
 const RECORDS_FILE = path.join(DATA_DIR, 'registrations.json');
 
 async function localFallback(input: RegistrationInput): Promise<RegistrationResult> {
-  await fs.mkdir(DATA_DIR, { recursive: true });
+  try {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+  } catch {}
 
   let count = 0;
   try {
@@ -68,7 +77,9 @@ async function localFallback(input: RegistrationInput): Promise<RegistrationResu
     count = 0;
   }
   count += 1;
-  await fs.writeFile(COUNTER_FILE, JSON.stringify({ count }, null, 2), 'utf8');
+  try {
+    await fs.writeFile(COUNTER_FILE, JSON.stringify({ count }, null, 2), 'utf8');
+  } catch {}
 
   const membershipNo = membership.base + count;
 
