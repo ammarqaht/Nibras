@@ -34,24 +34,56 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { registrationId, delta, reason, category } = body;
+    const { registrationId, groupId, delta, reason, category } = body;
 
-    const rId = parseInt(registrationId, 10);
     const dVal = parseInt(delta, 10);
-
-    if (isNaN(rId) || isNaN(dVal) || !reason || !category) {
+    if (isNaN(dVal) || !reason || !category) {
       return NextResponse.json({ error: 'البيانات غير كاملة أو غير صحيحة' }, { status: 400 });
     }
 
-    const record = await addPointsRecord({
-      registrationId: rId,
-      delta: dVal,
-      reason,
-      category,
-      recordedBy: session.name
-    });
+    if (groupId) {
+      const gId = parseInt(groupId, 10);
+      if (isNaN(gId)) {
+        return NextResponse.json({ error: 'رقم المجموعة غير صحيح' }, { status: 400 });
+      }
 
-    return NextResponse.json({ success: true, pointRecord: record });
+      const { getStudents } = await import('@/lib/services');
+      const allStudents = await getStudents();
+      const studentsInGroup = allStudents.filter(s => s.groupId === gId);
+
+      if (studentsInGroup.length === 0) {
+        return NextResponse.json({ error: 'لا يوجد طلاب مسجلين في هذه المجموعة / الأسرة' }, { status: 400 });
+      }
+
+      const records = [];
+      for (const s of studentsInGroup) {
+        const rec = await addPointsRecord({
+          registrationId: s.id,
+          delta: dVal,
+          reason: `${reason} (رصد جماعي للأسرة)`,
+          category,
+          recordedBy: session.name
+        });
+        records.push(rec);
+      }
+
+      return NextResponse.json({ success: true, pointRecords: records, bulk: true });
+    } else {
+      const rId = parseInt(registrationId, 10);
+      if (isNaN(rId)) {
+        return NextResponse.json({ error: 'الطالب المحدد غير صحيح' }, { status: 400 });
+      }
+
+      const record = await addPointsRecord({
+        registrationId: rId,
+        delta: dVal,
+        reason,
+        category,
+        recordedBy: session.name
+      });
+
+      return NextResponse.json({ success: true, pointRecord: record, bulk: false });
+    }
   } catch (error) {
     console.error('points POST error', error);
     return NextResponse.json({ error: 'حدث خطأ في تسجيل النقاط' }, { status: 500 });

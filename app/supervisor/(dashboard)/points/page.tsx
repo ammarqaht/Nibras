@@ -40,7 +40,9 @@ export default function PointsPage() {
   const [loading, setLoading] = useState(true);
 
   // Allocator state
+  const [allocationTarget, setAllocationTarget] = useState<'student' | 'group'>('student');
   const [selectedStudentId, setSelectedStudentId] = useState('');
+  const [selectedGroupId, setSelectedGroupId] = useState('');
   const [pointsDelta, setPointsDelta] = useState('10'); // default +10
   const [pointsReason, setPointsReason] = useState('');
   const [pointsCategory, setPointsCategory] = useState('participation');
@@ -119,27 +121,42 @@ export default function PointsPage() {
 
   const handleAllocatePoints = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedStudentId || !pointsReason.trim()) return;
+    if (allocationTarget === 'student' && !selectedStudentId) return;
+    if (allocationTarget === 'group' && !selectedGroupId) return;
+    if (!pointsReason.trim()) return;
 
     setSubmitting(true);
     setAllocatorMsg(null);
     try {
+      const payload: any = {
+        delta: parseInt(pointsDelta, 10),
+        reason: pointsReason,
+        category: pointsCategory
+      };
+
+      if (allocationTarget === 'student') {
+        payload.registrationId = selectedStudentId;
+      } else {
+        payload.groupId = selectedGroupId;
+      }
+
       const res = await fetch('/api/supervisor/points', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          registrationId: selectedStudentId,
-          delta: parseInt(pointsDelta, 10),
-          reason: pointsReason,
-          category: pointsCategory
-        })
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
       if (res.ok) {
-        setPointsLog(prev => [data.pointRecord, ...prev]);
-        setAllocatorMsg({ text: 'تم تخصيص النقاط بنجاح! 🏆', success: true });
-        // Clear fields
-        setSelectedStudentId('');
+        if (data.bulk) {
+          setPointsLog(prev => [...data.pointRecords, ...prev]);
+          setAllocatorMsg({ text: `تم رصد النقاط بنجاح لجميع طلاب الأسرة! 🏆 (+${pointsDelta} لكل طالب)`, success: true });
+          setSelectedGroupId('');
+        } else {
+          setPointsLog(prev => [data.pointRecord, ...prev]);
+          setAllocatorMsg({ text: 'تم تخصيص النقاط بنجاح! 🏆', success: true });
+          setSelectedStudentId('');
+        }
+        // Clear common fields
         setPointsReason('');
         setPointsCategory('participation');
       } else {
@@ -274,7 +291,25 @@ export default function PointsPage() {
         <div className="space-y-6">
           <div className="card p-6 bg-white space-y-4">
             <h3 className="font-display text-xl text-ink-900">منح / خصم نقاط تميز</h3>
-            <p className="text-xs text-ink-400">اختر طالباً لتعديل نقاط تميزه مع كتابة السبب والتصنيف.</p>
+            <p className="text-xs text-ink-400">رصد النقاط لطالب منفرد أو لأسرة/مجموعة كاملة مرة واحدة.</p>
+
+            {/* Allocation Target Tabs */}
+            <div className="grid grid-cols-2 gap-2 p-1 bg-cream-100 rounded-xl">
+              <button
+                type="button"
+                onClick={() => { setAllocationTarget('student'); setAllocatorMsg(null); }}
+                className={`py-2 text-xs font-semibold rounded-lg transition-all ${allocationTarget === 'student' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-900'}`}
+              >
+                👤 طالب واحد
+              </button>
+              <button
+                type="button"
+                onClick={() => { setAllocationTarget('group'); setAllocatorMsg(null); }}
+                className={`py-2 text-xs font-semibold rounded-lg transition-all ${allocationTarget === 'group' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-900'}`}
+              >
+                🛡️ أسرة كاملة
+              </button>
+            </div>
 
             {allocatorMsg && (
               <div className={`p-4 rounded-xl text-xs font-semibold text-center ${allocatorMsg.success ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
@@ -283,22 +318,40 @@ export default function PointsPage() {
             )}
 
             <form onSubmit={handleAllocatePoints} className="space-y-4">
-              {/* Select Student */}
-              <div>
-                <label className="label mb-1 block">اختر الطالب</label>
-                <select
-                  required
-                  value={selectedStudentId}
-                  onChange={e => setSelectedStudentId(e.target.value)}
-                  className="input w-full"
-                  disabled={submitting}
-                >
-                  <option value="">ابحث عن طالب...</option>
-                  {students.map(s => (
-                    <option key={s.id} value={s.id}>{s.studentName} (#{s.membershipNo})</option>
-                  ))}
-                </select>
-              </div>
+              {/* Target Selector */}
+              {allocationTarget === 'student' ? (
+                <div>
+                  <label className="label mb-1 block">اختر الطالب</label>
+                  <select
+                    required
+                    value={selectedStudentId}
+                    onChange={e => setSelectedStudentId(e.target.value)}
+                    className="input w-full"
+                    disabled={submitting}
+                  >
+                    <option value="">ابحث عن طالب...</option>
+                    {students.map(s => (
+                      <option key={s.id} value={s.id}>{s.studentName} (#{s.membershipNo})</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div>
+                  <label className="label mb-1 block">اختر الأسرة / المجموعة</label>
+                  <select
+                    required
+                    value={selectedGroupId}
+                    onChange={e => setSelectedGroupId(e.target.value)}
+                    className="input w-full"
+                    disabled={submitting}
+                  >
+                    <option value="">اختر الأسرة...</option>
+                    {groups.map(g => (
+                      <option key={g.id} value={g.id}>{g.name} ({g.stage})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Delta value */}
               <div>
