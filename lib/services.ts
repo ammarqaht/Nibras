@@ -82,7 +82,8 @@ export function hashPassword(password: string): string {
 }
 
 // Local fallback files paths
-const DATA_DIR = path.join(process.cwd(), '.data');
+const isVercel = !!process.env.VERCEL || process.env.NODE_ENV === 'production';
+const DATA_DIR = isVercel ? '/tmp' : path.join(process.cwd(), '.data');
 const FILE_REGISTRATIONS = path.join(DATA_DIR, 'registrations.json');
 const FILE_SUPERVISORS = path.join(DATA_DIR, 'supervisors.json');
 const FILE_ATTENDANCE = path.join(DATA_DIR, 'attendance.json');
@@ -101,8 +102,12 @@ async function readJsonFile<T>(filePath: string, defaultVal: T): Promise<T> {
 }
 
 async function writeJsonFile<T>(filePath: string, data: T): Promise<void> {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8');
+  try {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+    await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8');
+  } catch (err) {
+    console.warn(`Could not write json file to ${filePath} (read-only filesystem fallback):`, err);
+  }
 }
 
 // Ensure default Admin supervisor is seeded

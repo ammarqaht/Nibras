@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3009",
-    "build": "next build",
+    "build": "node -e \"if(process.env.DATABASE_URL){require('child_process').execSync('npx prisma db push',{stdio:'inherit'});}\" && next build",
     "start": "next start -p 3009",
     "postinstall": "prisma generate",
     "db:push": "prisma db push"
