@@ -35,6 +35,8 @@ export type StudentInfo = {
   paymentStatus: string;
   groupId: number | null;
   registrationStatus: string;
+  paymentType: string;
+  paymentReceipt: string | null;
 };
 
 export type AttendanceInfo = {
@@ -317,7 +319,9 @@ export async function getStudents(): Promise<StudentInfo[]> {
       createdAt: r.createdAt.toISOString(),
       paymentStatus: r.paymentStatus,
       groupId: r.groupId,
-      registrationStatus: r.registrationStatus
+      registrationStatus: r.registrationStatus,
+      paymentType: r.paymentType,
+      paymentReceipt: r.paymentReceipt
     }));
   } else {
     const list = await readJsonFile<any[]>(FILE_REGISTRATIONS, []);
@@ -339,7 +343,9 @@ export async function getStudents(): Promise<StudentInfo[]> {
       createdAt: r.createdAt || new Date().toISOString(),
       paymentStatus: r.paymentStatus || 'unpaid',
       groupId: r.groupId ?? null,
-      registrationStatus: r.registrationStatus || 'pending'
+      registrationStatus: r.registrationStatus || 'pending',
+      paymentType: r.paymentType || 'later',
+      paymentReceipt: r.paymentReceipt || null
     }));
   }
 }
@@ -364,7 +370,9 @@ export async function updateStudent(id: number, data: Partial<Omit<StudentInfo, 
         conditionNote: data.conditionNote,
         paymentStatus: data.paymentStatus,
         groupId: data.groupId,
-        registrationStatus: data.registrationStatus
+        registrationStatus: data.registrationStatus,
+        paymentType: data.paymentType,
+        paymentReceipt: data.paymentReceipt
       }
     });
     return {
@@ -385,16 +393,21 @@ export async function updateStudent(id: number, data: Partial<Omit<StudentInfo, 
       createdAt: updated.createdAt.toISOString(),
       paymentStatus: updated.paymentStatus,
       groupId: updated.groupId,
-      registrationStatus: updated.registrationStatus
+      registrationStatus: updated.registrationStatus,
+      paymentType: updated.paymentType,
+      paymentReceipt: updated.paymentReceipt
     };
   } else {
     const list = await getStudents();
     const index = list.findIndex(s => s.id === id);
     if (index === -1) return null;
-    const updated = {
-      ...list[index],
-      ...data
-    };
+    const updated = { ...list[index] };
+    Object.keys(data).forEach(key => {
+      const val = (data as any)[key];
+      if (val !== undefined) {
+        (updated as any)[key] = val;
+      }
+    });
     list[index] = updated;
     await writeJsonFile(FILE_REGISTRATIONS, list);
     return updated;
@@ -635,7 +648,7 @@ export async function getSettings(): Promise<Record<string, string>> {
   }
 }
 
-import { site as origSite, landing as origLanding, clubDetails as origClubDetails, footer as origFooter } from '../content';
+import { site as origSite, landing as origLanding, clubDetails as origClubDetails, footer as origFooter, defaultBankDetails as origDefaultBankDetails } from '../content';
 
 export async function saveSetting(key: string, value: string): Promise<void> {
   if (hasDatabase) {
@@ -721,7 +734,14 @@ export async function getMergedSettings() {
     }))
   };
 
-  return { site, landing, clubDetails, footer };
+  const bankDetails = {
+    bankName: custom.bankName || origDefaultBankDetails.bankName,
+    accountNumber: custom.bankAccount || origDefaultBankDetails.accountNumber,
+    iban: custom.bankIban || origDefaultBankDetails.iban,
+    accountOwner: custom.bankOwner || origDefaultBankDetails.accountOwner,
+  };
+
+  return { site, landing, clubDetails, footer, bankDetails };
 }
 
 export async function deleteStudent(id: number): Promise<boolean> {

@@ -29,6 +29,8 @@ model Registration {
   paymentStatus      String   @default("unpaid")
   groupId            Int?
   registrationStatus String   @default("pending")
+  paymentType        String   @default("later") // 'now' | 'later'
+  paymentReceipt     String?                    // Base64 string of receipt image
 
   @@index([nationalId])
 }

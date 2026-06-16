@@ -22,6 +22,8 @@ type Student = {
   paymentStatus: string;
   groupId: number | null;
   registrationStatus: string;
+  paymentType: string;
+  paymentReceipt: string | null;
 };
 
 type Group = {
@@ -319,6 +321,35 @@ export default function StudentsPage() {
     }
   };
 
+  const handleConfirmPayment = async () => {
+    if (!selectedStudent) return;
+    if (!confirm(`هل أنت متأكد من تأكيد استلام الدفع للطالب ${selectedStudent.studentName}؟`)) return;
+    setSaving(true);
+    try {
+      const res = await fetch('/api/supervisor/students', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selectedStudent.id,
+          paymentStatus: 'paid'
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setStudents(prev => prev.map(item => item.id === selectedStudent.id ? data.student : item));
+        setSelectedStudent(data.student);
+        alert('تم تأكيد الدفع بنجاح! ✅');
+      } else {
+        alert(data.error || 'فشل تأكيد الدفع');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ في الشبكة');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const currentGradeOptions = stages.find(s => s.key === editStage)?.grades || [];
 
   return (
@@ -503,9 +534,19 @@ export default function StudentsPage() {
                         </span>
                       </td>
                       <td className="p-4">
-                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${s.paymentStatus === 'paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                          {s.paymentStatus === 'paid' ? 'مدفوع' : 'لم يدفع'}
-                        </span>
+                        {s.paymentStatus === 'paid' ? (
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                            مدفوع
+                          </span>
+                        ) : s.paymentType === 'now' && s.paymentReceipt ? (
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 flex items-center gap-1 w-max">
+                            بانتظار المراجعة 📑
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+                            لم يدفع
+                          </span>
+                        )}
                       </td>
                       <td className="p-4 pl-6 text-left" onClick={(e) => e.stopPropagation()}>
                         <button 
@@ -753,6 +794,22 @@ export default function StudentsPage() {
                       {groups.find(g => g.id === selectedStudent.groupId)?.name || 'غير مصنف'}
                     </span>
                   </div>
+                  <div>
+                    <span className="text-ink-400 block mb-0.5">نوع السداد</span>
+                    <span className="font-semibold text-ink-900">
+                      {selectedStudent.paymentType === 'now' ? 'دفع فوري (تحويل بنكي)' : 'دفع آجل'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-ink-400 block mb-0.5">حالة السداد</span>
+                    <span className="font-semibold text-ink-950 flex items-center gap-1.5 font-bold">
+                      {selectedStudent.paymentStatus === 'paid' ? (
+                        <span className="text-green-600">تم الدفع ✅</span>
+                      ) : (
+                        <span className="text-red-500">لم يدفع ❌</span>
+                      )}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Map Coordinates or Google Maps Link block */}
@@ -778,6 +835,65 @@ export default function StudentsPage() {
                     </div>
                   </div>
                 ) : null}
+
+                {/* Payment Receipt & Details block */}
+                {selectedStudent.paymentType === 'now' && (
+                  <div className="p-4 rounded-2xl border border-ink-200/60 bg-cream-50/50 space-y-4">
+                    <span className="text-ink-400 text-xs block mb-1">تفاصيل الدفع وإيصال التحويل:</span>
+                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                      <div className="space-y-1">
+                        <span className="text-sm font-semibold text-ink-800 block">إيصال السداد المرفوع:</span>
+                        {selectedStudent.paymentReceipt ? (
+                          <span className="text-xs text-ink-500 block">انقر على الصورة للتكبير أو زر الفتح للمشاهدة بوضوح</span>
+                        ) : (
+                          <span className="text-xs text-red-500 font-semibold block">لم يتم رفع إيصال التحويل البنكي بعد</span>
+                        )}
+                      </div>
+                      
+                      {selectedStudent.paymentReceipt && (
+                        <a 
+                          href={selectedStudent.paymentReceipt} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="btn btn-secondary btn-sm flex items-center gap-1.5"
+                        >
+                          👁️ فتح الإيصال في صفحة جديدة
+                        </a>
+                      )}
+                    </div>
+
+                    {selectedStudent.paymentReceipt && (
+                      <div className="border border-ink-200 rounded-xl overflow-hidden max-w-xs bg-white shadow-sm">
+                        <img 
+                          src={selectedStudent.paymentReceipt} 
+                          alt="إيصال السداد" 
+                          className="w-full h-auto object-cover max-h-48 cursor-zoom-in hover:opacity-95 transition-opacity"
+                          onClick={() => {
+                            window.open(selectedStudent.paymentReceipt!, '_blank');
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Confirm Payment Button when unpaid */}
+                {selectedStudent.paymentStatus !== 'paid' && (
+                  <div className="p-4 rounded-2xl border border-yellow-200 bg-yellow-50/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <span className="text-amber-800 font-semibold text-sm block">لم يتم تأكيد السداد بعد</span>
+                      <span className="text-xs text-ink-500">يرجى مراجعة إيصال التحويل (إن وجد) وتأكيد استلام المبلغ بالضغط على الزر المقابل.</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleConfirmPayment}
+                      className="btn text-white bg-green-600 hover:bg-green-700 border-green-600 hover:border-green-700 flex items-center gap-1.5 w-full sm:w-auto justify-center font-semibold"
+                      disabled={saving}
+                    >
+                      {saving ? 'جاري الحفظ...' : '✅ تأكيد استلام الدفع'}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 

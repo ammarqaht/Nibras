@@ -16,6 +16,8 @@ export type RegistrationInput = {
   mapLink?: string | null;
   hasCondition: boolean;
   conditionNote?: string | null;
+  paymentType?: string;
+  paymentReceipt?: string | null;
 };
 
 export type RegistrationResult = {

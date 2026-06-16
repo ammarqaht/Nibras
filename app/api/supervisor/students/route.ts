@@ -119,7 +119,9 @@ export async function PUT(req: NextRequest) {
       conditionNote: body.conditionNote,
       paymentStatus: body.paymentStatus,
       groupId: body.groupId !== undefined ? (body.groupId === null ? null : parseInt(body.groupId, 10)) : undefined,
-      registrationStatus: body.registrationStatus
+      registrationStatus: body.registrationStatus,
+      paymentType: body.paymentType,
+      paymentReceipt: body.paymentReceipt
     });
 
     return NextResponse.json({ success: true, student: updated });
@@ -170,7 +172,9 @@ export async function POST(req: NextRequest) {
       registrationStatus,
       groupId,
       locationLat: null,
-      locationLng: null
+      locationLng: null,
+      paymentType: 'later',
+      paymentReceipt: null
     });
 
     return NextResponse.json({ success: true, student: created });

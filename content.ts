@@ -174,3 +174,11 @@ export const membership = {
   // Membership number = base + sequential count. Editable here.
   base: 1000
 };
+
+/* -------------------- BANK DETAILS -------------------- */
+export const defaultBankDetails = {
+  bankName: 'مصرف الراجحي',
+  accountNumber: '1234567890123456',
+  iban: 'SA1234567890123456789012',
+  accountOwner: 'نادي نبراس الصيفي'
+};

@@ -26,6 +26,11 @@ export default function SettingsPage() {
   const [socialYoutube, setSocialYoutube] = useState('');
   const [socialX, setSocialX] = useState('');
 
+  const [bankName, setBankName] = useState('');
+  const [bankAccount, setBankAccount] = useState('');
+  const [bankIban, setBankIban] = useState('');
+  const [bankOwner, setBankOwner] = useState('');
+
   const fetchSettings = async () => {
     setLoading(true);
     try {
@@ -51,6 +56,10 @@ export default function SettingsPage() {
         setSocialSnapchat(s.social_snapchat || 'https://www.snapchat.com/add/nibras');
         setSocialYoutube(s.social_youtube || 'https://www.youtube.com/@nibras');
         setSocialX(s.social_x || 'https://x.com/nibras');
+        setBankName(s.bankName || 'مصرف الراجحي');
+        setBankAccount(s.bankAccount || '1234567890123456');
+        setBankIban(s.bankIban || 'SA1234567890123456789012');
+        setBankOwner(s.bankOwner || 'نادي نبراس الصيفي');
       }
     } catch (err) {
       console.error('Error fetching settings', err);
@@ -495,6 +504,99 @@ export default function SettingsPage() {
                   className="btn btn-primary btn-sm shrink-0"
                 >
                   {savingKey === 'social_x' ? '...' : 'حفظ'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Bank Transfer Details Card */}
+        <div className="card p-6 bg-white space-y-6">
+          <h3 className="font-display text-xl text-ink-900 border-b border-ink-100 pb-3">🏦 بيانات الحساب البنكي للتحويل</h3>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            {/* Bank Name */}
+            <div>
+              <label className="label mb-1.5 block">اسم البنك</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={bankName}
+                  onChange={e => setBankName(e.target.value)}
+                  className="input flex-1"
+                  placeholder="مثال: مصرف الراجحي"
+                />
+                <button
+                  onClick={() => handleSaveSetting('bankName', bankName)}
+                  disabled={savingKey === 'bankName'}
+                  className="btn btn-primary btn-sm shrink-0"
+                >
+                  {savingKey === 'bankName' ? '...' : 'حفظ'}
+                </button>
+              </div>
+            </div>
+
+            {/* Account Owner */}
+            <div>
+              <label className="label mb-1.5 block">اسم صاحب الحساب</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={bankOwner}
+                  onChange={e => setBankOwner(e.target.value)}
+                  className="input flex-1"
+                  placeholder="مثال: نادي نبراس الصيفي"
+                />
+                <button
+                  onClick={() => handleSaveSetting('bankOwner', bankOwner)}
+                  disabled={savingKey === 'bankOwner'}
+                  className="btn btn-primary btn-sm shrink-0"
+                >
+                  {savingKey === 'bankOwner' ? '...' : 'حفظ'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            {/* Account Number */}
+            <div>
+              <label className="label mb-1.5 block">رقم الحساب</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={bankAccount}
+                  onChange={e => setBankAccount(e.target.value)}
+                  className="input flex-1 ltr text-left font-mono"
+                  placeholder="123456789..."
+                />
+                <button
+                  onClick={() => handleSaveSetting('bankAccount', bankAccount)}
+                  disabled={savingKey === 'bankAccount'}
+                  className="btn btn-primary btn-sm shrink-0"
+                >
+                  {savingKey === 'bankAccount' ? '...' : 'حفظ'}
+                </button>
+              </div>
+            </div>
+
+            {/* IBAN */}
+            <div>
+              <label className="label mb-1.5 block">رقم الآيبان (IBAN)</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={bankIban}
+                  onChange={e => setBankIban(e.target.value)}
+                  className="input flex-1 ltr text-left font-mono"
+                  placeholder="SA123456..."
+                />
+                <button
+                  onClick={() => handleSaveSetting('bankIban', bankIban)}
+                  disabled={savingKey === 'bankIban'}
+                  className="btn btn-primary btn-sm shrink-0"
+                >
+                  {savingKey === 'bankIban' ? '...' : 'حفظ'}
                 </button>
               </div>
             </div>

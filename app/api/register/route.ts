@@ -51,6 +51,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'يرجى تحديد الموقع على الخريطة أو إدخال رابط قوقل ماب' }, { status: 400 });
   }
 
+  const paymentType = String(body.paymentType ?? 'later').trim();
+  const paymentReceipt = typeof body.paymentReceipt === 'string' ? body.paymentReceipt : null;
+
+  if (paymentType === 'now' && !paymentReceipt) {
+    return NextResponse.json({ error: 'يرجى رفع صورة إيصال التحويل البنكي' }, { status: 400 });
+  }
+
   try {
     const result = await createRegistration({
       studentName,
@@ -64,7 +71,9 @@ export async function POST(req: Request) {
       locationLng: lng,
       mapLink: mapLink || null,
       hasCondition,
-      conditionNote: hasCondition ? conditionNote : null
+      conditionNote: hasCondition ? conditionNote : null,
+      paymentType,
+      paymentReceipt
     });
 
     return NextResponse.json({ membershipNo: result.membershipNo, mode: result.mode });
