@@ -3,14 +3,14 @@ import SocialIcon from '@/components/SocialIcon';
 import { footer } from '@/content';
 
 /** Shared footer across all pages — association contact / social channels. */
-export default function Footer() {
+export default function Footer({ tagline }: { tagline?: string }) {
   return (
     <footer className="mt-24 border-t border-ink-200/70 bg-cream-50">
       <div className="mx-auto max-w-6xl px-6 sm:px-8 py-12">
         <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-8">
           <div className="text-center sm:text-right">
             <Brand variant="lockup" imgClassName="h-11 w-auto" />
-            <p className="hint mt-3 font-display text-ink-500 tracking-wide">{footer.tagline}</p>
+            <p className="hint mt-3 font-display text-ink-500 tracking-wide">{tagline || footer.tagline}</p>
           </div>
 
           <div className="flex items-center gap-3">

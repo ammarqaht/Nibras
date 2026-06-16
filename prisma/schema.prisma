@@ -9,20 +9,74 @@ datasource db {
 }
 
 model Registration {
-  id             Int      @id @default(autoincrement())
-  membershipNo   Int      @unique
-  studentName    String
-  nationalId     String
-  guardianPhone  String
-  studentPhone   String?
-  stage          String
-  grade          String
-  neighborhood   String
-  locationLat    Float?
-  locationLng    Float?
-  hasCondition   Boolean  @default(false)
-  conditionNote  String?
-  createdAt      DateTime @default(now())
+  id                 Int      @id @default(autoincrement())
+  membershipNo       Int      @unique
+  studentName        String
+  nationalId         String
+  guardianPhone      String
+  studentPhone       String?
+  stage              String
+  grade              String
+  neighborhood       String
+  locationLat        Float?
+  locationLng        Float?
+  hasCondition       Boolean  @default(false)
+  conditionNote      String?
+  createdAt          DateTime @default(now())
+  
+  // Custom additions for dashboard
+  paymentStatus      String   @default("unpaid")
+  groupId            Int?
+  registrationStatus String   @default("pending")
 
   @@index([nationalId])
+}
+
+model Supervisor {
+  id           Int      @id @default(autoincrement())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String   @default("supervisor") // 'admin' | 'supervisor'
+  groupIds     String   @default("")           // comma-separated group IDs (e.g. "1,2")
+  createdAt    DateTime @default(now())
+}
+
+model Group {
+  id        Int      @id @default(autoincrement())
+  name      String
+  stage     String
+  createdAt DateTime @default(now())
+}
+
+model Attendance {
+  id             Int      @id @default(autoincrement())
+  registrationId Int
+  date           String   // Format 'YYYY-MM-DD'
+  status         String   // 'present' | 'absent' | 'late'
+  recordedBy     String?
+  createdAt      DateTime @default(now())
+}
+
+model Point {
+  id             Int      @id @default(autoincrement())
+  registrationId Int
+  delta          Int      // +points or -points
+  reason         String
+  category       String   // 'behavior' | 'participation' | 'activity' | 'other'
+  recordedBy     String?
+  createdAt      DateTime @default(now())
+}
+
+model Announcement {
+  id        Int      @id @default(autoincrement())
+  title     String
+  body      String
+  audience  String   // 'students' | 'guardians' | 'all'
+  createdAt DateTime @default(now())
+}
+
+model Setting {
+  key   String @id
+  value String // JSON string
 }

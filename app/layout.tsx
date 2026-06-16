@@ -1,11 +1,14 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
-import { site } from '@/content';
+import { getMergedSettings } from '@/lib/services';
 
-export const metadata: Metadata = {
-  title: site.metaTitle,
-  description: site.metaDescription
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { site } = await getMergedSettings();
+  return {
+    title: site.metaTitle,
+    description: site.metaDescription
+  };
+}
 
 export const viewport: Viewport = {
   themeColor: '#FAFAF7',

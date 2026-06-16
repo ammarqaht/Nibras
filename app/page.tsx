@@ -2,7 +2,7 @@ import Link from 'next/link';
 import SiteHeader from '@/components/SiteHeader';
 import Footer from '@/components/Footer';
 import LandingMotion from '@/components/LandingMotion';
-import { landing, clubDetails, site } from '@/content';
+import { getMergedSettings } from '@/lib/services';
 import {
   DiscoverIcon,
   TryIcon,
@@ -20,7 +20,8 @@ const HIGHLIGHT_ICONS: Record<string, (p: { className?: string }) => JSX.Element
   learn: LearnIcon
 };
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const { site, landing, clubDetails } = await getMergedSettings();
   const loc = clubDetails.location;
 
   return (
@@ -217,7 +218,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <Footer />
+      <Footer tagline={landing.tagline} />
       <LandingMotion />
     </main>
   );
