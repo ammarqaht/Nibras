@@ -1,0 +1,242 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   LOCAL FONTS
+   public/fonts/title  -> Nibrasfont        (headings / essential)
+   public/fonts/body   -> Thmanyah Sans     (everything else)
+
+   Nibrasfont ships as a single weight; it is registered across the
+   weight range so `font-weight` utilities stay visually consistent.
+   ============================================================ */
+@font-face {
+  font-family: "Nibras Display";
+  src: url("/fonts/title/Nibrasfont.otf") format("opentype");
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Nibras Display";
+  src: url("/fonts/title/Nibrasfont.otf") format("opentype");
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Nibras Display";
+  src: url("/fonts/title/Nibrasfont.otf") format("opentype");
+  font-weight: 900; font-style: normal; font-display: swap;
+}
+
+@font-face {
+  font-family: "Thmanyah Sans";
+  src: url("/fonts/body/thmanyahsans-Light.otf") format("opentype");
+  font-weight: 300; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Thmanyah Sans";
+  src: url("/fonts/body/thmanyahsans-Regular.otf") format("opentype");
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Thmanyah Sans";
+  src: url("/fonts/body/thmanyahsans-Medium.otf") format("opentype");
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Thmanyah Sans";
+  src: url("/fonts/body/thmanyahsans-Bold.otf") format("opentype");
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Thmanyah Sans";
+  src: url("/fonts/body/thmanyahsans-Black.otf") format("opentype");
+  font-weight: 900; font-style: normal; font-display: swap;
+}
+
+:root {
+  --font-display: "Nibras Display", "Times New Roman", serif;
+  --font-body:    "Thmanyah Sans", -apple-system, system-ui, sans-serif;
+
+  --bg:        #FAFAF7;
+  --bg-soft:   #F5F3EF;
+  --card:      #FFFFFF;
+  --ink:       #1A1A1A;
+  --ink-soft:  #6B6B6B;
+  --line:      #E8E4DF;
+
+  /* Nibras brand identity (replaces Medad gold/sage/rose) */
+  --accent:      #F5A623; /* orange  — primary */
+  --accent-soft: #F8BC5A;
+  --accent-deep: #E08A0C;
+  --blue:        #1E5BA8;
+  --cyan:        #2BAFD9;
+  --red:         #FB3B1E;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4, h5, h6 { font-family: var(--font-display); font-weight: 700; line-height: 1.15; }
+
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; cursor: pointer; }
+input, textarea, select { font-family: inherit; }
+
+::selection { background: rgba(245,166,35,0.20); color: var(--ink); }
+
+/* Subtle warm noise texture overlay */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+
+/* Field styles */
+.field {
+  width: 100%;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  font-size: 1rem;
+  color: var(--ink);
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+.field:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px rgba(245,166,35,0.12); }
+.field::placeholder { color: #B5B0A7; }
+.field[dir="ltr"] { direction: ltr; text-align: left; }
+.field.invalid { border-color: var(--red); box-shadow: 0 0 0 4px rgba(251,59,30,0.10); }
+
+.label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  margin-bottom: 0.4rem;
+  font-weight: 500;
+}
+.label .req { color: var(--red); margin-inline-start: 0.15rem; }
+.hint { font-size: 0.78rem; color: var(--ink-soft); margin-top: 0.4rem; line-height: 1.6; }
+.err-msg { font-size: 0.8rem; color: var(--red); margin-top: 0.4rem; }
+
+/* Button styles */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.8rem 1.4rem;
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 0.95rem;
+  border: 1px solid transparent;
+  transition: all 200ms cubic-bezier(0.4,0,0.2,1);
+  cursor: pointer;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-deep); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(245,166,35,0.28); }
+.btn-secondary { background: #fff; color: var(--ink); border-color: var(--line); }
+.btn-secondary:hover { border-color: var(--accent); color: var(--accent-deep); }
+.btn-ghost { background: transparent; color: var(--ink-soft); }
+.btn-ghost:hover { color: var(--ink); background: var(--bg-soft); }
+.btn-danger { background: #fff; color: var(--red); border-color: rgba(251,59,30,0.30); }
+.btn-danger:hover { background: rgba(251,59,30,0.06); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
+.btn-lg { padding: 1rem 2rem; font-size: 1.05rem; }
+
+/* Card */
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(45,35,20,0.06);
+}
+
+/* Choice chips (radio / stage selectors) */
+.choice {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.8rem 1.1rem;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  font-weight: 500;
+  font-size: 0.95rem;
+  transition: all 180ms cubic-bezier(0.4,0,0.2,1);
+  cursor: pointer;
+  user-select: none;
+}
+.choice:hover { border-color: var(--accent-soft); }
+.choice.is-active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(245,166,35,0.25);
+}
+
+/* Animations */
+@keyframes toastIn {
+  from { transform: translateY(-12px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes popIn {
+  0%   { opacity: 0; transform: scale(0.9); }
+  60%  { opacity: 1; transform: scale(1.03); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-\[marquee_22s_linear_infinite\] { animation: none !important; }
+}
+.toast { animation: toastIn 280ms cubic-bezier(0.4,0,0.2,1); }
+.fade-in { animation: fadeIn 240ms ease; }
+.pop-in { animation: popIn 420ms cubic-bezier(0.34,1.56,0.64,1) both; }
+
+/* Reveal-on-scroll fallback (used when GSAP is unavailable / reduced motion) */
+.reveal { opacity: 0; transform: translateY(28px); }
+.reveal.is-in { opacity: 1; transform: none; transition: opacity 700ms ease, transform 700ms cubic-bezier(0.22,1,0.36,1); }
+.reveal-hero { opacity: 0; transform: translateY(28px); }
+.reveal-hero.is-in { opacity: 1; transform: none; transition: opacity 800ms ease, transform 800ms cubic-bezier(0.22,1,0.36,1); }
+
+/* Stagger container: container stays visible; children reveal in sequence. */
+.reveal[data-stagger] { opacity: 1; transform: none; }
+.reveal[data-stagger] > * { opacity: 0; transform: translateY(28px); }
+.reveal[data-stagger].is-in > * { opacity: 1; transform: none; transition: opacity 700ms ease, transform 700ms cubic-bezier(0.22,1,0.36,1); }
+.reveal[data-stagger].is-in > *:nth-child(2) { transition-delay: 0.1s; }
+.reveal[data-stagger].is-in > *:nth-child(3) { transition-delay: 0.2s; }
+.reveal[data-stagger].is-in > *:nth-child(4) { transition-delay: 0.3s; }
+.reveal[data-stagger].is-in > *:nth-child(5) { transition-delay: 0.4s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal, .reveal-hero, .reveal[data-stagger] > * {
+    opacity: 1 !important; transform: none !important;
+  }
+}
+
+/* Hide scrollbar but keep functional */
+.scroll-soft::-webkit-scrollbar { width: 8px; height: 8px; }
+.scroll-soft::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+.scroll-soft::-webkit-scrollbar-track { background: transparent; }
