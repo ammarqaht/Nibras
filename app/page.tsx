@@ -53,15 +53,6 @@ export default async function LandingPage() {
           <p className="reveal-hero mt-4 text-ink-500 text-[clamp(1.05rem,2.2vw,1.4rem)]">
             {landing.taglineSub}
           </p>
-
-          <div className="reveal-hero mt-10 flex items-center justify-center gap-3 flex-wrap">
-            <Link href="/register" className="btn btn-primary btn-lg">
-              {landing.ctaPrimary}
-            </Link>
-            <a href="#about" className="btn btn-secondary btn-lg">
-              تعرّف على النادي
-            </a>
-          </div>
         </div>
       </section>
 
