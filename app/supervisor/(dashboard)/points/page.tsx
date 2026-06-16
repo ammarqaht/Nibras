@@ -356,20 +356,16 @@ export default function PointsPage() {
               {/* Delta value */}
               <div>
                 <label className="label mb-1 block">مقدار النقاط</label>
-                <select
+                <input
+                  type="number"
+                  required
                   value={pointsDelta}
                   onChange={e => setPointsDelta(e.target.value)}
                   className="input w-full font-display font-semibold"
+                  placeholder="مثال: 10 أو -5"
                   disabled={submitting}
-                >
-                  <option value="5">إضافة 5 نقاط (+5)</option>
-                  <option value="10">إضافة 10 نقاط (+10)</option>
-                  <option value="20">إضافة 20 نقطة (+20)</option>
-                  <option value="50">إضافة 50 نقطة (+50)</option>
-                  <option value="-5">خصم 5 نقاط (-5)</option>
-                  <option value="-10">خصم 10 نقاط (-10)</option>
-                  <option value="-20">خصم 20 نقطة (-20)</option>
-                </select>
+                />
+                <p className="hint mt-1">اكتب رقماً موجباً لإضافة نقاط، أو رقماً سالباً لخصم نقاط.</p>
               </div>
 
               {/* Category */}
