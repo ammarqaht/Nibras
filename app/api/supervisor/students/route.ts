@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { getStudents, updateStudent, getSupervisorByEmail } from '@/lib/services';
+import { getStudents, updateStudent, getSupervisorByEmail, createStudentManually, deleteStudent } from '@/lib/services';
 
 export async function GET(req: NextRequest) {
   try {
@@ -126,5 +126,86 @@ export async function PUT(req: NextRequest) {
   } catch (error) {
     console.error('students PUT error', error);
     return NextResponse.json({ error: 'حدث خطأ أثناء تعديل البيانات' }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const session = getSession(req);
+    if (!session) {
+      return NextResponse.json({ error: 'غير مصرح بالدخول' }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const studentName = String(body.studentName ?? '').trim();
+    const nationalId = String(body.nationalId ?? '').trim();
+    const guardianPhone = String(body.guardianPhone ?? '').trim();
+    const studentPhone = body.studentPhone ? String(body.studentPhone).trim() : null;
+    const stage = String(body.stage ?? '').trim();
+    const grade = String(body.grade ?? '').trim();
+    const neighborhood = String(body.neighborhood ?? '').trim();
+    const mapLink = body.mapLink ? String(body.mapLink).trim() : null;
+    const hasCondition = body.hasCondition === true;
+    const conditionNote = body.conditionNote ? String(body.conditionNote).trim() : null;
+    const paymentStatus = body.paymentStatus || 'unpaid';
+    const registrationStatus = body.registrationStatus || 'approved';
+    const groupId = body.groupId ? parseInt(body.groupId, 10) : null;
+
+    if (!studentName || !nationalId || !guardianPhone || !stage || !grade || !neighborhood) {
+      return NextResponse.json({ error: 'يرجى إكمال جميع الحقول الإلزامية' }, { status: 400 });
+    }
+
+    const created = await createStudentManually({
+      studentName,
+      nationalId,
+      guardianPhone,
+      studentPhone,
+      stage,
+      grade,
+      neighborhood,
+      mapLink,
+      hasCondition,
+      conditionNote,
+      paymentStatus,
+      registrationStatus,
+      groupId,
+      locationLat: null,
+      locationLng: null
+    });
+
+    return NextResponse.json({ success: true, student: created });
+  } catch (error) {
+    console.error('students POST error', error);
+    return NextResponse.json({ error: 'حدث خطأ أثناء إضافة الطالب' }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const session = getSession(req);
+    if (!session) {
+      return NextResponse.json({ error: 'غير مصرح بالدخول' }, { status: 401 });
+    }
+
+    const supervisor = await getSupervisorByEmail(session.email);
+    if (!supervisor || supervisor.role !== 'admin') {
+      return NextResponse.json({ error: 'غير مصرح لك بحذف الطلاب' }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const id = parseInt(searchParams.get('id') || '', 10);
+    if (isNaN(id)) {
+      return NextResponse.json({ error: 'معرّف الطالب غير صحيح' }, { status: 400 });
+    }
+
+    const success = await deleteStudent(id);
+    if (!success) {
+      return NextResponse.json({ error: 'الطالب غير موجود' }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('students DELETE error', error);
+    return NextResponse.json({ error: 'حدث خطأ أثناء حذف الطالب' }, { status: 500 });
   }
 }

@@ -180,13 +180,27 @@ export default async function LandingPage() {
                   </div>
                 </div>
                 <div className="h-56 md:h-auto border-t md:border-t-0 md:border-r border-ink-200">
-                  <iframe
-                    title={loc.label}
-                    src={loc.embedSrc}
-                    className="w-full h-full min-h-[14rem] block pointer-events-none"
-                    loading="lazy"
-                    referrerPolicy="no-referrer-when-downgrade"
-                  />
+                  {loc.embedSrc ? (
+                    <iframe
+                      title={loc.label}
+                      src={loc.embedSrc}
+                      className="w-full h-full min-h-[14rem] block pointer-events-none"
+                      loading="lazy"
+                      referrerPolicy="no-referrer-when-downgrade"
+                    />
+                  ) : (
+                    <div className="w-full h-full min-h-[14rem] bg-cream-50 flex flex-col items-center justify-center p-6 text-center group-hover:bg-cream-100/50 transition-colors duration-200">
+                      <span className="w-12 h-12 rounded-full bg-orange-50 text-orange-600 flex items-center justify-center text-2xl mb-3">
+                        📍
+                      </span>
+                      <span className="font-display text-lg text-ink-800 font-semibold mb-1">
+                        اضغط لفتح موقع النادي
+                      </span>
+                      <span className="text-xs text-ink-400">
+                        انقر للانتقال مباشرة إلى خرائط Google Maps
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </a>

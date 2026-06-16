@@ -616,13 +616,22 @@ export async function getMergedSettings() {
       ...origClubDetails.location,
       value: custom.clubLocationValue || origClubDetails.location.value,
       note: custom.clubLocationNote || origClubDetails.location.note,
-      lat: custom.clubLocationLat ? parseFloat(custom.clubLocationLat) : origClubDetails.location.lat,
-      lng: custom.clubLocationLng ? parseFloat(custom.clubLocationLng) : origClubDetails.location.lng,
+      mapLinkSetting: custom.clubLocationMapLink || '',
       get mapsLink(): string {
-        return `https://www.google.com/maps?q=${this.lat},${this.lng}`;
+        return this.mapLinkSetting || `https://www.google.com/maps?q=${origClubDetails.location.lat},${origClubDetails.location.lng}`;
       },
       get embedSrc(): string {
-        return `https://maps.google.com/maps?q=${this.lat},${this.lng}&z=15&output=embed`;
+        const url = this.mapsLink;
+        // Try to extract coordinates from standard google maps URL formats
+        const coordRegex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
+        const queryRegex = /[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/;
+        const match = url.match(coordRegex) || url.match(queryRegex);
+        if (match) {
+          const lat = parseFloat(match[1]);
+          const lng = parseFloat(match[2]);
+          return `https://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed`;
+        }
+        return '';
       }
     }
   };
@@ -637,4 +646,51 @@ export async function getMergedSettings() {
   };
 
   return { site, landing, clubDetails, footer };
+}
+
+export async function deleteStudent(id: number): Promise<boolean> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    try {
+      await prisma.registration.delete({ where: { id } });
+      return true;
+    } catch {
+      return false;
+    }
+  } else {
+    const list = await getStudents();
+    const index = list.findIndex(s => s.id === id);
+    if (index === -1) return false;
+    list.splice(index, 1);
+    await writeJsonFile(FILE_REGISTRATIONS, list);
+    return true;
+  }
+}
+
+export async function createStudentManually(data: Omit<StudentInfo, 'id' | 'membershipNo' | 'createdAt'>): Promise<StudentInfo> {
+  const { createRegistration } = await import('./membership');
+  const result = await createRegistration({
+    studentName: data.studentName,
+    nationalId: data.nationalId,
+    guardianPhone: data.guardianPhone,
+    studentPhone: data.studentPhone,
+    stage: data.stage,
+    grade: data.grade,
+    neighborhood: data.neighborhood,
+    mapLink: data.mapLink,
+    hasCondition: data.hasCondition,
+    conditionNote: data.conditionNote
+  });
+
+  const students = await getStudents();
+  const student = students.find(s => s.membershipNo === result.membershipNo);
+  if (!student) throw new Error('Student creation failed');
+
+  const updated = await updateStudent(student.id, {
+    paymentStatus: data.paymentStatus,
+    registrationStatus: data.registrationStatus,
+    groupId: data.groupId
+  });
+
+  return updated!;
 }

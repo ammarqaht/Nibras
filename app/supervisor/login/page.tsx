@@ -37,7 +37,7 @@ export default function SupervisorLoginPage() {
   };
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-cream-50 px-6 py-12 relative overflow-hidden">
+    <main className="supervisor-body min-h-screen flex items-center justify-center bg-cream-50 px-6 py-12 relative overflow-hidden">
       {/* Background gradients matching Nibras visual identity */}
       <div
         aria-hidden
@@ -50,9 +50,11 @@ export default function SupervisorLoginPage() {
 
       <div className="relative w-full max-w-md card p-8 sm:p-10 bg-white">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-brand text-white mb-4 shadow-brand font-display text-2xl">
-            ن
-          </div>
+          <img
+            src="/logos/nibras-icon.png"
+            alt="شعار النادي"
+            className="w-16 h-16 object-contain mx-auto mb-4"
+          />
           <h1 className="font-display text-3xl text-ink-900">بوابة المشرفين</h1>
           <p className="text-sm text-ink-500 mt-2">نادي نبراس الصيفي — لوحة الإدارة والتحضير</p>
         </div>

@@ -164,14 +164,27 @@ export default function AttendancePage() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 relative">
       {/* Page Header */}
       <div>
         <h1 className="font-display text-4xl text-ink-900">التحضير اليومي</h1>
         <p className="text-ink-500 mt-2">تحضير الطلاب وتتبع حضورهم اليومي للمجموعات باستخدام مسح الـ QR أو الإدخال اليدوي.</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Blur Overlay with "Coming Soon" */}
+      <div className="absolute inset-x-0 bottom-0 top-[88px] bg-cream-50/40 backdrop-blur-[6px] z-10 flex items-center justify-center rounded-3xl min-h-[400px]">
+        <div className="card p-8 sm:p-10 max-w-md text-center bg-white border border-ink-200 shadow-xl pop-in m-6">
+          <div className="w-16 h-16 rounded-full bg-orange-50 text-orange-600 flex items-center justify-center text-3xl mx-auto mb-4">
+            🔒
+          </div>
+          <h2 className="font-display text-2xl text-ink-900 mb-2">قريباً</h2>
+          <p className="text-sm text-ink-500 leading-relaxed">
+            ميزة التحضير اليومي ومسح الـ QR والإدخال السريع قيد التطوير وستكون متاحة للمشرفين قريباً.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 select-none pointer-events-none opacity-50">
         {/* Main Attendance Logging */}
         <div className="lg:col-span-2 space-y-6">
           {/* Controls Card */}

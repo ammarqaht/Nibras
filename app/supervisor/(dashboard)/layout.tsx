@@ -31,15 +31,17 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   return (
-    <div className="min-h-screen bg-cream-50 flex flex-col md:flex-row-reverse" dir="rtl">
+    <div className="supervisor-body min-h-screen bg-cream-50 flex flex-col md:flex-row-reverse" dir="rtl">
       {/* Sidebar Nav */}
       <aside className="w-full md:w-64 bg-white border-l border-ink-200/60 flex flex-col shrink-0">
         {/* Sidebar Header */}
         <div className="p-6 border-b border-ink-200/60 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-brand text-white flex items-center justify-center font-display text-lg">
-              ن
-            </div>
+            <img
+              src="/logos/nibras-icon.png"
+              alt="شعار النادي"
+              className="w-10 h-10 object-contain"
+            />
             <div>
               <div className="font-display text-lg text-ink-900 leading-tight">لوحة نبراس</div>
               <div className="text-xs text-ink-400 mt-0.5">مشرفي النادي الصيفي</div>

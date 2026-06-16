@@ -47,6 +47,7 @@ export default function StudentsPage() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Editable fields in modal
   const [editName, setEditName] = useState('');
@@ -62,6 +63,157 @@ export default function StudentsPage() {
   const [editPaymentStatus, setEditPaymentStatus] = useState('unpaid');
   const [editRegistrationStatus, setEditRegistrationStatus] = useState('pending');
   const [editGroupId, setEditGroupId] = useState<string>('');
+
+  // Add manual student states
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addName, setAddName] = useState('');
+  const [addNationalId, setAddNationalId] = useState('');
+  const [addGuardianPhone, setAddGuardianPhone] = useState('');
+  const [addStudentPhone, setAddStudentPhone] = useState('');
+  const [addStage, setAddStage] = useState('ابتدائي');
+  const [addGrade, setAddGrade] = useState('');
+  const [addNeighborhood, setAddNeighborhood] = useState('');
+  const [addMapLink, setAddMapLink] = useState('');
+  const [addHasCondition, setAddHasCondition] = useState(false);
+  const [addConditionNote, setAddConditionNote] = useState('');
+  const [addPaymentStatus, setAddPaymentStatus] = useState('unpaid');
+  const [addRegistrationStatus, setAddRegistrationStatus] = useState('approved');
+  const [addGroupId, setAddGroupId] = useState('');
+  const [adding, setAdding] = useState(false);
+
+  const handleDeleteStudent = async () => {
+    if (!selectedStudent) return;
+    if (!confirm(`هل أنت متأكد من حذف الطالب ${selectedStudent.studentName} نهائياً؟ لا يمكن التراجع عن هذا الإجراء.`)) return;
+    
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/supervisor/students?id=${selectedStudent.id}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setStudents(prev => prev.filter(item => item.id !== selectedStudent.id));
+        setSelectedStudent(null);
+      } else {
+        alert(data.error || 'فشل حذف الطالب');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ في الشبكة');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleCopyWhatsapp = () => {
+    if (!selectedStudent) return;
+    const groupName = groups.find(g => g.id === selectedStudent.groupId)?.name || 'غير مصنف';
+    const text = `*بيانات تسجيل الطالب في نادي نبراس:*
+اسم الطالب: ${selectedStudent.studentName}
+رقم العضوية: #${selectedStudent.membershipNo}
+المرحلة/الصف: ${selectedStudent.stage} — ${selectedStudent.grade}
+الحي السكني: ${selectedStudent.neighborhood}
+جوال ولي الأمر: ${selectedStudent.guardianPhone}
+جوال الطالب: ${selectedStudent.studentPhone || 'لا يوجد'}
+حالة التسجيل: ${selectedStudent.registrationStatus === 'approved' ? 'مقبول' : selectedStudent.registrationStatus === 'rejected' ? 'مرفوض' : 'قيد الانتظار'}
+حالة الدفع: ${selectedStudent.paymentStatus === 'paid' ? 'مدفوع' : 'لم يدفع'}
+رابط الموقع: ${selectedStudent.mapLink || (selectedStudent.locationLat && selectedStudent.locationLng ? `https://www.google.com/maps?q=${selectedStudent.locationLat},${selectedStudent.locationLng}` : 'غير متوفر')}`;
+
+    navigator.clipboard.writeText(text);
+    alert('تم نسخ البيانات المنسقة للواتساب بنجاح! ✅');
+  };
+
+  const handleExportCSV = () => {
+    if (students.length === 0) return;
+    
+    const headers = ['العضوية', 'اسم الطالب', 'الهوية', 'جوال ولي الأمر', 'جوال الطالب', 'المرحلة', 'الصف', 'الحي', 'المجموعة', 'حالة التسجيل', 'حالة الدفع', 'رابط الموقع'];
+    
+    const rows = students.map(s => {
+      const groupName = groups.find(g => g.id === s.groupId)?.name || 'غير مصنف';
+      const mapLinkStr = s.mapLink || (s.locationLat && s.locationLng ? `https://www.google.com/maps?q=${s.locationLat},${s.locationLng}` : '');
+      return [
+        s.membershipNo,
+        s.studentName,
+        s.nationalId,
+        s.guardianPhone,
+        s.studentPhone || '',
+        s.stage,
+        s.grade,
+        s.neighborhood,
+        groupName,
+        s.registrationStatus === 'approved' ? 'مقبول' : s.registrationStatus === 'rejected' ? 'مرفوض' : 'انتظار',
+        s.paymentStatus === 'paid' ? 'مدفوع' : 'لم يدفع',
+        mapLinkStr
+      ];
+    });
+    
+    const csvContent = "\uFEFF" + [headers.join(','), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `nibras_students_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleAddStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addName || !addNationalId || !addGuardianPhone || !addStage || !addGrade || !addNeighborhood) {
+      alert('يرجى إكمال جميع الحقول الإلزامية');
+      return;
+    }
+    setAdding(true);
+    try {
+      const res = await fetch('/api/supervisor/students', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentName: addName,
+          nationalId: addNationalId,
+          guardianPhone: addGuardianPhone,
+          studentPhone: addStudentPhone || null,
+          stage: addStage,
+          grade: addGrade,
+          neighborhood: addNeighborhood,
+          mapLink: addMapLink || null,
+          hasCondition: addHasCondition,
+          conditionNote: addHasCondition ? addConditionNote : null,
+          paymentStatus: addPaymentStatus,
+          registrationStatus: addRegistrationStatus,
+          groupId: addGroupId || null
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setStudents(prev => [data.student, ...prev]);
+        setShowAddModal(false);
+        // Reset states
+        setAddName('');
+        setAddNationalId('');
+        setAddGuardianPhone('');
+        setAddStudentPhone('');
+        setAddStage('ابتدائي');
+        setAddGrade('');
+        setAddNeighborhood('');
+        setAddMapLink('');
+        setAddHasCondition(false);
+        setAddConditionNote('');
+        setAddPaymentStatus('unpaid');
+        setAddRegistrationStatus('approved');
+        setAddGroupId('');
+      } else {
+        alert(data.error || 'فشل إضافة الطالب');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ في الشبكة');
+    } finally {
+      setAdding(false);
+    }
+  };
 
   const fetchStudents = useCallback(async () => {
     setLoading(true);
@@ -176,6 +328,20 @@ export default function StudentsPage() {
         <div>
           <h1 className="font-display text-4xl text-ink-900">إدارة الطلاب</h1>
           <p className="text-ink-500 mt-2">عرض بيانات الطلاب المسجلين، تعديل حالاتهم، وتوزيعهم على المجموعات.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <button 
+            onClick={handleExportCSV}
+            className="btn btn-secondary flex items-center gap-2"
+          >
+            📥 تصدير البيانات (CSV)
+          </button>
+          <button 
+            onClick={() => setShowAddModal(true)}
+            className="btn btn-primary flex items-center gap-2"
+          >
+            ➕ إضافة طالب جديد
+          </button>
         </div>
       </div>
 
@@ -616,9 +782,9 @@ export default function StudentsPage() {
             )}
 
             {/* Modal Actions Footer */}
-            <div className="mt-8 pt-4 border-t border-ink-100 flex items-center justify-end gap-3">
+            <div className="mt-8 pt-4 border-t border-ink-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               {editMode ? (
-                <>
+                <div className="flex items-center justify-end gap-3 w-full">
                   <button 
                     onClick={() => setEditMode(false)}
                     className="btn btn-secondary"
@@ -633,25 +799,252 @@ export default function StudentsPage() {
                   >
                     {saving ? 'جاري الحفظ…' : 'حفظ التعديلات'}
                   </button>
-                </>
+                </div>
               ) : (
                 <>
-                  <button 
-                    onClick={() => setSelectedStudent(null)}
-                    className="btn btn-secondary"
-                  >
-                    إغلاق
-                  </button>
-                  <button 
-                    onClick={() => setEditMode(true)}
-                    className="btn btn-primary"
-                  >
-                    تعديل البيانات
-                  </button>
+                  <div>
+                    <button 
+                      onClick={handleDeleteStudent}
+                      className="btn btn-danger flex items-center gap-2"
+                      disabled={deleting}
+                    >
+                      🗑️ {deleting ? 'جاري الحذف...' : 'حذف الطالب'}
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button 
+                      onClick={handleCopyWhatsapp}
+                      className="btn btn-secondary flex items-center gap-2"
+                      title="نسخ معلومات التسجيل منسقة للواتساب"
+                    >
+                      📋 نسخ للواتساب
+                    </button>
+                    <button 
+                      onClick={() => setSelectedStudent(null)}
+                      className="btn btn-secondary"
+                    >
+                      إغلاق
+                    </button>
+                    <button 
+                      onClick={() => setEditMode(true)}
+                      className="btn btn-primary"
+                    >
+                      تعديل البيانات
+                    </button>
+                  </div>
                 </>
               )}
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Add Student Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-950/40 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
+          <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto card shadow-xl p-6 sm:p-8 relative">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between border-b border-ink-100 pb-4 mb-6">
+              <div>
+                <h2 className="font-display text-2xl text-ink-900">إضافة طالب جديد يدوياً</h2>
+                <p className="text-xs text-ink-400 mt-1">تعبئة بيانات الطالب ومستوى قبوله ونظام دفعه.</p>
+              </div>
+              <button 
+                onClick={() => setShowAddModal(false)}
+                className="w-8 h-8 rounded-full bg-cream-50 hover:bg-cream-100 text-ink-600 flex items-center justify-center transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleAddStudent} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="label mb-1 block">الاسم الرباعي <span className="req">*</span></label>
+                  <input 
+                    type="text" 
+                    required
+                    value={addName}
+                    onChange={e => setAddName(e.target.value)}
+                    className="input w-full"
+                    placeholder="محمد بن عبدالله بن علي العتيبي"
+                  />
+                </div>
+                <div>
+                  <label className="label mb-1 block">رقم الهوية الوطنية / الإقامة <span className="req">*</span></label>
+                  <input 
+                    type="text" 
+                    required
+                    value={addNationalId}
+                    onChange={e => setAddNationalId(e.target.value)}
+                    className="input w-full ltr text-left"
+                    placeholder="1023456789"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="label mb-1 block">جوال ولي الأمر <span className="req">*</span></label>
+                  <input 
+                    type="text" 
+                    required
+                    value={addGuardianPhone}
+                    onChange={e => setAddGuardianPhone(e.target.value)}
+                    className="input w-full ltr text-left"
+                    placeholder="0500000000"
+                  />
+                </div>
+                <div>
+                  <label className="label mb-1 block">جوال الطالب (اختياري)</label>
+                  <input 
+                    type="text" 
+                    value={addStudentPhone}
+                    onChange={e => setAddStudentPhone(e.target.value)}
+                    className="input w-full ltr text-left"
+                    placeholder="0500000000"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="label mb-1 block">المرحلة الدراسية <span className="req">*</span></label>
+                  <select 
+                    value={addStage}
+                    onChange={e => {
+                      setAddStage(e.target.value);
+                      setAddGrade('');
+                    }}
+                    className="input w-full"
+                  >
+                    {stages.map(s => (
+                      <option key={s.key} value={s.key}>{s.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label mb-1 block">الصف الدراسي <span className="req">*</span></label>
+                  <select 
+                    value={addGrade}
+                    onChange={e => setAddGrade(e.target.value)}
+                    required
+                    className="input w-full"
+                  >
+                    <option value="">اختر الصف</option>
+                    {(stages.find(s => s.key === addStage)?.grades || []).map(g => (
+                      <option key={g} value={g}>{g}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label mb-1 block">الحي السكني <span className="req">*</span></label>
+                  <input 
+                    type="text" 
+                    required
+                    value={addNeighborhood}
+                    onChange={e => setAddNeighborhood(e.target.value)}
+                    className="input w-full"
+                    placeholder="مثال: الياسمين"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <label className="label mb-1 block">رابط خرائط قوقل ماب لموقع المنزل</label>
+                  <input 
+                    type="text" 
+                    value={addMapLink}
+                    onChange={e => setAddMapLink(e.target.value)}
+                    className="input w-full ltr text-left font-mono text-xs"
+                    placeholder="https://maps.app.goo.gl/..."
+                  />
+                </div>
+              </div>
+
+              {/* Health condition toggle */}
+              <div className="p-4 rounded-2xl bg-cream-50/50 border border-ink-200/50 space-y-3">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input 
+                    type="checkbox"
+                    checked={addHasCondition}
+                    onChange={e => setAddHasCondition(e.target.checked)}
+                    className="rounded text-brand w-5 h-5 focus:ring-brand"
+                  />
+                  <span className="font-semibold text-sm text-ink-900">هل يعاني الطالب من حالة صحية أو حساسية؟</span>
+                </label>
+                {addHasCondition && (
+                  <textarea 
+                    placeholder="اكتب تفاصيل الحالة الصحية أو الحساسية هنا بالتفصيل لضمان سلامته..."
+                    value={addConditionNote}
+                    onChange={e => setAddConditionNote(e.target.value)}
+                    className="input w-full h-20 resize-none"
+                    required
+                  />
+                )}
+              </div>
+
+              {/* Administrative options */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-ink-100">
+                <div>
+                  <label className="label mb-1 block">المجموعة</label>
+                  <select 
+                    value={addGroupId}
+                    onChange={e => setAddGroupId(e.target.value)}
+                    className="input w-full"
+                  >
+                    <option value="">غير مصنف</option>
+                    {groups.map(g => (
+                      <option key={g.id} value={g.id}>{g.name} ({g.stage})</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label mb-1 block">حالة التسجيل</label>
+                  <select 
+                    value={addRegistrationStatus}
+                    onChange={e => setAddRegistrationStatus(e.target.value)}
+                    className="input w-full"
+                  >
+                    <option value="approved">مقبول</option>
+                    <option value="pending">قيد الانتظار</option>
+                    <option value="rejected">مرفوض</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="label mb-1 block">حالة الدفع</label>
+                  <select 
+                    value={addPaymentStatus}
+                    onChange={e => setAddPaymentStatus(e.target.value)}
+                    className="input w-full"
+                  >
+                    <option value="unpaid">لم يدفع</option>
+                    <option value="paid">مدفوع</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="mt-8 pt-4 border-t border-ink-100 flex items-center justify-end gap-3">
+                <button 
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="btn btn-secondary"
+                  disabled={adding}
+                >
+                  إلغاء
+                </button>
+                <button 
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={adding}
+                >
+                  {adding ? 'جاري الإضافة...' : '➕ إضافة الطالب'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

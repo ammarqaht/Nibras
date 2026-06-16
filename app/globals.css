@@ -106,7 +106,8 @@ body::after {
 }
 
 /* Field styles */
-.field {
+.field,
+.input {
   width: 100%;
   background: #fff;
   border: 1px solid var(--line);
@@ -116,10 +117,14 @@ body::after {
   color: var(--ink);
   transition: border-color 200ms ease, box-shadow 200ms ease;
 }
-.field:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px rgba(245,166,35,0.12); }
-.field::placeholder { color: #B5B0A7; }
-.field[dir="ltr"] { direction: ltr; text-align: left; }
-.field.invalid { border-color: var(--red); box-shadow: 0 0 0 4px rgba(251,59,30,0.10); }
+.field:focus,
+.input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px rgba(245,166,35,0.12); }
+.field::placeholder,
+.input::placeholder { color: #B5B0A7; }
+.field[dir="ltr"],
+.input[dir="ltr"] { direction: ltr; text-align: left; }
+.field.invalid,
+.input.invalid { border-color: var(--red); box-shadow: 0 0 0 4px rgba(251,59,30,0.10); }
 
 .label {
   display: block;
@@ -240,3 +245,15 @@ body::after {
 .scroll-soft::-webkit-scrollbar { width: 8px; height: 8px; }
 .scroll-soft::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
 .scroll-soft::-webkit-scrollbar-track { background: transparent; }
+
+/* Clean font override for supervisor dashboard pages */
+.supervisor-body,
+.supervisor-body h1,
+.supervisor-body h2,
+.supervisor-body h3,
+.supervisor-body h4,
+.supervisor-body h5,
+.supervisor-body h6,
+.supervisor-body .font-display {
+  font-family: var(--font-body) !important;
+}

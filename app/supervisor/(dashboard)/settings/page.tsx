@@ -20,8 +20,7 @@ export default function SettingsPage() {
   const [clubFeesValue, setClubFeesValue] = useState('');
   const [clubLocationValue, setClubLocationValue] = useState('');
   const [clubLocationNote, setClubLocationNote] = useState('');
-  const [clubLocationLat, setClubLocationLat] = useState('');
-  const [clubLocationLng, setClubLocationLng] = useState('');
+  const [clubLocationMapLink, setClubLocationMapLink] = useState('');
   const [socialWhatsapp, setSocialWhatsapp] = useState('');
   const [socialSnapchat, setSocialSnapchat] = useState('');
   const [socialYoutube, setSocialYoutube] = useState('');
@@ -47,8 +46,7 @@ export default function SettingsPage() {
         setClubFeesValue(s.clubFeesValue || '300 ريال');
         setClubLocationValue(s.clubLocationValue || 'مقر نادي نبراس');
         setClubLocationNote(s.clubLocationNote || 'اضغط لفتح الخريطة');
-        setClubLocationLat(s.clubLocationLat || '24.7136');
-        setClubLocationLng(s.clubLocationLng || '46.6753');
+        setClubLocationMapLink(s.clubLocationMapLink || '');
         setSocialWhatsapp(s.social_whatsapp || 'https://wa.me/000000000000');
         setSocialSnapchat(s.social_snapchat || 'https://www.snapchat.com/add/nibras');
         setSocialYoutube(s.social_youtube || 'https://www.youtube.com/@nibras');
@@ -364,45 +362,24 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 border-t border-ink-100 pt-5 mt-5">
-            {/* Latitude */}
+          <div className="grid grid-cols-1 gap-5 border-t border-ink-100 pt-5 mt-5">
+            {/* Google Maps Link */}
             <div>
-              <label className="label mb-1.5 block">خط العرض للموقع (Latitude)</label>
+              <label className="label mb-1.5 block">رابط موقع قوقل ماب (Google Maps Link)</label>
               <div className="flex gap-2">
                 <input
                   type="text"
-                  value={clubLocationLat}
-                  onChange={e => setClubLocationLat(e.target.value)}
-                  className="input flex-1 ltr text-left font-mono"
-                  placeholder="مثال: 24.7136"
+                  value={clubLocationMapLink}
+                  onChange={e => setClubLocationMapLink(e.target.value)}
+                  className="input flex-1 ltr text-left"
+                  placeholder="مثال: https://maps.app.goo.gl/... أو https://google.com/maps?..."
                 />
                 <button
-                  onClick={() => handleSaveSetting('clubLocationLat', clubLocationLat)}
-                  disabled={savingKey === 'clubLocationLat'}
+                  onClick={() => handleSaveSetting('clubLocationMapLink', clubLocationMapLink)}
+                  disabled={savingKey === 'clubLocationMapLink'}
                   className="btn btn-primary btn-sm shrink-0"
                 >
-                  {savingKey === 'clubLocationLat' ? '...' : 'حفظ'}
-                </button>
-              </div>
-            </div>
-
-            {/* Longitude */}
-            <div>
-              <label className="label mb-1.5 block">خط الطول للموقع (Longitude)</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={clubLocationLng}
-                  onChange={e => setClubLocationLng(e.target.value)}
-                  className="input flex-1 ltr text-left font-mono"
-                  placeholder="مثال: 46.6753"
-                />
-                <button
-                  onClick={() => handleSaveSetting('clubLocationLng', clubLocationLng)}
-                  disabled={savingKey === 'clubLocationLng'}
-                  className="btn btn-primary btn-sm shrink-0"
-                >
-                  {savingKey === 'clubLocationLng' ? '...' : 'حفظ'}
+                  {savingKey === 'clubLocationMapLink' ? '...' : 'حفظ'}
                 </button>
               </div>
             </div>
