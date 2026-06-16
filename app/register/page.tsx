@@ -17,7 +17,36 @@ export default function RegisterPage() {
 
   useEffect(() => {
     // Force browser scroll to top on mount / refresh
-    window.scrollTo(0, 0);
+    let originalScrollRestoration: string | undefined;
+    if (typeof window !== 'undefined' && window.history && 'scrollRestoration' in window.history) {
+      originalScrollRestoration = window.history.scrollRestoration;
+      window.history.scrollRestoration = 'manual';
+    }
+
+    const forceScroll = () => {
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    };
+
+    forceScroll();
+
+    // Multiple attempts to override Next.js scroll restoration and layout shifts
+    const timers = [
+      setTimeout(forceScroll, 10),
+      setTimeout(forceScroll, 50),
+      setTimeout(forceScroll, 100),
+      setTimeout(forceScroll, 200),
+      setTimeout(forceScroll, 400),
+      setTimeout(forceScroll, 800)
+    ];
+
+    return () => {
+      if (typeof window !== 'undefined' && window.history && 'scrollRestoration' in window.history && originalScrollRestoration) {
+        window.history.scrollRestoration = originalScrollRestoration as any;
+      }
+      timers.forEach(clearTimeout);
+    };
   }, []);
 
   const [studentName, setStudentName] = useState('');
