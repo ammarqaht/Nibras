@@ -15,6 +15,7 @@ type Student = {
   neighborhood: string;
   locationLat: number | null;
   locationLng: number | null;
+  mapLink: string | null;
   hasCondition: boolean;
   conditionNote: string | null;
   createdAt: string;
@@ -55,6 +56,7 @@ export default function StudentsPage() {
   const [editStage, setEditStage] = useState('');
   const [editGrade, setEditGrade] = useState('');
   const [editNeighborhood, setEditNeighborhood] = useState('');
+  const [editMapLink, setEditMapLink] = useState('');
   const [editHasCondition, setEditHasCondition] = useState(false);
   const [editConditionNote, setEditConditionNote] = useState('');
   const [editPaymentStatus, setEditPaymentStatus] = useState('unpaid');
@@ -116,6 +118,7 @@ export default function StudentsPage() {
     setEditStage(s.stage);
     setEditGrade(s.grade);
     setEditNeighborhood(s.neighborhood);
+    setEditMapLink(s.mapLink || '');
     setEditHasCondition(s.hasCondition);
     setEditConditionNote(s.conditionNote || '');
     setEditPaymentStatus(s.paymentStatus);
@@ -139,6 +142,7 @@ export default function StudentsPage() {
           stage: editStage,
           grade: editGrade,
           neighborhood: editNeighborhood,
+          mapLink: editMapLink || null,
           hasCondition: editHasCondition,
           conditionNote: editHasCondition ? editConditionNote : null,
           paymentStatus: editPaymentStatus,
@@ -471,6 +475,19 @@ export default function StudentsPage() {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <label className="label mb-1 block">رابط خرائط قوقل ماب (إذا لم يتوفر إحداثيات)</label>
+                    <input 
+                      type="text" 
+                      value={editMapLink}
+                      onChange={e => setEditMapLink(e.target.value)}
+                      className="input w-full ltr text-left font-mono text-xs"
+                      placeholder="مثال: https://maps.google.com/..."
+                    />
+                  </div>
+                </div>
+
                 {/* Health condition toggle */}
                 <div className="p-4 rounded-2xl bg-cream-50/50 border border-ink-200/50 space-y-3">
                   <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -572,16 +589,20 @@ export default function StudentsPage() {
                   </div>
                 </div>
 
-                {/* Map Coordinates block */}
-                {selectedStudent.locationLat && selectedStudent.locationLng && (
+                {/* Map Coordinates or Google Maps Link block */}
+                {(selectedStudent.locationLat && selectedStudent.locationLng) || selectedStudent.mapLink ? (
                   <div className="p-4 rounded-2xl border border-ink-200/60 bg-cream-50/50">
                     <span className="text-ink-400 text-xs block mb-1.5">الموقع الجغرافي المسجل:</span>
                     <div className="flex items-center justify-between gap-3 text-sm">
                       <span className="font-semibold text-ink-800">
-                        إحداثيات: {selectedStudent.locationLat.toFixed(5)}, {selectedStudent.locationLng.toFixed(5)}
+                        {selectedStudent.locationLat && selectedStudent.locationLng ? (
+                          <>إحداثيات: {selectedStudent.locationLat.toFixed(5)}, {selectedStudent.locationLng.toFixed(5)}</>
+                        ) : (
+                          <>رابط خرائط قوقل ماب المسجل</>
+                        )}
                       </span>
                       <a 
-                        href={`https://www.google.com/maps?q=${selectedStudent.locationLat},${selectedStudent.locationLng}`}
+                        href={selectedStudent.mapLink || `https://www.google.com/maps?q=${selectedStudent.locationLat},${selectedStudent.locationLng}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="btn btn-secondary btn-sm"
@@ -590,7 +611,7 @@ export default function StudentsPage() {
                       </a>
                     </div>
                   </div>
-                )}
+                ) : null}
               </div>
             )}
 

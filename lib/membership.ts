@@ -13,6 +13,7 @@ export type RegistrationInput = {
   neighborhood: string;
   locationLat?: number | null;
   locationLng?: number | null;
+  mapLink?: string | null;
   hasCondition: boolean;
   conditionNote?: string | null;
 };

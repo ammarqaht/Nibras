@@ -114,6 +114,7 @@ export async function PUT(req: NextRequest) {
       neighborhood: body.neighborhood,
       locationLat: body.locationLat,
       locationLng: body.locationLng,
+      mapLink: body.mapLink,
       hasCondition: body.hasCondition,
       conditionNote: body.conditionNote,
       paymentStatus: body.paymentStatus,

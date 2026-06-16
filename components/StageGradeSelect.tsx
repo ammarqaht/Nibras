@@ -24,36 +24,21 @@ export default function StageGradeSelect({
 
   return (
     <div>
-      {/* Stage chips — collapse to just the selected one once chosen */}
+      {/* Stage chips — keep all options visible all the time */}
       <div className="flex flex-wrap gap-2.5">
-        {stages
-          .filter((s) => !stage || s.key === stage)
-          .map((s) => (
-            <button
-              key={s.key}
-              type="button"
-              className={`choice ${stage === s.key ? 'is-active' : ''}`}
-              onClick={() => {
-                onStageChange(s.key);
-                onGradeChange('');
-              }}
-            >
-              {s.label}
-            </button>
-          ))}
-
-        {stage && (
+        {stages.map((s) => (
           <button
+            key={s.key}
             type="button"
-            className="btn btn-ghost text-sm"
+            className={`choice ${stage === s.key ? 'is-active' : ''}`}
             onClick={() => {
-              onStageChange('');
+              onStageChange(s.key);
               onGradeChange('');
             }}
           >
-            تغيير المرحلة
+            {s.label}
           </button>
-        )}
+        ))}
       </div>
 
       {/* Grade options for the chosen stage */}

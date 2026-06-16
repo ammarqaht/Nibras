@@ -20,6 +20,7 @@ model Registration {
   neighborhood       String
   locationLat        Float?
   locationLng        Float?
+  mapLink            String?
   hasCondition       Boolean  @default(false)
   conditionNote      String?
   createdAt          DateTime @default(now())

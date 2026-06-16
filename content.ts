@@ -83,7 +83,7 @@ export const form = {
   subtitle: 'املأ البيانات التالية لإتمام تسجيل الطالب.',
 
   labels: {
-    studentName: 'اسم الطالب الرباعي',
+    studentName: 'اكتب اسمك الرباعي',
     nationalId: 'رقم الهوية',
     guardianPhone: 'رقم جوال ولي الأمر',
     studentPhone: 'رقم جوال الطالب',
@@ -98,8 +98,8 @@ export const form = {
   },
 
   placeholders: {
-    studentName: 'الاسم الأول، اسم الأب، اسم الجد، اسم العائلة',
-    nationalId: 'مثال: 1xxxxxxxxx',
+    studentName: 'اكتب اسمك الرباعي هنا',
+    nationalId: 'مثال: 1000000000',
     guardianPhone: '05xxxxxxxx',
     studentPhone: '05xxxxxxxx',
     neighborhood: 'اسم الحي',

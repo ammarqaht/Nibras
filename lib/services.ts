@@ -25,6 +25,7 @@ export type StudentInfo = {
   neighborhood: string;
   locationLat: number | null;
   locationLng: number | null;
+  mapLink: string | null;
   hasCondition: boolean;
   conditionNote: string | null;
   createdAt: string;
@@ -234,6 +235,7 @@ export async function getStudents(): Promise<StudentInfo[]> {
       neighborhood: r.neighborhood,
       locationLat: r.locationLat,
       locationLng: r.locationLng,
+      mapLink: r.mapLink,
       hasCondition: r.hasCondition,
       conditionNote: r.conditionNote,
       createdAt: r.createdAt.toISOString(),
@@ -255,6 +257,7 @@ export async function getStudents(): Promise<StudentInfo[]> {
       neighborhood: r.neighborhood,
       locationLat: r.locationLat ?? null,
       locationLng: r.locationLng ?? null,
+      mapLink: r.mapLink || null,
       hasCondition: !!r.hasCondition,
       conditionNote: r.conditionNote || null,
       createdAt: r.createdAt || new Date().toISOString(),
@@ -280,6 +283,7 @@ export async function updateStudent(id: number, data: Partial<Omit<StudentInfo, 
         neighborhood: data.neighborhood,
         locationLat: data.locationLat,
         locationLng: data.locationLng,
+        mapLink: data.mapLink,
         hasCondition: data.hasCondition,
         conditionNote: data.conditionNote,
         paymentStatus: data.paymentStatus,
@@ -299,6 +303,7 @@ export async function updateStudent(id: number, data: Partial<Omit<StudentInfo, 
       neighborhood: updated.neighborhood,
       locationLat: updated.locationLat,
       locationLng: updated.locationLng,
+      mapLink: updated.mapLink,
       hasCondition: updated.hasCondition,
       conditionNote: updated.conditionNote,
       createdAt: updated.createdAt.toISOString(),

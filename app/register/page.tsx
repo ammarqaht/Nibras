@@ -23,6 +23,7 @@ export default function RegisterPage() {
   const [grade, setGrade] = useState('');
   const [neighborhood, setNeighborhood] = useState('');
   const [coords, setCoords] = useState<Coords | null>(null);
+  const [mapLink, setMapLink] = useState('');
   const [hasCondition, setHasCondition] = useState<null | boolean>(null);
   const [conditionNote, setConditionNote] = useState('');
 
@@ -41,6 +42,8 @@ export default function RegisterPage() {
     if (!stage) e.stage = 'يرجى اختيار المرحلة الدراسية.';
     else if (!grade) e.grade = 'يرجى اختيار الصف.';
     if (!neighborhood.trim()) e.neighborhood = 'يرجى إدخال الحي السكني.';
+    if (!coords && !mapLink.trim())
+      e.location = 'يرجى تحديد موقعك على الخريطة أو إدخال رابط قوقل ماب الخاص بك.';
     if (hasCondition === null) e.hasCondition = 'يرجى تحديد الإجابة.';
     if (hasCondition === true && !conditionNote.trim())
       e.conditionNote = 'يرجى توضيح نوع الحساسية أو المرض.';
@@ -73,6 +76,7 @@ export default function RegisterPage() {
           neighborhood: neighborhood.trim(),
           locationLat: coords?.lat ?? null,
           locationLng: coords?.lng ?? null,
+          mapLink: mapLink.trim() || null,
           hasCondition: hasCondition === true,
           conditionNote: hasCondition === true ? conditionNote.trim() : null
         })
@@ -190,13 +194,28 @@ export default function RegisterPage() {
               />
             </Field>
 
-            {/* الموقع (اختياري) */}
+            {/* الموقع (إجباري) */}
             <div>
               <label className="label">
-                {form.labels.location}{' '}
-                <span className="text-ink-400 font-normal">({form.labels.locationOptional})</span>
+                {form.labels.location} <span className="req">*</span>
               </label>
               <LocationPicker value={coords} onChange={setCoords} />
+              
+              <div className="mt-4">
+                <label className="label">رابط موقع قوقل ماب (إذا لم تكن في المنزل)</label>
+                <input
+                  type="url"
+                  className={`field ${showErr('location') ? 'invalid' : ''}`}
+                  placeholder="مثال: https://maps.app.goo.gl/... أو https://google.com/maps?..."
+                  value={mapLink}
+                  onChange={(e) => setMapLink(e.target.value)}
+                  dir="ltr"
+                />
+                <p className="hint mt-2">
+                  إذا كنت تقوم بالتسجيل من مكان آخر، يمكنك نسخ رابط موقعك الحالي من تطبيق خرائط Google ولصقه هنا.
+                </p>
+                {showErr('location') && <p className="err-msg mt-2">{errors.location}</p>}
+              </div>
             </div>
 
             {/* الحساسية / الأمراض */}

@@ -45,6 +45,11 @@ export async function POST(req: Request) {
 
   const lat = typeof body.locationLat === 'number' ? body.locationLat : null;
   const lng = typeof body.locationLng === 'number' ? body.locationLng : null;
+  const mapLink = String(body.mapLink ?? '').trim();
+
+  if (!lat && !lng && !mapLink) {
+    return NextResponse.json({ error: 'يرجى تحديد الموقع على الخريطة أو إدخال رابط قوقل ماب' }, { status: 400 });
+  }
 
   try {
     const result = await createRegistration({
@@ -57,6 +62,7 @@ export async function POST(req: Request) {
       neighborhood,
       locationLat: lat,
       locationLng: lng,
+      mapLink: mapLink || null,
       hasCondition,
       conditionNote: hasCondition ? conditionNote : null
     });
