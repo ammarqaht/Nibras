@@ -68,13 +68,13 @@ export default function SupervisorLoginPage() {
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="label block mb-2" htmlFor="email">
-              البريد الإلكتروني
+              اسم المستخدم أو البريد الإلكتروني
             </label>
             <input
               id="email"
-              type="email"
+              type="text"
               required
-              placeholder="example@nibras.com"
+              placeholder="admin"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="input w-full ltr text-left"

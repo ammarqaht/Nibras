@@ -104,40 +104,74 @@ async function writeJsonFile<T>(filePath: string, data: T): Promise<void> {
 
 // Ensure default Admin supervisor is seeded
 export async function seedDefaultAdminIfNeeded(): Promise<void> {
-  const adminEmail = 'admin@nibras.com';
-  const defaultHash = hashPassword('admin123');
+  const defaultHash = hashPassword('12345');
 
   if (hasDatabase) {
     const prisma = getPrisma()!;
-    const existing = await prisma.supervisor.findUnique({
-      where: { email: adminEmail }
+    
+    // Seed/Update 'admin'
+    await prisma.supervisor.upsert({
+      where: { email: 'admin' },
+      update: { passwordHash: defaultHash, role: 'admin', name: 'المدير العام' },
+      create: {
+        name: 'المدير العام',
+        email: 'admin',
+        passwordHash: defaultHash,
+        role: 'admin',
+        groupIds: ''
+      }
     });
-    if (!existing) {
-      await prisma.supervisor.create({
-        data: {
-          name: 'المدير العام',
-          email: adminEmail,
-          passwordHash: defaultHash,
-          role: 'admin',
-          groupIds: ''
-        }
-      });
-    }
+
+    // Seed/Update 'admin@nibras.com'
+    await prisma.supervisor.upsert({
+      where: { email: 'admin@nibras.com' },
+      update: { passwordHash: defaultHash, role: 'admin', name: 'المدير العام' },
+      create: {
+        name: 'المدير العام',
+        email: 'admin@nibras.com',
+        passwordHash: defaultHash,
+        role: 'admin',
+        groupIds: ''
+      }
+    });
   } else {
     const supervisors = await readJsonFile<SupervisorInfo[]>(FILE_SUPERVISORS, []);
-    const exists = supervisors.some(s => s.email === adminEmail);
-    if (!exists) {
+    
+    // Update or add 'admin'
+    const adminIndex = supervisors.findIndex(s => s.email === 'admin');
+    if (adminIndex !== -1) {
+      supervisors[adminIndex].passwordHash = defaultHash;
+      supervisors[adminIndex].role = 'admin';
+    } else {
       supervisors.push({
         id: supervisors.length + 1,
         name: 'المدير العام',
-        email: adminEmail,
+        email: 'admin',
         passwordHash: defaultHash,
         role: 'admin',
         groupIds: '',
         createdAt: new Date().toISOString()
       });
-      await writeJsonFile(FILE_SUPERVISORS, supervisors);
     }
+
+    // Update or add 'admin@nibras.com'
+    const adminEmailIndex = supervisors.findIndex(s => s.email === 'admin@nibras.com');
+    if (adminEmailIndex !== -1) {
+      supervisors[adminEmailIndex].passwordHash = defaultHash;
+      supervisors[adminEmailIndex].role = 'admin';
+    } else {
+      supervisors.push({
+        id: supervisors.length + 1,
+        name: 'المدير العام',
+        email: 'admin@nibras.com',
+        passwordHash: defaultHash,
+        role: 'admin',
+        groupIds: '',
+        createdAt: new Date().toISOString()
+      });
+    }
+
+    await writeJsonFile(FILE_SUPERVISORS, supervisors);
   }
 }
 
