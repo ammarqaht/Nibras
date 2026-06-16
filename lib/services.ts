@@ -3,6 +3,9 @@ import path from 'path';
 import { getPrisma, hasDatabase } from './db';
 import crypto from 'crypto';
 
+// Mutable flag that lets us fallback to JSON if Prisma DB throws any connection/schema errors
+let databaseAvailable = hasDatabase;
+
 export type SupervisorInfo = {
   id: number;
   name: string;
@@ -106,35 +109,42 @@ async function writeJsonFile<T>(filePath: string, data: T): Promise<void> {
 export async function seedDefaultAdminIfNeeded(): Promise<void> {
   const defaultHash = hashPassword('12345');
 
-  if (hasDatabase) {
-    const prisma = getPrisma()!;
-    
-    // Seed/Update 'admin'
-    await prisma.supervisor.upsert({
-      where: { email: 'admin' },
-      update: { passwordHash: defaultHash, role: 'admin', name: 'المدير العام' },
-      create: {
-        name: 'المدير العام',
-        email: 'admin',
-        passwordHash: defaultHash,
-        role: 'admin',
-        groupIds: ''
-      }
-    });
+  if (databaseAvailable) {
+    try {
+      const prisma = getPrisma()!;
+      
+      // Seed/Update 'admin'
+      await prisma.supervisor.upsert({
+        where: { email: 'admin' },
+        update: { passwordHash: defaultHash, role: 'admin', name: 'المدير العام' },
+        create: {
+          name: 'المدير العام',
+          email: 'admin',
+          passwordHash: defaultHash,
+          role: 'admin',
+          groupIds: ''
+        }
+      });
 
-    // Seed/Update 'admin@nibras.com'
-    await prisma.supervisor.upsert({
-      where: { email: 'admin@nibras.com' },
-      update: { passwordHash: defaultHash, role: 'admin', name: 'المدير العام' },
-      create: {
-        name: 'المدير العام',
-        email: 'admin@nibras.com',
-        passwordHash: defaultHash,
-        role: 'admin',
-        groupIds: ''
-      }
-    });
-  } else {
+      // Seed/Update 'admin@nibras.com'
+      await prisma.supervisor.upsert({
+        where: { email: 'admin@nibras.com' },
+        update: { passwordHash: defaultHash, role: 'admin', name: 'المدير العام' },
+        create: {
+          name: 'المدير العام',
+          email: 'admin@nibras.com',
+          passwordHash: defaultHash,
+          role: 'admin',
+          groupIds: ''
+        }
+      });
+    } catch (err) {
+      console.error("Database seed failed, disabling DB client and falling back to JSON:", err);
+      databaseAvailable = false;
+    }
+  }
+
+  if (!databaseAvailable) {
     const supervisors = await readJsonFile<SupervisorInfo[]>(FILE_SUPERVISORS, []);
     
     // Update or add 'admin'
@@ -178,23 +188,31 @@ export async function seedDefaultAdminIfNeeded(): Promise<void> {
 // ==================== SUPERVISOR SERVICES ====================
 export async function getSupervisorByEmail(email: string): Promise<SupervisorInfo | null> {
   await seedDefaultAdminIfNeeded();
-  if (hasDatabase) {
-    const prisma = getPrisma()!;
-    const sup = await prisma.supervisor.findUnique({ where: { email } });
-    if (!sup) return null;
-    return {
-      id: sup.id,
-      name: sup.name,
-      email: sup.email,
-      passwordHash: sup.passwordHash,
-      role: sup.role,
-      groupIds: sup.groupIds,
-      createdAt: sup.createdAt.toISOString()
-    };
-  } else {
+  if (databaseAvailable) {
+    try {
+      const prisma = getPrisma()!;
+      const sup = await prisma.supervisor.findUnique({ where: { email } });
+      if (!sup) return null;
+      return {
+        id: sup.id,
+        name: sup.name,
+        email: sup.email,
+        passwordHash: sup.passwordHash,
+        role: sup.role,
+        groupIds: sup.groupIds,
+        createdAt: sup.createdAt.toISOString()
+      };
+    } catch (err) {
+      console.error("Database query failed, falling back to JSON:", err);
+      databaseAvailable = false;
+    }
+  }
+  
+  if (!databaseAvailable) {
     const supervisors = await readJsonFile<SupervisorInfo[]>(FILE_SUPERVISORS, []);
     return supervisors.find(s => s.email === email) || null;
   }
+  return null;
 }
 
 export async function getAllSupervisors(): Promise<SupervisorInfo[]> {
