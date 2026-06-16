@@ -20,6 +20,12 @@ export default function SettingsPage() {
   const [clubFeesValue, setClubFeesValue] = useState('');
   const [clubLocationValue, setClubLocationValue] = useState('');
   const [clubLocationNote, setClubLocationNote] = useState('');
+  const [clubLocationLat, setClubLocationLat] = useState('');
+  const [clubLocationLng, setClubLocationLng] = useState('');
+  const [socialWhatsapp, setSocialWhatsapp] = useState('');
+  const [socialSnapchat, setSocialSnapchat] = useState('');
+  const [socialYoutube, setSocialYoutube] = useState('');
+  const [socialX, setSocialX] = useState('');
 
   const fetchSettings = async () => {
     setLoading(true);
@@ -41,6 +47,12 @@ export default function SettingsPage() {
         setClubFeesValue(s.clubFeesValue || '300 ريال');
         setClubLocationValue(s.clubLocationValue || 'مقر نادي نبراس');
         setClubLocationNote(s.clubLocationNote || 'اضغط لفتح الخريطة');
+        setClubLocationLat(s.clubLocationLat || '24.7136');
+        setClubLocationLng(s.clubLocationLng || '46.6753');
+        setSocialWhatsapp(s.social_whatsapp || 'https://wa.me/000000000000');
+        setSocialSnapchat(s.social_snapchat || 'https://www.snapchat.com/add/nibras');
+        setSocialYoutube(s.social_youtube || 'https://www.youtube.com/@nibras');
+        setSocialX(s.social_x || 'https://x.com/nibras');
       }
     } catch (err) {
       console.error('Error fetching settings', err);
@@ -352,7 +364,51 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 border-t border-ink-100 pt-5 mt-5">
+            {/* Latitude */}
+            <div>
+              <label className="label mb-1.5 block">خط العرض للموقع (Latitude)</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={clubLocationLat}
+                  onChange={e => setClubLocationLat(e.target.value)}
+                  className="input flex-1 ltr text-left font-mono"
+                  placeholder="مثال: 24.7136"
+                />
+                <button
+                  onClick={() => handleSaveSetting('clubLocationLat', clubLocationLat)}
+                  disabled={savingKey === 'clubLocationLat'}
+                  className="btn btn-primary btn-sm shrink-0"
+                >
+                  {savingKey === 'clubLocationLat' ? '...' : 'حفظ'}
+                </button>
+              </div>
+            </div>
+
+            {/* Longitude */}
+            <div>
+              <label className="label mb-1.5 block">خط الطول للموقع (Longitude)</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={clubLocationLng}
+                  onChange={e => setClubLocationLng(e.target.value)}
+                  className="input flex-1 ltr text-left font-mono"
+                  placeholder="مثال: 46.6753"
+                />
+                <button
+                  onClick={() => handleSaveSetting('clubLocationLng', clubLocationLng)}
+                  disabled={savingKey === 'clubLocationLng'}
+                  className="btn btn-primary btn-sm shrink-0"
+                >
+                  {savingKey === 'clubLocationLng' ? '...' : 'حفظ'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-5 mt-5">
             {/* Location Note */}
             <div>
               <label className="label mb-1.5 block">ملاحظة الموقع (الخريطة)</label>
@@ -369,6 +425,99 @@ export default function SettingsPage() {
                   className="btn btn-primary btn-sm shrink-0"
                 >
                   {savingKey === 'clubLocationNote' ? '...' : 'حفظ'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Social Media Links */}
+        <div className="card p-6 bg-white space-y-5">
+          <h3 className="font-display text-xl text-ink-900 border-b border-ink-100 pb-3">روابط التواصل الاجتماعي</h3>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            {/* Whatsapp */}
+            <div>
+              <label className="label mb-1.5 block">رابط واتساب (WhatsApp)</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={socialWhatsapp}
+                  onChange={e => setSocialWhatsapp(e.target.value)}
+                  className="input flex-1 ltr text-left"
+                  placeholder="https://wa.me/..."
+                />
+                <button
+                  onClick={() => handleSaveSetting('social_whatsapp', socialWhatsapp)}
+                  disabled={savingKey === 'social_whatsapp'}
+                  className="btn btn-primary btn-sm shrink-0"
+                >
+                  {savingKey === 'social_whatsapp' ? '...' : 'حفظ'}
+                </button>
+              </div>
+            </div>
+
+            {/* Snapchat */}
+            <div>
+              <label className="label mb-1.5 block">رابط سناب شات (Snapchat)</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={socialSnapchat}
+                  onChange={e => setSocialSnapchat(e.target.value)}
+                  className="input flex-1 ltr text-left"
+                  placeholder="https://snapchat.com/..."
+                />
+                <button
+                  onClick={() => handleSaveSetting('social_snapchat', socialSnapchat)}
+                  disabled={savingKey === 'social_snapchat'}
+                  className="btn btn-primary btn-sm shrink-0"
+                >
+                  {savingKey === 'social_snapchat' ? '...' : 'حفظ'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            {/* Youtube */}
+            <div>
+              <label className="label mb-1.5 block">رابط يوتيوب (YouTube)</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={socialYoutube}
+                  onChange={e => setSocialYoutube(e.target.value)}
+                  className="input flex-1 ltr text-left"
+                  placeholder="https://youtube.com/..."
+                />
+                <button
+                  onClick={() => handleSaveSetting('social_youtube', socialYoutube)}
+                  disabled={savingKey === 'social_youtube'}
+                  className="btn btn-primary btn-sm shrink-0"
+                >
+                  {savingKey === 'social_youtube' ? '...' : 'حفظ'}
+                </button>
+              </div>
+            </div>
+
+            {/* X */}
+            <div>
+              <label className="label mb-1.5 block">رابط إكس (X / Twitter)</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={socialX}
+                  onChange={e => setSocialX(e.target.value)}
+                  className="input flex-1 ltr text-left"
+                  placeholder="https://x.com/..."
+                />
+                <button
+                  onClick={() => handleSaveSetting('social_x', socialX)}
+                  disabled={savingKey === 'social_x'}
+                  className="btn btn-primary btn-sm shrink-0"
+                >
+                  {savingKey === 'social_x' ? '...' : 'حفظ'}
                 </button>
               </div>
             </div>

@@ -554,7 +554,7 @@ export async function getSettings(): Promise<Record<string, string>> {
   }
 }
 
-import { site as origSite, landing as origLanding, clubDetails as origClubDetails } from '../content';
+import { site as origSite, landing as origLanding, clubDetails as origClubDetails, footer as origFooter } from '../content';
 
 export async function saveSetting(key: string, value: string): Promise<void> {
   if (hasDatabase) {
@@ -611,8 +611,25 @@ export async function getMergedSettings() {
       ...origClubDetails.location,
       value: custom.clubLocationValue || origClubDetails.location.value,
       note: custom.clubLocationNote || origClubDetails.location.note,
+      lat: custom.clubLocationLat ? parseFloat(custom.clubLocationLat) : origClubDetails.location.lat,
+      lng: custom.clubLocationLng ? parseFloat(custom.clubLocationLng) : origClubDetails.location.lng,
+      get mapsLink(): string {
+        return `https://www.google.com/maps?q=${this.lat},${this.lng}`;
+      },
+      get embedSrc(): string {
+        return `https://maps.google.com/maps?q=${this.lat},${this.lng}&z=15&output=embed`;
+      }
     }
   };
 
-  return { site, landing, clubDetails };
+  const footer = {
+    ...origFooter,
+    tagline: custom.landingTagline || origFooter.tagline,
+    social: origFooter.social.map(s => ({
+      ...s,
+      href: custom[`social_${s.key}`] || s.href
+    }))
+  };
+
+  return { site, landing, clubDetails, footer };
 }

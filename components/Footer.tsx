@@ -1,20 +1,57 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import Brand from '@/components/Brand';
 import SocialIcon from '@/components/SocialIcon';
-import { footer } from '@/content';
+import { footer as origFooter } from '@/content';
 
 /** Shared footer across all pages — association contact / social channels. */
-export default function Footer({ tagline }: { tagline?: string }) {
+export default function Footer({
+  tagline,
+  social: initialSocial
+}: {
+  tagline?: string;
+  social?: Array<{ key: string; label: string; href: string }>;
+}) {
+  const [social, setSocial] = useState(initialSocial || origFooter.social);
+  const [customTagline, setCustomTagline] = useState(tagline);
+
+  useEffect(() => {
+    if (initialSocial) {
+      setSocial(initialSocial);
+      return;
+    }
+
+    // Fetch public settings client-side for pages where it is not pre-rendered
+    fetch('/api/supervisor/settings')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.settings) {
+          const custom = data.settings;
+          const mergedSocial = origFooter.social.map((s) => ({
+            ...s,
+            href: custom[`social_${s.key}`] || s.href
+          }));
+          setSocial(mergedSocial);
+          if (!tagline && custom.landingTagline) {
+            setCustomTagline(custom.landingTagline);
+          }
+        }
+      })
+      .catch(() => {});
+  }, [tagline, initialSocial]);
+
   return (
     <footer className="mt-24 border-t border-ink-200/70 bg-cream-50">
       <div className="mx-auto max-w-6xl px-6 sm:px-8 py-12">
         <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-8">
           <div className="text-center sm:text-right">
             <Brand variant="lockup" imgClassName="h-11 w-auto" />
-            <p className="hint mt-3 font-display text-ink-500 tracking-wide">{tagline || footer.tagline}</p>
+            <p className="hint mt-3 font-display text-ink-500 tracking-wide">{customTagline || origFooter.tagline}</p>
           </div>
 
           <div className="flex items-center gap-3">
-            {footer.social.map((s) => (
+            {social.map((s) => (
               <a
                 key={s.key}
                 href={s.href}
@@ -31,7 +68,7 @@ export default function Footer({ tagline }: { tagline?: string }) {
         </div>
 
         <div className="mt-10 pt-6 border-t border-ink-200/60 flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-ink-400">
-          <span>{footer.rights}</span>
+          <span>{origFooter.rights}</span>
           <div className="flex items-center gap-2.5">
             <span className="font-display tracking-wide text-ink-300">صُمم بعناية بواسطة</span>
             {/* eslint-disable-next-line @next/next/no-img-element */}

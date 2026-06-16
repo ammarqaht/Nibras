@@ -4,11 +4,6 @@ import { getSettings, saveSetting } from '@/lib/services';
 
 export async function GET(req: NextRequest) {
   try {
-    const session = getSession(req);
-    if (!session) {
-      return NextResponse.json({ error: 'غير مصرح بالدخول' }, { status: 401 });
-    }
-
     const settings = await getSettings();
     return NextResponse.json({ settings });
   } catch (error) {

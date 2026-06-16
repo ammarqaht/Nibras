@@ -21,7 +21,7 @@ const HIGHLIGHT_ICONS: Record<string, (p: { className?: string }) => JSX.Element
 };
 
 export default async function LandingPage() {
-  const { site, landing, clubDetails } = await getMergedSettings();
+  const { site, landing, clubDetails, footer } = await getMergedSettings();
   const loc = clubDetails.location;
 
   return (
@@ -218,7 +218,7 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      <Footer tagline={landing.tagline} />
+      <Footer tagline={landing.tagline} social={footer.social} />
       <LandingMotion />
     </main>
   );
