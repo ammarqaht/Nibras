@@ -273,6 +273,25 @@ export async function createSupervisor(data: Omit<SupervisorInfo, 'id' | 'create
   }
 }
 
+export async function deleteSupervisor(id: number): Promise<boolean> {
+  if (hasDatabase) {
+    try {
+      const prisma = getPrisma()!;
+      await prisma.supervisor.delete({ where: { id } });
+      return true;
+    } catch {
+      return false;
+    }
+  } else {
+    const supervisors = await readJsonFile<SupervisorInfo[]>(FILE_SUPERVISORS, []);
+    const index = supervisors.findIndex(s => s.id === id);
+    if (index === -1) return false;
+    supervisors.splice(index, 1);
+    await writeJsonFile(FILE_SUPERVISORS, supervisors);
+    return true;
+  }
+}
+
 // ==================== STUDENT / REGISTRATION SERVICES ====================
 export async function getStudents(): Promise<StudentInfo[]> {
   if (hasDatabase) {

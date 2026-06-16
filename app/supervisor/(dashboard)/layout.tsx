@@ -19,6 +19,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     { label: 'التحضير اليومي', href: '/supervisor/attendance', icon: '📝' },
     { label: 'لوحة النقاط', href: '/supervisor/points', icon: '🏆' },
     { label: 'المدفوعات', href: '/supervisor/payments', icon: '💰' },
+    { label: 'الفواتير', href: '/supervisor/invoices', icon: '🧾' },
     { label: 'الحالات الصحية', href: '/supervisor/health', icon: '🚨' },
     { label: 'خريطة المواقع', href: '/supervisor/locations', icon: '📍' },
     { label: 'المجموعات', href: '/supervisor/groups', icon: '🛡️' },
@@ -27,6 +28,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   // Admin-only nav items
   if (session.role === 'admin') {
+    navItems.push({ label: 'إدارة المشرفين', href: '/supervisor/supervisors', icon: '👤' });
     navItems.push({ label: 'إدارة المحتوى', href: '/supervisor/settings', icon: '⚙️' });
   }
 
