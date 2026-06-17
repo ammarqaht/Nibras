@@ -38,6 +38,8 @@ export default function SupervisorsPage() {
   const [accountType, setAccountType] = useState<'admin' | 'supervisor'>('supervisor');
   const [selectedRoles, setSelectedRoles] = useState<string[]>(['general_supervisor']);
   const [groupIds, setGroupIds] = useState<number[]>([]);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [isEditingPrimary, setIsEditingPrimary] = useState(false);
 
   async function load() {
     const [r, gr] = await Promise.all([
@@ -59,9 +61,39 @@ export default function SupervisorsPage() {
     setGroupIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
-  async function create(e: React.FormEvent) {
+  function cancelEdit() {
+    setName('');
+    setEmail('');
+    setPassword('');
+    setAccountType('supervisor');
+    setSelectedRoles(['general_supervisor']);
+    setGroupIds([]);
+    setEditingId(null);
+    setIsEditingPrimary(false);
+  }
+
+  function startEdit(s: Sup) {
+    setEditingId(s.id);
+    setName(s.name);
+    setEmail(s.email);
+    setPassword('');
+    const primary = s.email === 'admin' || s.email === 'admin@nibras.com';
+    setIsEditingPrimary(primary);
+    if (s.role === 'admin') {
+      setAccountType('admin');
+      setSelectedRoles(['general_supervisor']);
+      setGroupIds([]);
+    } else {
+      setAccountType('supervisor');
+      setSelectedRoles(s.role.split(',').map((r) => r.trim()).filter(Boolean));
+      setGroupIds(s.groupIds.split(',').map((id) => parseInt(id.trim(), 10)).filter((id) => !isNaN(id)));
+    }
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim() || !email.trim() || !password) return pushToast('error', 'أكمل الحقول الإلزامية');
+    if (!name.trim() || !email.trim()) return pushToast('error', 'أكمل الحقول الإلزامية');
+    if (!editingId && !password) return pushToast('error', 'يرجى إدخال كلمة مرور للمشرف الجديد');
 
     let finalRole = 'admin';
     let finalGroupIds = '';
@@ -78,27 +110,33 @@ export default function SupervisorsPage() {
     }
 
     setBusy(true);
+
+    const payload: any = {
+      name: name.trim(),
+      email: email.trim(),
+      role: finalRole,
+      groupIds: finalGroupIds
+    };
+
+    if (editingId) {
+      payload.id = editingId;
+      if (password) payload.password = password;
+    } else {
+      payload.password = password;
+    }
+
     const r = await fetch('/api/supervisor/supervisors', {
-      method: 'POST',
+      method: editingId ? 'PUT' : 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: name.trim(),
-        email: email.trim(),
-        password,
-        role: finalRole,
-        groupIds: finalGroupIds
-      })
+      body: JSON.stringify(payload)
     });
+
     setBusy(false);
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) return pushToast('error', j.error ?? 'فشل إضافة المشرف');
-    pushToast('success', 'تمت إضافة المشرف');
-    setName('');
-    setEmail('');
-    setPassword('');
-    setAccountType('supervisor');
-    setSelectedRoles(['general_supervisor']);
-    setGroupIds([]);
+    if (!r.ok) return pushToast('error', j.error ?? (editingId ? 'فشل تعديل المشرف' : 'فشل إضافة المشرف'));
+
+    pushToast('success', editingId ? 'تم تعديل بيانات المشرف' : 'تمت إضافة المشرف');
+    cancelEdit();
     load();
   }
 
@@ -122,8 +160,8 @@ export default function SupervisorsPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <form onSubmit={create} className="card p-6 space-y-4 self-start">
-          <h2 className="text-lg font-bold text-ink-900">إضافة مشرف</h2>
+        <form onSubmit={handleSubmit} className="card p-6 space-y-4 self-start">
+          <h2 className="text-lg font-bold text-ink-900">{editingId ? 'تعديل المشرف' : 'إضافة مشرف'}</h2>
           <div>
             <label className="label">الاسم</label>
             <input className="field" value={name} onChange={(e) => setName(e.target.value)} />
@@ -133,22 +171,26 @@ export default function SupervisorsPage() {
             <input className="field" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
           <div>
-            <label className="label">كلمة المرور</label>
-            <input className="field" dir="ltr" value={password} onChange={(e) => setPassword(e.target.value)} />
+            <label className="label">
+              كلمة المرور {editingId && <span className="text-xs text-ink-400 font-normal">(اتركها فارغة للإبقاء على الحالية)</span>}
+            </label>
+            <input className="field" dir="ltr" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={editingId ? '••••••••' : ''} />
           </div>
           <div>
             <label className="label">نوع الحساب</label>
             <div className="flex gap-2">
               <button
                 type="button"
-                className={`choice flex-1 ${accountType === 'supervisor' ? 'is-active' : ''}`}
+                disabled={isEditingPrimary}
+                className={`choice flex-1 ${accountType === 'supervisor' ? 'is-active' : ''} ${isEditingPrimary ? 'opacity-50 cursor-not-allowed' : ''}`}
                 onClick={() => setAccountType('supervisor')}
               >
                 مشرف
               </button>
               <button
                 type="button"
-                className={`choice flex-1 ${accountType === 'admin' ? 'is-active' : ''}`}
+                disabled={isEditingPrimary}
+                className={`choice flex-1 ${accountType === 'admin' ? 'is-active' : ''} ${isEditingPrimary ? 'opacity-50 cursor-not-allowed' : ''}`}
                 onClick={() => setAccountType('admin')}
               >
                 مدير عام
@@ -209,7 +251,12 @@ export default function SupervisorsPage() {
               )}
             </div>
           )}
-          <button type="submit" disabled={busy} className="btn btn-primary w-full">{busy ? '...' : 'إضافة المشرف'}</button>
+          <div className="flex gap-2">
+            <button type="submit" disabled={busy} className="btn btn-primary flex-1">{busy ? '...' : editingId ? 'حفظ التعديلات' : 'إضافة المشرف'}</button>
+            {editingId && (
+              <button type="button" onClick={cancelEdit} className="btn btn-secondary">إلغاء</button>
+            )}
+          </div>
         </form>
 
         <div className="card p-6 lg:col-span-2">
@@ -237,9 +284,12 @@ export default function SupervisorsPage() {
                           </td>
                           <td className="text-ink-500 text-sm">{s.role === 'admin' ? 'الكل' : groupNames(s.groupIds) || '—'}</td>
                           <td>
-                            {!primary && (
-                              <button onClick={() => del(s)} className="btn btn-danger py-1 px-3 text-xs">حذف</button>
-                            )}
+                            <div className="flex items-center gap-1.5 justify-end">
+                              <button onClick={() => startEdit(s)} className="btn btn-secondary py-1 px-3 text-xs">تعديل</button>
+                              {!primary && (
+                                <button onClick={() => del(s)} className="btn btn-danger py-1 px-3 text-xs">حذف</button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -265,9 +315,12 @@ export default function SupervisorsPage() {
                           المجموعات: {s.role === 'admin' ? 'الكل' : groupNames(s.groupIds) || '—'}
                         </div>
                       </div>
-                      {!primary && (
-                        <button onClick={() => del(s)} className="btn btn-danger py-1 px-3 text-xs shrink-0">حذف</button>
-                      )}
+                      <div className="flex flex-col gap-1.5 shrink-0 items-end">
+                        <button onClick={() => startEdit(s)} className="btn btn-secondary py-1 px-3 text-xs">تعديل</button>
+                        {!primary && (
+                          <button onClick={() => del(s)} className="btn btn-danger py-1 px-3 text-xs">حذف</button>
+                        )}
+                      </div>
                     </li>
                   );
                 })}

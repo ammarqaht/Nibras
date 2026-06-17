@@ -294,6 +294,54 @@ export async function deleteSupervisor(id: number): Promise<boolean> {
   }
 }
 
+export async function updateSupervisor(
+  id: number,
+  data: Partial<Omit<SupervisorInfo, 'id' | 'createdAt'>> & { password?: string }
+): Promise<SupervisorInfo | null> {
+  const updateData: any = {};
+  if (data.name !== undefined) updateData.name = data.name;
+  if (data.email !== undefined) updateData.email = data.email;
+  if (data.role !== undefined) updateData.role = data.role;
+  if (data.groupIds !== undefined) updateData.groupIds = data.groupIds;
+  if (data.password) updateData.passwordHash = hashPassword(data.password);
+
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    try {
+      const updated = await prisma.supervisor.update({
+        where: { id },
+        data: updateData
+      });
+      return {
+        id: updated.id,
+        name: updated.name,
+        email: updated.email,
+        passwordHash: updated.passwordHash,
+        role: updated.role,
+        groupIds: updated.groupIds,
+        createdAt: updated.createdAt.toISOString()
+      };
+    } catch {
+      return null;
+    }
+  } else {
+    const list = await readJsonFile<SupervisorInfo[]>(FILE_SUPERVISORS, []);
+    const index = list.findIndex(s => s.id === id);
+    if (index === -1) return null;
+
+    const updated = { ...list[index] };
+    if (updateData.name !== undefined) updated.name = updateData.name;
+    if (updateData.email !== undefined) updated.email = updateData.email;
+    if (updateData.role !== undefined) updated.role = updateData.role;
+    if (updateData.groupIds !== undefined) updated.groupIds = updateData.groupIds;
+    if (updateData.passwordHash !== undefined) updated.passwordHash = updateData.passwordHash;
+
+    list[index] = updated;
+    await writeJsonFile(FILE_SUPERVISORS, list);
+    return updated;
+  }
+}
+
 // ==================== STUDENT / REGISTRATION SERVICES ====================
 export async function getStudents(): Promise<StudentInfo[]> {
   if (hasDatabase) {

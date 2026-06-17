@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { getAllSupervisors, createSupervisor, deleteSupervisor, hashPassword } from '@/lib/services';
+import { getAllSupervisors, createSupervisor, deleteSupervisor, hashPassword, updateSupervisor } from '@/lib/services';
 
 export async function GET(req: NextRequest) {
   try {
@@ -97,5 +97,58 @@ export async function DELETE(req: NextRequest) {
   } catch (error) {
     console.error('Supervisors DELETE error', error);
     return NextResponse.json({ error: 'حدث خطأ أثناء حذف المشرف' }, { status: 500 });
+  }
+}
+
+export async function PUT(req: NextRequest) {
+  try {
+    const session = getSession(req);
+    if (!session || session.role !== 'admin') {
+      return NextResponse.json({ error: 'غير مصرح بالدخول' }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const id = parseInt(body.id, 10);
+    if (isNaN(id)) {
+      return NextResponse.json({ error: 'معرّف المشرف غير صحيح' }, { status: 400 });
+    }
+
+    const { name, email, password, role, groupIds } = body;
+
+    // Check email uniqueness if email is changed
+    if (email) {
+      const normalizedEmail = String(email).trim().toLowerCase();
+      const supervisors = await getAllSupervisors();
+      const exists = supervisors.some(s => s.id !== id && s.email.toLowerCase() === normalizedEmail);
+      if (exists) {
+        return NextResponse.json({ error: 'اسم المستخدم أو البريد الإلكتروني مسجل مسبقاً لمشرف آخر' }, { status: 400 });
+      }
+    }
+
+    // Prevent editing primary admin account to a non-admin role
+    const supervisors = await getAllSupervisors();
+    const target = supervisors.find(s => s.id === id);
+    if (target && (target.email === 'admin' || target.email === 'admin@nibras.com')) {
+      if (role && role !== 'admin') {
+        return NextResponse.json({ error: 'لا يمكن تغيير دور المدير العام الرئيسي' }, { status: 400 });
+      }
+    }
+
+    const updated = await updateSupervisor(id, {
+      name: name ? String(name).trim() : undefined,
+      email: email ? String(email).trim().toLowerCase() : undefined,
+      password: password || undefined,
+      role: role || undefined,
+      groupIds: groupIds !== undefined ? groupIds : undefined
+    });
+
+    if (!updated) {
+      return NextResponse.json({ error: 'المشرف غير موجود أو فشل التحديث' }, { status: 400 });
+    }
+
+    return NextResponse.json({ success: true, supervisor: updated });
+  } catch (error) {
+    console.error('Supervisors PUT error', error);
+    return NextResponse.json({ error: 'حدث خطأ أثناء تعديل بيانات المشرف' }, { status: 500 });
   }
 }
