@@ -274,20 +274,21 @@ body::after {
 .marquee-track {
   display: flex;
   width: max-content;
-  animation: marquee 30s linear infinite;
+  direction: ltr;
+  animation: marquee 18s linear infinite;
 }
 .marquee-content {
   display: flex;
   flex-direction: row;
   align-items: center;
   gap: 2.5rem;
-  padding-inline: 1.25rem; /* half of gap to keep spacing even between copies */
+  padding-right: 2.5rem; /* matches gap so copies join seamlessly */
   white-space: nowrap;
   flex-shrink: 0;
 }
 @keyframes marquee {
   from { transform: translateX(0); }
-  to   { transform: translateX(-50%); }
+  to   { transform: translateX(-33.3333%); }
 }
 @keyframes shimmer {
   0% { transform: translateX(-150%) skewX(-15deg); }
