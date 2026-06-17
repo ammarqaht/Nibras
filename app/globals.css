@@ -170,6 +170,60 @@ body::after {
   box-shadow: 0 2px 12px rgba(45,35,20,0.06);
 }
 
+/* Table (supervisor dashboard) */
+.tbl { width: 100%; border-collapse: collapse; }
+.tbl th {
+  font-weight: 600;
+  font-size: 0.82rem;
+  text-align: right;
+  color: var(--accent-deep);
+  background: #FBF6EC;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.tbl td {
+  padding: 0.85rem 1rem;
+  font-size: 0.92rem;
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+}
+.tbl tr:nth-child(even) td { background: rgba(245,243,239,0.4); }
+.tbl tr:hover td { background: #FBF8F2; }
+.tbl tr:last-child td { border-bottom: none; }
+
+/* Status pill */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.pill-green  { background: #E7F6EC; color: #1B7A43; }
+.pill-red    { background: #FDEAE6; color: #C42910; }
+.pill-yellow { background: #FCF3DC; color: #9A6B00; }
+.pill-blue   { background: #EAF1F9; color: #1E5BA8; }
+.pill-gray   { background: #F0EEE9; color: #6B6B6B; }
+
+/* Modal */
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 9998;
+  background: rgba(26,26,26,0.45);
+  backdrop-filter: blur(2px);
+  animation: fadeIn 180ms ease;
+}
+.modal-panel {
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  box-shadow: 0 24px 60px rgba(26,26,26,0.22);
+  animation: popIn 320ms cubic-bezier(0.34,1.56,0.64,1) both;
+}
+
 /* Choice chips (radio / stage selectors) */
 .choice {
   display: inline-flex;
