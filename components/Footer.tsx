@@ -42,12 +42,18 @@ export default function Footer({
   }, [tagline, initialSocial]);
 
   return (
-    <footer className="mt-24 border-t border-ink-200/70 bg-cream-50">
-      <div className="mx-auto max-w-6xl px-6 sm:px-8 py-12">
+    <footer
+      className="mt-24 border-t border-blue-900/50 text-white relative overflow-hidden"
+      style={{
+        background:
+          'radial-gradient(circle at 80% 10%, rgba(245,166,35,0.15) 0%, transparent 50%), radial-gradient(circle at 20% 90%, rgba(43,175,217,0.2) 0%, transparent 60%), linear-gradient(135deg, #1E5BA8 0%, #113669 100%)'
+      }}
+    >
+      <div className="mx-auto max-w-6xl px-6 sm:px-8 py-12 relative z-10">
         <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-8">
           <div className="text-center sm:text-right">
-            <Brand variant="lockup" imgClassName="h-11 w-auto" />
-            <p className="hint mt-3 font-display text-ink-500 tracking-wide">{customTagline || origFooter.tagline}</p>
+            <Brand variant="lockup" imgClassName="h-11 w-auto brightness-0 invert" />
+            <p className="mt-3 font-display text-blue-100/80 tracking-wide text-sm">{customTagline || origFooter.tagline}</p>
           </div>
 
           <div className="flex items-center gap-3">
@@ -59,7 +65,7 @@ export default function Footer({
                 rel="noopener noreferrer"
                 aria-label={s.label}
                 title={s.label}
-                className="w-11 h-11 rounded-full border border-ink-200 bg-white text-ink-700 flex items-center justify-center transition-all duration-200 hover:text-white hover:bg-brand hover:border-transparent hover:-translate-y-0.5 hover:shadow-brand"
+                className="w-11 h-11 rounded-full border border-white/20 bg-white/10 text-white flex items-center justify-center transition-all duration-200 hover:text-blue-900 hover:bg-white hover:border-transparent hover:-translate-y-0.5 hover:shadow-lg"
               >
                 <SocialIcon name={s.key} />
               </a>
@@ -67,15 +73,15 @@ export default function Footer({
           </div>
         </div>
 
-        <div className="mt-10 pt-6 border-t border-ink-200/60 flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-ink-400">
+        <div className="mt-10 pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-blue-200/70">
           <span>{origFooter.rights}</span>
           <div className="flex items-center gap-2.5">
-            <span className="font-display tracking-wide text-ink-300">صُمم بعناية بواسطة</span>
+            <span className="font-display tracking-wide text-blue-200/50">صُمم بعناية بواسطة</span>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/logos/ammar-logo.png"
               alt="عمار سالم — Ammar Salem"
-              className="h-8 w-auto opacity-75 transition-opacity duration-200 hover:opacity-100 select-none pointer-events-none"
+              className="h-8 w-auto opacity-75 brightness-0 invert transition-opacity duration-200 hover:opacity-100 select-none pointer-events-none"
               draggable={false}
             />
           </div>
