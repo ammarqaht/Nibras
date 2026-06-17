@@ -35,9 +35,9 @@ export const landing = {
 
   // The "feeling" tags / why-join cards (creative presentation of the club spirit).
   highlights: [
-    { icon: 'discover', title: 'اكتشف', desc: 'برامج متنوعة تفتح للطالب آفاقاً جديدة في القيم والثقافة والترفيه.' },
-    { icon: 'try', title: 'جرّب', desc: 'تجارب عملية وممتعة تصقل المهارة وتبني الثقة في بيئة آمنة.' },
-    { icon: 'learn', title: 'انطلق', desc: 'معارف قيّمة وخبرات جديدة تبني عقل الطالب وتصنع مستقبله.' }
+    { icon: 'discover', title: 'اكتشف', desc: 'برامج متنوعة تفتح للطالب آفاقاً جديدة في القيم والثقافة والترفيه.', color: 'var(--accent)' },
+    { icon: 'try', title: 'جرّب', desc: 'تجارب عملية وممتعة تصقل المهارة وتبني الثقة في بيئة آمنة.', color: 'var(--blue)' },
+    { icon: 'learn', title: 'انطلق', desc: 'معارف قيّمة وخبرات جديدة تبني عقل الطالب وتصنع مستقبله.', color: 'var(--red)' }
   ]
 };
 
@@ -50,7 +50,7 @@ export const clubDetails = {
   },
   dates: {
     label: 'تاريخ النادي',
-    value: 'الثلاثاء 15 محرم – الخميس 9 صفر'
+    value: '15 محرم – 9 صفر'
   },
   time: {
     label: 'وقت النادي',

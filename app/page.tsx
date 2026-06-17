@@ -104,7 +104,7 @@ export default async function LandingPage() {
               <div key={h.title} className="card p-7 text-center">
                 <div
                   className="mx-auto w-14 h-14 rounded-2xl flex items-center justify-center mb-5"
-                  style={{ background: 'var(--accent)', color: '#fff' }}
+                  style={{ background: h.color || 'var(--accent)', color: '#fff' }}
                 >
                   <Icon className="w-7 h-7" />
                 </div>

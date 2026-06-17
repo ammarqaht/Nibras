@@ -342,23 +342,13 @@ export default function RegisterPage() {
                   <label className="label">
                     {form.labels.location} <span className="req">*</span>
                   </label>
-                  <LocationPicker value={coords} onChange={setCoords} />
-                  
-                  <div className="mt-4">
-                    <label className="label">رابط موقع قوقل ماب (إذا لم تكن في المنزل)</label>
-                    <input
-                      type="url"
-                      className={`field ${showErr('location') ? 'invalid' : ''}`}
-                      placeholder="مثال: https://maps.app.goo.gl/... أو https://google.com/maps?..."
-                      value={mapLink}
-                      onChange={(e) => setMapLink(e.target.value)}
-                      dir="ltr"
-                    />
-                    <p className="hint mt-2">
-                      إذا كنت تقوم بالتسجيل من مكان آخر، يمكنك نسخ رابط موقعك الحالي من تطبيق خرائط Google ولصقه هنا.
-                    </p>
-                    {showErr('location') && <p className="err-msg mt-2">{errors.location}</p>}
-                  </div>
+                  <LocationPicker
+                    value={coords}
+                    onChange={setCoords}
+                    mapLink={mapLink}
+                    onMapLinkChange={setMapLink}
+                  />
+                  {showErr('location') && <p className="err-msg mt-2">{errors.location}</p>}
                 </div>
 
                 {/* الحساسية / الأمراض */}

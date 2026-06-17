@@ -6,22 +6,22 @@ import { form } from '@/content';
 export type Coords = { lat: number; lng: number };
 
 /**
- * Optional geolocation field — "تحديد موقعي".
- *
- * NOTE: the prompt asked to reuse the "أضاحي" site's map implementation, but no
- * such site exists in this workspace (no geolocation code anywhere). This is a
- * fresh implementation styled to match the system: browser geolocation +
- * an embedded Google-Maps preview that links out. No API key required.
+ * Optional geolocation field — "تحديد موقعي" + "لست في المنزل" button.
  */
 export default function LocationPicker({
   value,
-  onChange
+  onChange,
+  mapLink,
+  onMapLinkChange
 }: {
   value: Coords | null;
   onChange: (c: Coords | null) => void;
+  mapLink?: string;
+  onMapLinkChange?: (v: string) => void;
 }) {
   const [status, setStatus] = useState<'idle' | 'locating' | 'error'>('idle');
   const [errMsg, setErrMsg] = useState('');
+  const [showMapInput, setShowMapInput] = useState(false);
 
   function locate() {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
@@ -56,25 +56,53 @@ export default function LocationPicker({
       <p className="hint mb-3">{form.locationNote}</p>
 
       {!value && (
-        <button
-          type="button"
-          className="btn btn-secondary"
-          onClick={locate}
-          disabled={status === 'locating'}
-        >
-          {status === 'locating' ? (
-            <>
-              <Spinner /> {form.locating}
-            </>
-          ) : (
-            <>
-              <PinIcon /> {form.locateButton}
-            </>
-          )}
-        </button>
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={locate}
+            disabled={status === 'locating'}
+          >
+            {status === 'locating' ? (
+              <>
+                <Spinner /> {form.locating}
+              </>
+            ) : (
+              <>
+                <PinIcon /> {form.locateButton}
+              </>
+            )}
+          </button>
+
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => setShowMapInput((v) => !v)}
+          >
+            <HomeIcon /> لست في المنزل
+          </button>
+        </div>
       )}
 
       {status === 'error' && <p className="err-msg mt-2">{errMsg}</p>}
+
+      {/* Google Maps link input — shown when "لست في المنزل" is clicked */}
+      {showMapInput && !value && (
+        <div className="mt-4 fade-in">
+          <label className="label">رابط موقع قوقل ماب</label>
+          <input
+            type="url"
+            className="field"
+            placeholder="مثال: https://maps.app.goo.gl/... أو https://google.com/maps?..."
+            value={mapLink || ''}
+            onChange={(e) => onMapLinkChange?.(e.target.value)}
+            dir="ltr"
+          />
+          <p className="hint mt-2">
+            افتح تطبيق خرائط Google، حدد موقع منزلك، ثم انسخ الرابط والصقه هنا.
+          </p>
+        </div>
+      )}
 
       {value && (
         <div className="fade-in">
@@ -135,6 +163,13 @@ function PinIcon() {
   return (
     <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z" />
+    </svg>
+  );
+}
+function HomeIcon() {
+  return (
+    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 3 2 12h3v8h6v-6h2v6h6v-8h3L12 3Z" />
     </svg>
   );
 }
