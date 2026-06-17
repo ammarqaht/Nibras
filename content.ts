@@ -11,7 +11,7 @@ export const site = {
   nameAr: 'نبراس',
   nameEn: 'Nibras',
   clubNameAr: 'نادي نبراس',
-  metaTitle: 'نادي نبراس — اكتشف، جرّب، تعلم',
+  metaTitle: 'نادي نبراس — اكتشف، جرّب، انطلق',
   metaDescription:
     'نادي نبراس الصيفي — نادٍ قيمي يجمع بين القيم والثقافة والترفيه لتنمية مهارات الطالب. سجّل الآن.',
 
@@ -25,19 +25,19 @@ export const site = {
 
 /* -------------------- PAGE 1 — التعريف -------------------- */
 export const landing = {
-  tagline: 'اكتشف – جرّب – تعلم',
+  tagline: 'اكتشف – جرّب – انطلق',
   taglineSub: 'مكان واحد يجمع كل شغفك',
   intro:
     'نادي نبراس هو نادٍ قيمي يهدف إلى تنمية مهارات الطالب عن طريق برامج متنوعة، تجمع بين القيم والثقافة والترفيه بشكل هادف وممتع.',
   ctaPrimary: 'سجّل معنا',
   // Short marquee words shown under the hero (purely decorative).
-  marquee: ['قيم', 'ثقافة', 'ترفيه', 'مهارات', 'إبداع', 'تعلم'],
+  marquee: ['قيم', 'ثقافة', 'ترفيه', 'مهارات', 'إبداع', 'انطلق'],
 
   // The "feeling" tags / why-join cards (creative presentation of the club spirit).
   highlights: [
     { icon: 'discover', title: 'اكتشف', desc: 'برامج متنوعة تفتح للطالب آفاقاً جديدة في القيم والثقافة والترفيه.' },
     { icon: 'try', title: 'جرّب', desc: 'تجارب عملية وممتعة تصقل المهارة وتبني الثقة في بيئة آمنة.' },
-    { icon: 'learn', title: 'تعلم', desc: 'معارف قيّمة وخبرات جديدة تبني عقل الطالب وتصنع مستقبله.' }
+    { icon: 'learn', title: 'انطلق', desc: 'معارف قيّمة وخبرات جديدة تبني عقل الطالب وتصنع مستقبله.' }
   ]
 };
 
@@ -158,7 +158,7 @@ export const confirmation = {
 
 /* -------------------- SHARED — footer / social -------------------- */
 export const footer = {
-  tagline: 'اكتشف – جرّب – تعلم',
+  tagline: 'اكتشف – جرّب – انطلق',
   rights: '© ١٤٤٧هـ نادي نبراس — جميع الحقوق محفوظة',
   // TODO: replace placeholder links with the real association channels.
   social: [

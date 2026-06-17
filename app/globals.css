@@ -274,6 +274,11 @@ body::after {
   from { transform: translateX(0); }
   to   { transform: translateX(-50%); }
 }
+@keyframes shimmer {
+  0% { transform: translateX(-150%) skewX(-15deg); }
+  30% { transform: translateX(150%) skewX(-15deg); }
+  100% { transform: translateX(150%) skewX(-15deg); }
+}
 @media (prefers-reduced-motion: reduce) {
   .animate-\[marquee_22s_linear_infinite\] { animation: none !important; }
 }

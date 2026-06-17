@@ -41,7 +41,7 @@ export default function SettingsPage() {
         setSiteNameAr(s.siteNameAr || 'نبراس');
         setSiteNameEn(s.siteNameEn || 'Nibras');
         setClubNameAr(s.clubNameAr || 'نادي نبراس');
-        setLandingTagline(s.landingTagline || 'اكتشف – جرّب – تعلم');
+        setLandingTagline(s.landingTagline || 'اكتشف – جرّب – انطلق');
         setLandingTaglineSub(s.landingTaglineSub || 'مكان واحد يجمع كل شغفك');
         setLandingIntro(s.landingIntro || 'نادي نبراس هو نادٍ قيمي يهدف إلى تنمية مهارات الطالب عن طريق برامج متنوعة، تجمع بين القيم والثقافة والترفيه بشكل هادف وممتع.');
         setClubTargetGroupValue(s.clubTargetGroupValue || 'الابتدائي العليا – متوسط – ثانوي');
