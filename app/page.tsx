@@ -59,18 +59,21 @@ export default async function LandingPage() {
 
       {/* ============================ MARQUEE ============================ */}
       <div className="border-y border-ink-200/70 bg-cream-50 py-4 overflow-hidden select-none">
-        <div className="flex flex-row items-center gap-10 whitespace-nowrap w-max animate-[marquee_22s_linear_infinite] [--gap:2.5rem]">
-          {Array.from({ length: 20 }).flatMap((_, r) =>
-            landing.marquee.map((w, i) => (
-              <span
-                key={`${r}-${i}`}
-                className="font-display text-2xl sm:text-3xl text-ink-300 flex items-center gap-10"
-              >
-                {w}
-                <span className="w-2 h-2 rounded-full" style={{ background: 'var(--accent)' }} />
-              </span>
-            ))
-          )}
+        <div className="marquee-track">
+          {/* Two identical copies side-by-side for a seamless infinite loop */}
+          {[0, 1].map((copy) => (
+            <div key={copy} className="marquee-content" aria-hidden={copy === 1}>
+              {landing.marquee.map((w, i) => (
+                <span
+                  key={i}
+                  className="font-display text-2xl sm:text-3xl text-ink-300 flex items-center gap-10"
+                >
+                  {w}
+                  <span className="w-2 h-2 rounded-full" style={{ background: 'var(--accent)' }} />
+                </span>
+              ))}
+            </div>
+          ))}
         </div>
       </div>
 

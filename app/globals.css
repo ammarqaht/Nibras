@@ -270,6 +270,21 @@ body::after {
   60%  { opacity: 1; transform: scale(1.03); }
   100% { opacity: 1; transform: scale(1); }
 }
+/* ─── Seamless infinite marquee ─── */
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee 30s linear infinite;
+}
+.marquee-content {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 2.5rem;
+  padding-inline: 1.25rem; /* half of gap to keep spacing even between copies */
+  white-space: nowrap;
+  flex-shrink: 0;
+}
 @keyframes marquee {
   from { transform: translateX(0); }
   to   { transform: translateX(-50%); }
@@ -280,7 +295,7 @@ body::after {
   100% { transform: translateX(150%) skewX(-15deg); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .animate-\[marquee_22s_linear_infinite\] { animation: none !important; }
+  .marquee-track { animation: none !important; }
 }
 .toast { animation: toastIn 280ms cubic-bezier(0.4,0,0.2,1); }
 .fade-in { animation: fadeIn 240ms ease; }
