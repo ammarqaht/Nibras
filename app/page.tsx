@@ -29,34 +29,29 @@ export default async function LandingPage() {
       <SiteHeader />
 
       {/* ============================ HERO ============================ */}
-      <section
-        className="relative px-6 pt-16 pb-24 sm:pt-24 sm:pb-36 overflow-hidden text-white border-b border-blue-900/50"
-        style={{
-          background:
-            'radial-gradient(circle at 50% 18%, rgba(245,166,35,0.15) 0%, transparent 60%), radial-gradient(circle at 80% 60%, rgba(43,175,217,0.2) 0%, transparent 60%), linear-gradient(135deg, #1E5BA8 0%, #113669 100%)'
-        }}
-      >
-        <div className="relative mx-auto max-w-4xl text-center z-10">
-          <div className="relative inline-block overflow-hidden mx-auto rounded-2xl">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={site.logos.lockupVertical}
-              alt={site.clubNameAr}
-              className="reveal-hero mx-auto w-auto h-44 sm:h-56 md:h-64 select-none brightness-0 invert"
-              draggable={false}
-            />
-            <div
-              className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/40 to-transparent pointer-events-none"
-              style={{
-                animation: 'shimmer 3.5s infinite linear',
-              }}
-            />
-          </div>
+      {/* ============================ HERO ============================ */}
+      <section className="relative px-6 pt-10 pb-20 sm:pt-16 sm:pb-28">
+        <div
+          aria-hidden
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background:
+              'radial-gradient(60rem 36rem at 50% 18%, rgba(245,166,35,0.10), transparent 60%), radial-gradient(50rem 36rem at 80% 60%, rgba(43,175,217,0.07), transparent 60%), radial-gradient(40rem 30rem at 15% 70%, rgba(30,91,168,0.06), transparent 60%)'
+          }}
+        />
+        <div className="relative mx-auto max-w-4xl text-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={site.logos.lockupVertical}
+            alt={site.clubNameAr}
+            className="reveal-hero mx-auto w-auto h-44 sm:h-56 md:h-64 select-none"
+            draggable={false}
+          />
 
-          <h1 className="reveal-hero font-display text-white mt-8 leading-tight text-[clamp(1.8rem,5.5vw,3.2rem)]">
+          <h1 className="reveal-hero font-display text-ink-900 mt-8 leading-tight text-[clamp(2.4rem,7vw,4.5rem)]">
             {landing.tagline}
           </h1>
-          <p className="reveal-hero mt-4 text-blue-100/80 text-[clamp(1rem,2vw,1.25rem)]">
+          <p className="reveal-hero mt-4 text-ink-500 text-[clamp(1.05rem,2.2vw,1.4rem)]">
             {landing.taglineSub}
           </p>
         </div>
@@ -65,7 +60,7 @@ export default async function LandingPage() {
       {/* ============================ MARQUEE ============================ */}
       <div className="border-y border-ink-200/70 bg-cream-50 py-4 overflow-hidden select-none">
         <div className="flex flex-row items-center gap-10 whitespace-nowrap w-max animate-[marquee_22s_linear_infinite] [--gap:2.5rem]">
-          {Array.from({ length: 4 }).flatMap((_, r) =>
+          {Array.from({ length: 20 }).flatMap((_, r) =>
             landing.marquee.map((w, i) => (
               <span
                 key={`${r}-${i}`}
