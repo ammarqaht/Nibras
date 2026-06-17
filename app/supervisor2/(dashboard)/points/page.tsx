@@ -33,6 +33,9 @@ export default function PointsPage() {
   const [category, setCategory] = useState('behavior');
   const [busy, setBusy] = useState(false);
 
+  const [activeTab, setActiveTab] = useState<'leaderboard' | 'history'>('leaderboard');
+  const [leaderboardSearch, setLeaderboardSearch] = useState('');
+
   async function loadAll() {
     const [sr, gr, pr] = await Promise.all([
       fetch('/api/supervisor/students', { cache: 'no-store' }),
@@ -50,6 +53,32 @@ export default function PointsPage() {
     const m = new Map(students.map((s) => [s.id, s.studentName]));
     return (id: number) => m.get(id) ?? `#${id}`;
   }, [students]);
+
+  const leaderboard = useMemo(() => {
+    const pointsMap = new Map<number, number>();
+    points.forEach((p) => {
+      pointsMap.set(p.registrationId, (pointsMap.get(p.registrationId) ?? 0) + p.delta);
+    });
+
+    const list = students.map((s) => {
+      const total = pointsMap.get(s.id) ?? 0;
+      const groupName = s.groupId ? groups.find((g) => g.id === s.groupId)?.name : '—';
+      return {
+        ...s,
+        totalPoints: total,
+        groupName
+      };
+    });
+
+    list.sort((a, b) => b.totalPoints - a.totalPoints);
+    return list;
+  }, [students, points, groups]);
+
+  const filteredLeaderboard = useMemo(() => {
+    return leaderboard.filter((item) =>
+      item.studentName.toLowerCase().includes(leaderboardSearch.trim().toLowerCase())
+    );
+  }, [leaderboard, leaderboardSearch]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -138,9 +167,107 @@ export default function PointsPage() {
         </form>
 
         <div className="card p-6 lg:col-span-2">
-          <h2 className="text-lg font-bold text-ink-900 mb-4">سجل النقاط</h2>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 border-b border-ink-200 pb-4">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className={`choice py-1.5 px-4 text-sm ${activeTab === 'leaderboard' ? 'is-active' : ''}`}
+                onClick={() => setActiveTab('leaderboard')}
+              >
+                🏆 ترتيب الصدارة
+              </button>
+              <button
+                type="button"
+                className={`choice py-1.5 px-4 text-sm ${activeTab === 'history' ? 'is-active' : ''}`}
+                onClick={() => setActiveTab('history')}
+              >
+                📜 سجل رصد النقاط
+              </button>
+            </div>
+            
+            {activeTab === 'leaderboard' && (
+              <input
+                type="text"
+                placeholder="ابحث عن اسم طالب..."
+                className="field py-1 px-3 text-xs sm:w-48"
+                value={leaderboardSearch}
+                onChange={(e) => setLeaderboardSearch(e.target.value)}
+              />
+            )}
+          </div>
+
           {loading ? (
             <p className="text-center py-10 text-ink-400 text-sm">جارٍ التحميل…</p>
+          ) : activeTab === 'leaderboard' ? (
+            filteredLeaderboard.length === 0 ? (
+              <p className="text-center py-10 text-ink-400 text-sm">لا يوجد طلاب تطابق خيارات البحث.</p>
+            ) : (
+              <>
+                <div className="hidden lg:block overflow-x-auto scroll-soft">
+                  <table className="tbl">
+                    <thead>
+                      <tr>
+                        <th>الترتيب</th>
+                        <th>الطالب</th>
+                        <th>رقم العضوية</th>
+                        <th>الأسرة / المجموعة</th>
+                        <th>إجمالي النقاط</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredLeaderboard.map((item) => {
+                        const rank = leaderboard.findIndex((x) => x.id === item.id) + 1;
+                        let rankBadge;
+                        if (rank === 1) rankBadge = <span className="text-xl">🥇</span>;
+                        else if (rank === 2) rankBadge = <span className="text-xl">🥈</span>;
+                        else if (rank === 3) rankBadge = <span className="text-xl">🥉</span>;
+                        else rankBadge = <span className="text-ink-400 font-mono">#{rank}</span>;
+
+                        return (
+                          <tr key={item.id}>
+                            <td>{rankBadge}</td>
+                            <td className="font-semibold text-ink-900">{item.studentName}</td>
+                            <td className="font-mono text-ink-500 text-sm">#{item.membershipNo}</td>
+                            <td className="text-ink-600 text-sm">{item.groupName}</td>
+                            <td>
+                              <span className={`pill ${item.totalPoints >= 0 ? 'pill-green' : 'pill-red'} font-bold`}>
+                                {item.totalPoints} نقطة
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <ul className="lg:hidden divide-y divide-ink-200">
+                  {filteredLeaderboard.map((item) => {
+                    const rank = leaderboard.findIndex((x) => x.id === item.id) + 1;
+                    let rankBadge;
+                    if (rank === 1) rankBadge = <span className="text-lg">🥇</span>;
+                    else if (rank === 2) rankBadge = <span className="text-lg">🥈</span>;
+                    else if (rank === 3) rankBadge = <span className="text-lg">🥉</span>;
+                    else rankBadge = <span className="text-ink-400 font-mono text-xs">#{rank}</span>;
+
+                    return (
+                      <li key={item.id} className="py-3 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="shrink-0 w-8 text-center">{rankBadge}</div>
+                          <div className="min-w-0">
+                            <div className="font-semibold text-ink-900 truncate">{item.studentName}</div>
+                            <div className="text-xs text-ink-400 mt-0.5">العضوية: #{item.membershipNo} · الأسرة: {item.groupName}</div>
+                          </div>
+                        </div>
+                        <span className={`pill shrink-0 ${item.totalPoints >= 0 ? 'pill-green' : 'pill-red'} font-bold`}>
+                          {item.totalPoints} ن
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            )
           ) : points.length === 0 ? (
             <p className="text-center py-10 text-ink-400 text-sm">لا توجد نقاط مرصودة بعد.</p>
           ) : (
