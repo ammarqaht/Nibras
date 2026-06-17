@@ -130,35 +130,62 @@ export default function SupervisorsPage() {
           {loading ? (
             <p className="text-center py-10 text-ink-400 text-sm">جارٍ التحميل…</p>
           ) : (
-            <div className="overflow-x-auto scroll-soft">
-              <table className="tbl">
-                <thead>
-                  <tr><th>الاسم</th><th>المستخدم</th><th>الصلاحية</th><th>المجموعات</th><th></th></tr>
-                </thead>
-                <tbody>
-                  {list.map((s) => {
-                    const primary = s.email === 'admin' || s.email === 'admin@nibras.com';
-                    return (
-                      <tr key={s.id}>
-                        <td className="font-medium">{s.name}</td>
-                        <td dir="ltr" className="text-right text-ink-500">{s.email}</td>
-                        <td>
-                          <span className={`pill ${s.role === 'admin' ? 'pill-blue' : 'pill-gray'}`}>
+            <>
+              <div className="hidden lg:block overflow-x-auto scroll-soft">
+                <table className="tbl">
+                  <thead>
+                    <tr><th>الاسم</th><th>المستخدم</th><th>الصلاحية</th><th>المجموعات</th><th></th></tr>
+                  </thead>
+                  <tbody>
+                    {list.map((s) => {
+                      const primary = s.email === 'admin' || s.email === 'admin@nibras.com';
+                      return (
+                        <tr key={s.id}>
+                          <td className="font-medium">{s.name}</td>
+                          <td dir="ltr" className="text-right text-ink-500">{s.email}</td>
+                          <td>
+                            <span className={`pill ${s.role === 'admin' ? 'pill-blue' : 'pill-gray'}`}>
+                              {s.role === 'admin' ? 'مدير عام' : 'مشرف'}
+                            </span>
+                          </td>
+                          <td className="text-ink-500 text-sm">{s.role === 'admin' ? 'الكل' : groupNames(s.groupIds) || '—'}</td>
+                          <td>
+                            {!primary && (
+                              <button onClick={() => del(s)} className="btn btn-danger py-1 px-3 text-xs">حذف</button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <ul className="lg:hidden divide-y divide-ink-200">
+                {list.map((s) => {
+                  const primary = s.email === 'admin' || s.email === 'admin@nibras.com';
+                  return (
+                    <li key={s.id} className="py-3 flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-ink-900 truncate">{s.name}</span>
+                          <span className={`pill shrink-0 ${s.role === 'admin' ? 'pill-blue' : 'pill-gray'}`}>
                             {s.role === 'admin' ? 'مدير عام' : 'مشرف'}
                           </span>
-                        </td>
-                        <td className="text-ink-500 text-sm">{s.role === 'admin' ? 'الكل' : groupNames(s.groupIds) || '—'}</td>
-                        <td>
-                          {!primary && (
-                            <button onClick={() => del(s)} className="btn btn-danger py-1 px-3 text-xs">حذف</button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                        </div>
+                        <div dir="ltr" className="text-xs text-ink-400 mt-0.5 text-right truncate">{s.email}</div>
+                        <div className="text-xs text-ink-500 mt-0.5">
+                          المجموعات: {s.role === 'admin' ? 'الكل' : groupNames(s.groupIds) || '—'}
+                        </div>
+                      </div>
+                      {!primary && (
+                        <button onClick={() => del(s)} className="btn btn-danger py-1 px-3 text-xs shrink-0">حذف</button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
           )}
         </div>
       </div>

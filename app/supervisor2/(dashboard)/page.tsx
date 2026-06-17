@@ -103,35 +103,55 @@ export default function DashboardHome() {
               {recent.length === 0 ? (
                 <p className="text-center py-8 text-ink-400 text-sm">لا توجد تسجيلات بعد.</p>
               ) : (
-                <div className="overflow-x-auto scroll-soft">
-                  <table className="tbl">
-                    <thead>
-                      <tr>
-                        <th>الطالب</th>
-                        <th>العضوية</th>
-                        <th>المرحلة</th>
-                        <th>الدفع</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {recent.map((s) => (
-                        <tr key={s.id}>
-                          <td className="font-medium">
-                            {s.studentName}
-                            {s.hasCondition && <span title="حالة صحية" className="mr-1">🚨</span>}
-                          </td>
-                          <td dir="ltr" className="text-right font-mono text-ink-500">#{s.membershipNo}</td>
-                          <td className="text-ink-500">{s.stage}</td>
-                          <td>
-                            <span className={`pill ${s.paymentStatus === 'paid' ? 'pill-green' : 'pill-red'}`}>
-                              {s.paymentStatus === 'paid' ? 'مدفوع' : 'لم يدفع'}
-                            </span>
-                          </td>
+                <>
+                  <div className="hidden lg:block overflow-x-auto scroll-soft">
+                    <table className="tbl">
+                      <thead>
+                        <tr>
+                          <th>الطالب</th>
+                          <th>العضوية</th>
+                          <th>المرحلة</th>
+                          <th>الدفع</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {recent.map((s) => (
+                          <tr key={s.id}>
+                            <td className="font-medium">
+                              {s.studentName}
+                              {s.hasCondition && <span title="حالة صحية" className="mr-1">🚨</span>}
+                            </td>
+                            <td dir="ltr" className="text-right font-mono text-ink-500">#{s.membershipNo}</td>
+                            <td className="text-ink-500">{s.stage}</td>
+                            <td>
+                              <span className={`pill ${s.paymentStatus === 'paid' ? 'pill-green' : 'pill-red'}`}>
+                                {s.paymentStatus === 'paid' ? 'مدفوع' : 'لم يدفع'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <ul className="lg:hidden divide-y divide-ink-100">
+                    {recent.map((s) => (
+                      <li key={s.id} className="py-3 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-medium text-ink-900 truncate">
+                            {s.studentName}
+                            {s.hasCondition && <span className="mr-1">🚨</span>}
+                          </div>
+                          <div className="text-xs text-ink-400 mt-0.5">
+                            <span dir="ltr" className="font-mono">#{s.membershipNo}</span> · {s.stage}
+                          </div>
+                        </div>
+                        <span className={`pill shrink-0 ${s.paymentStatus === 'paid' ? 'pill-green' : 'pill-red'}`}>
+                          {s.paymentStatus === 'paid' ? 'مدفوع' : 'لم يدفع'}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
               )}
             </div>
 

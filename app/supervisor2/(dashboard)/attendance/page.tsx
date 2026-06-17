@@ -137,38 +137,66 @@ export default function AttendancePage() {
         ) : list.length === 0 ? (
           <p className="text-center py-16 text-ink-400 text-sm">لا يوجد طلاب.</p>
         ) : (
-          <div className="overflow-x-auto scroll-soft">
-            <table className="tbl">
-              <thead>
-                <tr><th>الطالب</th><th>العضوية</th><th>المرحلة</th><th>الحالة</th></tr>
-              </thead>
-              <tbody>
-                {list.map((s) => (
-                  <tr key={s.id}>
-                    <td className="font-medium">{s.studentName}</td>
-                    <td dir="ltr" className="text-right font-mono text-ink-500">#{s.membershipNo}</td>
-                    <td className="text-ink-500 text-sm">{s.stage} — {s.grade}</td>
-                    <td>
-                      <div className="flex gap-1.5">
-                        {STATUSES.map((st) => {
-                          const active = records[s.id] === st.key;
-                          return (
-                            <button
-                              key={st.key}
-                              onClick={() => mark(s.id, st.key)}
-                              className={`choice py-1 px-3 text-xs ${active ? 'is-active' : ''}`}
-                            >
-                              {st.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <div className="hidden lg:block overflow-x-auto scroll-soft">
+              <table className="tbl">
+                <thead>
+                  <tr><th>الطالب</th><th>العضوية</th><th>المرحلة</th><th>الحالة</th></tr>
+                </thead>
+                <tbody>
+                  {list.map((s) => (
+                    <tr key={s.id}>
+                      <td className="font-medium">{s.studentName}</td>
+                      <td dir="ltr" className="text-right font-mono text-ink-500">#{s.membershipNo}</td>
+                      <td className="text-ink-500 text-sm">{s.stage} — {s.grade}</td>
+                      <td>
+                        <div className="flex gap-1.5">
+                          {STATUSES.map((st) => {
+                            const active = records[s.id] === st.key;
+                            return (
+                              <button
+                                key={st.key}
+                                onClick={() => mark(s.id, st.key)}
+                                className={`choice py-1 px-3 text-xs ${active ? 'is-active' : ''}`}
+                              >
+                                {st.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <ul className="lg:hidden divide-y divide-ink-200">
+              {list.map((s) => (
+                <li key={s.id} className="p-4">
+                  <div className="flex items-baseline justify-between gap-2 mb-2.5">
+                    <span className="font-semibold text-ink-900 truncate">{s.studentName}</span>
+                    <span dir="ltr" className="font-mono text-xs text-ink-400 shrink-0">#{s.membershipNo}</span>
+                  </div>
+                  <div className="text-xs text-ink-400 mb-2.5">{s.stage} — {s.grade}</div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {STATUSES.map((st) => {
+                      const active = records[s.id] === st.key;
+                      return (
+                        <button
+                          key={st.key}
+                          onClick={() => mark(s.id, st.key)}
+                          className={`choice py-2 text-xs ${active ? 'is-active' : ''}`}
+                        >
+                          {st.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
       </div>
     </div>

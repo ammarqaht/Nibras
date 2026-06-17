@@ -144,28 +144,45 @@ export default function PointsPage() {
           ) : points.length === 0 ? (
             <p className="text-center py-10 text-ink-400 text-sm">لا توجد نقاط مرصودة بعد.</p>
           ) : (
-            <div className="overflow-x-auto scroll-soft">
-              <table className="tbl">
-                <thead>
-                  <tr><th>الطالب</th><th>النقاط</th><th>التصنيف</th><th>السبب</th><th>بواسطة</th></tr>
-                </thead>
-                <tbody>
-                  {points.map((p) => (
-                    <tr key={p.id}>
-                      <td className="font-medium">{nameOf(p.registrationId)}</td>
-                      <td>
-                        <span className={`pill ${p.delta >= 0 ? 'pill-green' : 'pill-red'}`} dir="ltr">
-                          {p.delta >= 0 ? `+${p.delta}` : p.delta}
-                        </span>
-                      </td>
-                      <td className="text-ink-500 text-sm">{catLabel(p.category)}</td>
-                      <td className="text-ink-700 text-sm">{p.reason}</td>
-                      <td className="text-ink-400 text-sm">{p.recordedBy || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <>
+              <div className="hidden lg:block overflow-x-auto scroll-soft">
+                <table className="tbl">
+                  <thead>
+                    <tr><th>الطالب</th><th>النقاط</th><th>التصنيف</th><th>السبب</th><th>بواسطة</th></tr>
+                  </thead>
+                  <tbody>
+                    {points.map((p) => (
+                      <tr key={p.id}>
+                        <td className="font-medium">{nameOf(p.registrationId)}</td>
+                        <td>
+                          <span className={`pill ${p.delta >= 0 ? 'pill-green' : 'pill-red'}`} dir="ltr">
+                            {p.delta >= 0 ? `+${p.delta}` : p.delta}
+                          </span>
+                        </td>
+                        <td className="text-ink-500 text-sm">{catLabel(p.category)}</td>
+                        <td className="text-ink-700 text-sm">{p.reason}</td>
+                        <td className="text-ink-400 text-sm">{p.recordedBy || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <ul className="lg:hidden divide-y divide-ink-200">
+                {points.map((p) => (
+                  <li key={p.id} className="py-3 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-medium text-ink-900 truncate">{nameOf(p.registrationId)}</div>
+                      <div className="text-sm text-ink-700 mt-0.5">{p.reason}</div>
+                      <div className="text-xs text-ink-400 mt-0.5">{catLabel(p.category)} · {p.recordedBy || '—'}</div>
+                    </div>
+                    <span className={`pill shrink-0 ${p.delta >= 0 ? 'pill-green' : 'pill-red'}`} dir="ltr">
+                      {p.delta >= 0 ? `+${p.delta}` : p.delta}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
         </div>
       </div>

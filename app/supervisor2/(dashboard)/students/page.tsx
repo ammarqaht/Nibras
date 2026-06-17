@@ -176,46 +176,79 @@ export default function StudentsPage() {
         ) : filtered.length === 0 ? (
           <p className="text-center py-16 text-ink-400 text-sm">لا يوجد طلاب مطابقون.</p>
         ) : (
-          <div className="overflow-x-auto scroll-soft">
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>الطالب</th>
-                  <th>العضوية</th>
-                  <th>المرحلة / الصف</th>
-                  <th>الدفع</th>
-                  <th>التسجيل</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((s) => {
-                  const pp = paymentPill(s);
-                  const rp = regPill(s.registrationStatus);
-                  return (
-                    <tr key={s.id} className="cursor-pointer" onClick={() => setSelected(s)}>
-                      <td className="font-medium">
+          <>
+            {/* desktop: table */}
+            <div className="hidden lg:block overflow-x-auto scroll-soft">
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>الطالب</th>
+                    <th>العضوية</th>
+                    <th>المرحلة / الصف</th>
+                    <th>الدفع</th>
+                    <th>التسجيل</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((s) => {
+                    const pp = paymentPill(s);
+                    const rp = regPill(s.registrationStatus);
+                    return (
+                      <tr key={s.id} className="cursor-pointer" onClick={() => setSelected(s)}>
+                        <td className="font-medium">
+                          {s.studentName}
+                          {s.hasCondition && <span title="حالة صحية" className="mr-1">🚨</span>}
+                        </td>
+                        <td dir="ltr" className="text-right font-mono text-ink-500">#{s.membershipNo}</td>
+                        <td className="text-ink-500 text-sm">{s.stage} — {s.grade}</td>
+                        <td><span className={`pill ${pp.cls}`}>{pp.label}</span></td>
+                        <td><span className={`pill ${rp.cls}`}>{rp.label}</span></td>
+                        <td>
+                          <button
+                            className="btn btn-secondary py-1 px-3 text-xs"
+                            onClick={(e) => { e.stopPropagation(); setSelected(s); }}
+                          >
+                            عرض
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* mobile: tappable cards (no horizontal scroll) */}
+            <ul className="lg:hidden divide-y divide-ink-200">
+              {filtered.map((s) => {
+                const pp = paymentPill(s);
+                const rp = regPill(s.registrationStatus);
+                return (
+                  <li
+                    key={s.id}
+                    onClick={() => setSelected(s)}
+                    className="p-4 flex items-center gap-3 active:bg-cream-100 cursor-pointer"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-ink-900 truncate">
                         {s.studentName}
                         {s.hasCondition && <span title="حالة صحية" className="mr-1">🚨</span>}
-                      </td>
-                      <td dir="ltr" className="text-right font-mono text-ink-500">#{s.membershipNo}</td>
-                      <td className="text-ink-500 text-sm">{s.stage} — {s.grade}</td>
-                      <td><span className={`pill ${pp.cls}`}>{pp.label}</span></td>
-                      <td><span className={`pill ${rp.cls}`}>{rp.label}</span></td>
-                      <td>
-                        <button
-                          className="btn btn-secondary py-1 px-3 text-xs"
-                          onClick={(e) => { e.stopPropagation(); setSelected(s); }}
-                        >
-                          عرض
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                      </div>
+                      <div className="text-xs text-ink-400 mt-0.5">
+                        <span dir="ltr" className="font-mono">#{s.membershipNo}</span> · {s.stage} — {s.grade}
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        <span className={`pill ${pp.cls}`}>{pp.label}</span>
+                        <span className={`pill ${rp.cls}`}>{rp.label}</span>
+                      </div>
+                    </div>
+                    <span className="text-ink-300 text-xl shrink-0">‹</span>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
         )}
       </div>
 

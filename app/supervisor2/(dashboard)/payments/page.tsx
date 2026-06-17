@@ -94,52 +94,95 @@ export default function PaymentsPage() {
         ) : filtered.length === 0 ? (
           <p className="text-center py-16 text-ink-400 text-sm">لا توجد سجلات في هذا التصنيف.</p>
         ) : (
-          <div className="overflow-x-auto scroll-soft">
-            <table className="tbl">
-              <thead>
-                <tr><th>الطالب</th><th>العضوية</th><th>نوع الدفع</th><th>الإيصال</th><th>الحالة</th><th></th></tr>
-              </thead>
-              <tbody>
-                {filtered.map((s) => (
-                  <tr key={s.id}>
-                    <td className="font-medium">{s.studentName}</td>
-                    <td dir="ltr" className="text-right font-mono text-ink-500">#{s.membershipNo}</td>
-                    <td><span className="pill pill-gray">{s.paymentType === 'now' ? 'فوري' : 'آجل'}</span></td>
-                    <td>
-                      {s.paymentReceipt ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={s.paymentReceipt}
-                          alt="إيصال"
-                          onClick={() => openReceipt(s.paymentReceipt!)}
-                          className="w-12 h-12 object-cover rounded-md border border-ink-200 cursor-pointer"
-                        />
-                      ) : (
-                        <span className="text-ink-300 text-xs">—</span>
-                      )}
-                    </td>
-                    <td>
+          <>
+            <div className="hidden lg:block overflow-x-auto scroll-soft">
+              <table className="tbl">
+                <thead>
+                  <tr><th>الطالب</th><th>العضوية</th><th>نوع الدفع</th><th>الإيصال</th><th>الحالة</th><th></th></tr>
+                </thead>
+                <tbody>
+                  {filtered.map((s) => (
+                    <tr key={s.id}>
+                      <td className="font-medium">{s.studentName}</td>
+                      <td dir="ltr" className="text-right font-mono text-ink-500">#{s.membershipNo}</td>
+                      <td><span className="pill pill-gray">{s.paymentType === 'now' ? 'فوري' : 'آجل'}</span></td>
+                      <td>
+                        {s.paymentReceipt ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={s.paymentReceipt}
+                            alt="إيصال"
+                            onClick={() => openReceipt(s.paymentReceipt!)}
+                            className="w-12 h-12 object-cover rounded-md border border-ink-200 cursor-pointer"
+                          />
+                        ) : (
+                          <span className="text-ink-300 text-xs">—</span>
+                        )}
+                      </td>
+                      <td>
+                        <span className={`pill ${s.paymentStatus === 'paid' ? 'pill-green' : isReview(s) ? 'pill-yellow' : 'pill-red'}`}>
+                          {s.paymentStatus === 'paid' ? 'مدفوع' : isReview(s) ? 'بانتظار المراجعة' : 'لم يدفع'}
+                        </span>
+                      </td>
+                      <td>
+                        {s.paymentStatus !== 'paid' && (
+                          <button
+                            onClick={() => confirm(s.id)}
+                            disabled={busyId === s.id}
+                            className="btn text-white border-transparent py-1 px-3 text-xs"
+                            style={{ background: '#1B7A43' }}
+                          >
+                            ✅ تأكيد الدفع
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <ul className="lg:hidden divide-y divide-ink-200">
+              {filtered.map((s) => (
+                <li key={s.id} className="p-4 flex items-center gap-3">
+                  {s.paymentReceipt ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={s.paymentReceipt}
+                      alt="إيصال"
+                      onClick={() => openReceipt(s.paymentReceipt!)}
+                      className="w-14 h-14 object-cover rounded-lg border border-ink-200 cursor-pointer shrink-0"
+                    />
+                  ) : (
+                    <div className="w-14 h-14 rounded-lg bg-cream-100 flex items-center justify-center text-ink-300 text-xs shrink-0">
+                      لا إيصال
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-ink-900 truncate">{s.studentName}</div>
+                    <div className="text-xs text-ink-400 mt-0.5">
+                      <span dir="ltr" className="font-mono">#{s.membershipNo}</span> · {s.paymentType === 'now' ? 'فوري' : 'آجل'}
+                    </div>
+                    <div className="mt-1.5">
                       <span className={`pill ${s.paymentStatus === 'paid' ? 'pill-green' : isReview(s) ? 'pill-yellow' : 'pill-red'}`}>
                         {s.paymentStatus === 'paid' ? 'مدفوع' : isReview(s) ? 'بانتظار المراجعة' : 'لم يدفع'}
                       </span>
-                    </td>
-                    <td>
-                      {s.paymentStatus !== 'paid' && (
-                        <button
-                          onClick={() => confirm(s.id)}
-                          disabled={busyId === s.id}
-                          className="btn text-white border-transparent py-1 px-3 text-xs"
-                          style={{ background: '#1B7A43' }}
-                        >
-                          ✅ تأكيد الدفع
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    </div>
+                  </div>
+                  {s.paymentStatus !== 'paid' && (
+                    <button
+                      onClick={() => confirm(s.id)}
+                      disabled={busyId === s.id}
+                      className="btn text-white border-transparent py-2 px-3 text-xs shrink-0"
+                      style={{ background: '#1B7A43' }}
+                    >
+                      ✅ تأكيد
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </>
         )}
       </div>
     </div>
