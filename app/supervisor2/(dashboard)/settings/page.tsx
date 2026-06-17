@@ -10,34 +10,6 @@ type Section = { title: string; fields: Field[] };
 
 const SECTIONS: Section[] = [
   {
-    title: 'هوية الموقع',
-    fields: [
-      { key: 'siteNameAr', label: 'اسم الموقع', def: site.nameAr },
-      { key: 'clubNameAr', label: 'اسم النادي', def: site.clubNameAr }
-    ]
-  },
-  {
-    title: 'الصفحة الرئيسية',
-    fields: [
-      { key: 'landingTagline', label: 'الشعار النصي', def: landing.tagline },
-      { key: 'landingTaglineSub', label: 'العبارة الفرعية', def: landing.taglineSub },
-      { key: 'landingIntro', label: 'نبذة النادي', def: landing.intro, type: 'textarea' }
-    ]
-  },
-  {
-    title: 'تفاصيل النادي',
-    fields: [
-      { key: 'clubTargetGroupValue', label: 'الفئة المستهدفة', def: clubDetails.targetGroup.value },
-      { key: 'clubDatesValue', label: 'تاريخ النادي', def: clubDetails.dates.value },
-      { key: 'clubTimeValue', label: 'وقت النادي', def: clubDetails.time.value },
-      { key: 'clubTimeNote', label: 'أيام النادي', def: clubDetails.time.note },
-      { key: 'clubFeesValue', label: 'الرسوم', def: clubDetails.fees.value },
-      { key: 'clubLocationValue', label: 'اسم الموقع', def: clubDetails.location.value },
-      { key: 'clubLocationNote', label: 'وصف الموقع', def: clubDetails.location.note },
-      { key: 'clubLocationMapLink', label: 'رابط الموقع على خرائط Google', def: '', ltr: true }
-    ]
-  },
-  {
     title: 'الحساب البنكي (للتحويل)',
     fields: [
       { key: 'bankName', label: 'اسم البنك', def: defaultBankDetails.bankName },
@@ -47,7 +19,7 @@ const SECTIONS: Section[] = [
     ]
   },
   {
-    title: 'روابط التواصل',
+    title: 'روابط التواصل الاجتماعي',
     fields: footer.social.map((s) => ({ key: `social_${s.key}`, label: s.label, def: s.href, ltr: true }))
   }
 ];
@@ -62,7 +34,16 @@ export default function SettingsPage() {
     (async () => {
       const r = await fetch('/api/supervisor/settings', { cache: 'no-store' });
       const j = await r.json().catch(() => ({ settings: {} }));
-      setValues(j.settings ?? {});
+      
+      // Initialize with default values from content file so fields are not empty
+      const defaultValues: Record<string, string> = {};
+      SECTIONS.forEach((sec) => {
+        sec.fields.forEach((f) => {
+          defaultValues[f.key] = f.def;
+        });
+      });
+
+      setValues({ ...defaultValues, ...(j.settings ?? {}) });
       setLoading(false);
     })();
   }, []);

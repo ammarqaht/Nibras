@@ -248,6 +248,13 @@ body::after {
   color: #fff;
   box-shadow: 0 4px 14px rgba(245,166,35,0.25);
 }
+@media (max-width: 640px) {
+  .choice {
+    padding: 0.5rem 0.8rem;
+    font-size: 0.85rem;
+  }
+}
+
 
 /* Animations */
 @keyframes toastIn {
@@ -311,3 +318,12 @@ body::after {
 .supervisor-body .font-display {
   font-family: var(--font-body) !important;
 }
+
+/* Date & Select inputs height fix for mobile Safari/iOS */
+input[type="date"],
+select.field,
+select.input {
+  min-height: 48px;
+  line-height: 1.2;
+}
+

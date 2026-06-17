@@ -8,12 +8,11 @@ type Student = {
   paymentStatus: string; paymentType: string; paymentReceipt: string | null;
 };
 
-type Tab = 'review' | 'unpaid' | 'paid' | 'all';
+type Tab = 'unpaid' | 'paid' | 'all';
 const TABS: { key: Tab; label: string }[] = [
-  { key: 'review', label: 'بانتظار المراجعة' },
-  { key: 'unpaid', label: 'غير مدفوع' },
+  { key: 'all', label: 'الكل' },
   { key: 'paid', label: 'مدفوع' },
-  { key: 'all', label: 'الكل' }
+  { key: 'unpaid', label: 'غير مدفوع' }
 ];
 
 function isReview(s: Student) {
@@ -23,7 +22,7 @@ function isReview(s: Student) {
 export default function PaymentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<Tab>('review');
+  const [tab, setTab] = useState<Tab>('all');
   const [busyId, setBusyId] = useState<number | null>(null);
 
   async function load() {
@@ -83,7 +82,9 @@ export default function PaymentsPage() {
             onClick={() => setTab(t.key)}
           >
             {t.label}
-            {t.key === 'review' && reviewCount > 0 && <span className="font-bold"> ({reviewCount})</span>}
+            {t.key === 'unpaid' && reviewCount > 0 && (
+              <span className="font-bold text-amber-500 mr-1"> ({reviewCount} مراجعة 📑)</span>
+            )}
           </button>
         ))}
       </div>

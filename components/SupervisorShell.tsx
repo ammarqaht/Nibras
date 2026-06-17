@@ -123,7 +123,7 @@ export default function SupervisorShell({ children }: { children: React.ReactNod
                   {user?.role === 'admin' ? 'مدير عام' : 'مشرف'}
                 </span>
               </span>
-              <button onClick={logout} className="hidden lg:inline-flex btn btn-ghost text-sm">
+              <button onClick={logout} className="!hidden lg:!inline-flex btn btn-ghost text-sm">
                 خروج
               </button>
             </div>

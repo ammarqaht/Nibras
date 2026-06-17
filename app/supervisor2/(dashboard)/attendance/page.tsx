@@ -97,13 +97,27 @@ export default function AttendancePage() {
   }, [list, records]);
 
   return (
-    <div>
+    <div className="space-y-6 relative">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-ink-900 mb-1">تسجيل الحضور</h1>
         <p className="text-sm text-ink-500">اختر اليوم وسجّل حضور الطلاب.</p>
       </div>
 
-      <div className="card p-4 mb-5 grid grid-cols-1 md:grid-cols-3 gap-3">
+      {/* Blur Overlay with "Coming Soon" */}
+      <div className="absolute inset-x-0 bottom-0 top-[72px] bg-cream-50/40 backdrop-blur-[6px] z-10 flex items-center justify-center rounded-3xl min-h-[400px]">
+        <div className="card p-8 sm:p-10 max-w-md text-center bg-white border border-ink-200 shadow-xl pop-in m-6">
+          <div className="w-16 h-16 rounded-full bg-orange-50 text-orange-600 flex items-center justify-center text-3xl mx-auto mb-4">
+            🔒
+          </div>
+          <h2 className="font-display text-2xl text-ink-900 mb-2">قريباً</h2>
+          <p className="text-sm text-ink-500 leading-relaxed">
+            ميزة التحضير اليومي ومسح الـ QR والتحضير السريع قيد التطوير وستكون متاحة للمشرفين قريباً.
+          </p>
+        </div>
+      </div>
+
+      <div className="select-none pointer-events-none opacity-40 space-y-6">
+        <div className="card p-4 mb-5 grid grid-cols-1 md:grid-cols-3 gap-3">
         <div>
           <label className="label">التاريخ</label>
           <input type="date" className="field" dir="ltr" value={date} onChange={(e) => setDate(e.target.value)} />
@@ -198,6 +212,7 @@ export default function AttendancePage() {
             </ul>
           </>
         )}
+      </div>
       </div>
     </div>
   );

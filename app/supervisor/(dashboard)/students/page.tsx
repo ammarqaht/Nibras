@@ -929,13 +929,6 @@ export default function StudentsPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     <button 
-                      onClick={handleCopyWhatsapp}
-                      className="btn btn-secondary flex items-center gap-2"
-                      title="نسخ معلومات التسجيل منسقة للواتساب"
-                    >
-                      📋 نسخ للواتساب
-                    </button>
-                    <button 
                       onClick={() => setSelectedStudent(null)}
                       className="btn btn-secondary"
                     >

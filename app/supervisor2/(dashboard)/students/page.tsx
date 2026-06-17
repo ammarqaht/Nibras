@@ -228,7 +228,7 @@ export default function StudentsPage() {
                   <li
                     key={s.id}
                     onClick={() => setSelected(s)}
-                    className="p-4 flex items-center gap-3 active:bg-cream-100 cursor-pointer"
+                    className="py-2.5 px-4 flex items-center gap-3 active:bg-cream-100 cursor-pointer"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="font-semibold text-ink-900 truncate">
@@ -394,14 +394,14 @@ function StudentModal({
     : null;
 
   return (
-    <div className="modal-backdrop flex items-start md:items-center justify-center p-3 md:p-6 overflow-y-auto" onClick={onClose}>
+    <div className="modal-backdrop flex items-start md:items-center justify-center p-2 sm:p-6 overflow-y-auto" onClick={onClose}>
       <div className="modal-panel w-full max-w-2xl my-4" onClick={(e) => e.stopPropagation()}>
         {/* header */}
-        <div className="flex items-start justify-between p-5 border-b border-ink-200">
+        <div className="flex items-start justify-between p-4 sm:p-5 border-b border-ink-200">
           <div>
-            <h2 className="text-xl font-bold text-ink-900">{student.studentName}</h2>
+            <h2 className="text-lg sm:text-xl font-bold text-ink-900">{student.studentName}</h2>
             <div className="flex items-center gap-2 mt-1.5">
-              <span dir="ltr" className="text-sm font-mono text-ink-500">#{student.membershipNo}</span>
+              <span dir="ltr" className="text-xs sm:text-sm font-mono text-ink-500">#{student.membershipNo}</span>
               <span className={`pill ${pp.cls}`}>{pp.label}</span>
               <span className={`pill ${rp.cls}`}>{rp.label}</span>
             </div>
@@ -409,7 +409,7 @@ function StudentModal({
           <button onClick={onClose} className="text-ink-400 hover:text-ink-900 text-2xl leading-none px-2">×</button>
         </div>
 
-        <div className="p-5 space-y-5 max-h-[70vh] overflow-y-auto scroll-soft">
+        <div className="p-4 sm:p-5 space-y-4 sm:space-y-5 max-h-[70vh] overflow-y-auto scroll-soft">
           {edit ? (
             /* ---------- EDIT MODE ---------- */
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -472,7 +472,7 @@ function StudentModal({
           ) : (
             /* ---------- VIEW MODE ---------- */
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:gap-x-6">
                 <Info label="رقم الهوية" value={student.nationalId} ltr />
                 <Info label="المرحلة / الصف" value={`${student.stage} — ${student.grade}`} />
                 <Info label="جوال ولي الأمر" value={student.guardianPhone} ltr />
@@ -568,7 +568,6 @@ function StudentModal({
             ) : (
               <>
                 <button onClick={() => setEdit(true)} className="btn btn-secondary text-sm">✎ تعديل</button>
-                <button onClick={copyWhatsapp} className="btn btn-secondary text-sm">📋 نسخ للواتساب</button>
               </>
             )}
           </div>
