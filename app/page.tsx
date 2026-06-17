@@ -48,7 +48,7 @@ export default async function LandingPage() {
             draggable={false}
           />
 
-          <h1 className="reveal-hero font-display text-ink-900 mt-8 leading-tight text-[clamp(2.4rem,7vw,4.5rem)]">
+          <h1 className="reveal-hero font-display text-ink-900 mt-8 leading-tight text-[clamp(1.6rem,5vw,3.2rem)]">
             {landing.tagline}
           </h1>
           <p className="reveal-hero mt-4 text-ink-500 text-[clamp(1.05rem,2.2vw,1.4rem)]">
