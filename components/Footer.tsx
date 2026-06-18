@@ -81,7 +81,7 @@ export default function Footer({
             <img
               src="/logos/ammar-logo.png"
               alt="عمار سالم — Ammar Salem"
-              className="h-8 w-auto opacity-75 brightness-0 invert transition-opacity duration-200 hover:opacity-100 select-none pointer-events-none"
+              className="h-14 w-auto opacity-75 brightness-0 invert transition-opacity duration-200 hover:opacity-100 select-none pointer-events-none"
               draggable={false}
             />
           </div>

@@ -7,6 +7,7 @@ import {
   DiscoverIcon,
   TryIcon,
   LearnIcon,
+  RocketIcon,
   TargetIcon,
   CalendarIcon,
   ClockIcon,
@@ -17,7 +18,7 @@ import {
 const HIGHLIGHT_ICONS: Record<string, (p: { className?: string }) => JSX.Element> = {
   discover: DiscoverIcon,
   try: TryIcon,
-  learn: LearnIcon
+  learn: RocketIcon
 };
 
 export default async function LandingPage() {
