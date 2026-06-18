@@ -104,6 +104,17 @@ export async function PUT(req: NextRequest) {
       }
     }
 
+    // Auto-set registrationStatus based on paymentStatus
+    let registrationStatus = body.registrationStatus;
+    if (body.paymentStatus === 'paid') {
+      registrationStatus = 'approved';
+    } else if (body.paymentStatus === 'unpaid' || body.paymentStatus === 'apple_pay') {
+      // Only override if we're explicitly changing payment status
+      if (body.paymentStatus && !body.registrationStatus) {
+        registrationStatus = 'pending';
+      }
+    }
+
     const updated = await updateStudent(id, {
       studentName: body.studentName,
       nationalId: body.nationalId,
@@ -119,7 +130,7 @@ export async function PUT(req: NextRequest) {
       conditionNote: body.conditionNote,
       paymentStatus: body.paymentStatus,
       groupId: body.groupId !== undefined ? (body.groupId === null ? null : parseInt(body.groupId, 10)) : undefined,
-      registrationStatus: body.registrationStatus,
+      registrationStatus,
       paymentType: body.paymentType,
       paymentReceipt: body.paymentReceipt
     });

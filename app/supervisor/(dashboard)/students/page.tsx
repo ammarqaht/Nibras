@@ -733,15 +733,14 @@ export default function StudentsPage() {
                   </div>
                   <div>
                     <label className="label mb-1 block">حالة القبول</label>
-                    <select 
-                      value={editRegistrationStatus}
-                      onChange={e => setEditRegistrationStatus(e.target.value)}
-                      className="input w-full"
-                    >
-                      <option value="pending">قيد الانتظار</option>
-                      <option value="approved">مقبول</option>
-                      <option value="rejected">مرفوض</option>
-                    </select>
+                    <div className="flex items-center gap-2 py-2">
+                      {editPaymentStatus === 'paid' ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium" style={{ background: '#DEF7E5', color: '#1B7A43' }}>✓ مقبول</span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium" style={{ background: '#FEF3CD', color: '#856404' }}>⏳ قيد المراجعة</span>
+                      )}
+                      <span className="text-xs text-ink-400">(تلقائي)</span>
+                    </div>
                   </div>
                   <div>
                     <label className="label mb-1 block">حالة الدفع</label>

@@ -544,13 +544,20 @@ function StudentModal({
                 )}
               </div>
 
-              {/* registration controls */}
+              {/* registration status (auto-determined by payment) */}
               <div>
                 <div className="label">حالة التسجيل</div>
-                <div className="flex flex-wrap gap-2">
-                  <button className={`choice ${student.registrationStatus === 'approved' ? 'is-active' : ''}`} onClick={() => setReg('approved')} disabled={busy}>قبول</button>
-                  <button className={`choice ${student.registrationStatus === 'pending' ? 'is-active' : ''}`} onClick={() => setReg('pending')} disabled={busy}>قيد المراجعة</button>
-                  <button className={`choice ${student.registrationStatus === 'rejected' ? 'is-active' : ''}`} onClick={() => setReg('rejected')} disabled={busy}>رفض</button>
+                <div className="flex items-center gap-2">
+                  {student.paymentStatus === 'paid' ? (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium" style={{ background: '#DEF7E5', color: '#1B7A43' }}>
+                      ✓ مقبول
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium" style={{ background: '#FEF3CD', color: '#856404' }}>
+                      ⏳ قيد المراجعة
+                    </span>
+                  )}
+                  <span className="text-xs text-ink-400">(يتحدد تلقائياً حسب حالة الدفع)</span>
                 </div>
               </div>
             </>
