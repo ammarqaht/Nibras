@@ -28,7 +28,7 @@ export default function SiteHeader({ showCta = true }: { showCta?: boolean }) {
       <div className="mx-auto max-w-6xl px-6 sm:px-8 py-4 flex items-center justify-between">
         <Brand href="/" variant="lockup" imgClassName="h-10 sm:h-11 w-auto" />
         {showCta && (
-          <Link href="/register" className="btn btn-primary">
+          <Link href="/register" className="btn bg-nblue hover:bg-nblue-600 text-white hover:shadow-[0_8px_24px_rgba(16,63,145,0.22)] hover:-translate-y-0.5 border-none transition-all duration-300">
             {landing.ctaPrimary}
           </Link>
         )}

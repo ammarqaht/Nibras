@@ -36,7 +36,7 @@ export const landing = {
   // The "feeling" tags / why-join cards (creative presentation of the club spirit).
   highlights: [
     { icon: 'discover', title: 'اكتشف', desc: 'برامج متنوعة تفتح للطالب آفاقاً جديدة في القيم والثقافة والترفيه.', color: 'var(--accent)' },
-    { icon: 'try', title: 'جرّب', desc: 'تجارب عملية وممتعة تصقل المهارة وتبني الثقة في بيئة آمنة.', color: 'var(--blue)' },
+    { icon: 'try', title: 'جرّب', desc: 'تجارب عملية وممتعة تصقل المهارة وتبني الثقة في بيئة آمنة.', color: 'var(--cyan)' },
     { icon: 'learn', title: 'انطلق', desc: 'معارف قيّمة وخبرات جديدة تبني عقل الطالب وتصنع مستقبله.', color: 'var(--red)' }
   ]
 };
@@ -83,22 +83,22 @@ export const form = {
   subtitle: 'املأ البيانات التالية لإتمام تسجيل الطالب.',
 
   labels: {
-    studentName: 'اكتب اسمك الرباعي',
-    nationalId: 'رقم الهوية',
+    studentName: 'اسم الطالب الرباعي',
+    nationalId: 'رقم هوية الطالب',
     guardianPhone: 'رقم جوال ولي الأمر',
     studentPhone: 'رقم جوال الطالب',
     studentPhoneHint: 'إن وجد',
     stage: 'المرحلة الدراسية التي تم التخرج منها',
     grade: 'الصف',
     neighborhood: 'الحي السكني',
-    location: 'الموقع بالضبط',
-    locationOptional: 'اختياري',
+    location: 'موقع المنزل',
+    locationOptional: 'يستفاد منه في النقل',
     allergy: 'هل يعاني الطالب من حساسية أو أمراض مزمنة؟',
     allergyDetails: 'ما هي؟'
   },
 
   placeholders: {
-    studentName: 'اكتب اسمك الرباعي هنا',
+    studentName: 'اكتب اسم الطالب الرباعي هنا',
     nationalId: 'مثال: 1000000000',
     guardianPhone: '05xxxxxxxx',
     studentPhone: '05xxxxxxxx',
@@ -106,10 +106,9 @@ export const form = {
     allergyDetails: 'اذكر نوع الحساسية أو المرض'
   },
 
-  // Editable helper note for the (optional) location field — worded so it still
-  // makes sense if the person is NOT at home while filling the form.
+  // Editable helper note for the location field
   locationNote:
-    'نطلب الموقع فقط لأننا قد نحتاج لتوصيل الطالب في بعض الحالات. تحديد الموقع اختياري تماماً — إن لم تكن في المنزل الآن يمكنك تخطّيه أو تعديله لاحقاً.',
+    'يستفاد من الموقع في توصيل الابن في الحالات الاستثنائية والطارئة لا سمح الله.',
   locateButton: 'تحديد موقعي',
   locateAgainButton: 'إعادة تحديد الموقع',
   locateClearButton: 'إلغاء الموقع',

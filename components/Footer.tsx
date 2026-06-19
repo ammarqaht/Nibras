@@ -46,7 +46,7 @@ export default function Footer({
       className="mt-24 border-t border-blue-900/50 text-white relative overflow-hidden"
       style={{
         background:
-          'radial-gradient(circle at 80% 10%, rgba(245,166,35,0.15) 0%, transparent 50%), radial-gradient(circle at 20% 90%, rgba(43,175,217,0.2) 0%, transparent 60%), linear-gradient(135deg, #1E5BA8 0%, #113669 100%)'
+          'radial-gradient(circle at 80% 10%, rgba(255,159,28,0.15) 0%, transparent 50%), radial-gradient(circle at 20% 90%, rgba(18,179,213,0.2) 0%, transparent 60%), linear-gradient(135deg, #103F91 0%, #071F4A 100%)'
       }}
     >
       <div className="mx-auto max-w-6xl px-6 sm:px-8 py-12 relative z-10">
