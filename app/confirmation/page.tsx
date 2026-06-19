@@ -178,7 +178,7 @@ export default function ConfirmationPage() {
               <div className="absolute top-[15px] left-0 right-0 h-[3px] bg-ink-200/60 z-0 rounded-full" />
               {/* Line Connector Active Fill */}
               <div 
-                className="absolute top-[15px] right-0 h-[3px] bg-nblue z-0 transition-all duration-500 rounded-full" 
+                className="absolute top-[15px] right-0 h-[3px] bg-brand z-0 transition-all duration-500 rounded-full" 
                 style={{ 
                   width: '100%'
                 }} 
@@ -186,30 +186,30 @@ export default function ConfirmationPage() {
               
               {/* Step 1 */}
               <div className="flex flex-col items-center relative z-10 flex-1">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-300 bg-white text-nblue border-nblue">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-300 bg-brand text-white border-brand">
                   ١
                 </div>
-                <span className="text-xs font-semibold mt-2 absolute whitespace-nowrap top-8 text-ink-400">
+                <span className="text-xs font-semibold mt-2 absolute whitespace-nowrap top-8 text-brand-600 font-bold">
                   بيانات الطالب
                 </span>
               </div>
               
               {/* Step 2 */}
               <div className="flex flex-col items-center relative z-10 flex-1">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-300 bg-white text-nblue border-nblue">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-300 bg-brand text-white border-brand">
                   ٢
                 </div>
-                <span className="text-xs font-semibold mt-2 absolute whitespace-nowrap top-8 text-ink-400">
+                <span className="text-xs font-semibold mt-2 absolute whitespace-nowrap top-8 text-brand-600 font-bold">
                   طريقة السداد
                 </span>
               </div>
 
               {/* Step 3 */}
               <div className="flex flex-col items-center relative z-10 flex-1">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-300 bg-nblue text-white border-nblue shadow-[0_0_12px_rgba(16,63,145,0.25)]">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-300 bg-brand text-white border-brand shadow-[0_0_12px_rgba(255,159,28,0.25)]">
                   ٣
                 </div>
-                <span className="text-xs font-semibold mt-2 absolute whitespace-nowrap top-8 text-nblue-900 font-bold">
+                <span className="text-xs font-semibold mt-2 absolute whitespace-nowrap top-8 text-brand-600 font-bold">
                   التأكيد
                 </span>
               </div>

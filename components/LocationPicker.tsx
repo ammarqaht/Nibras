@@ -129,13 +129,6 @@ export default function LocationPicker({
             <div className="flex flex-wrap items-center gap-4 text-xs mt-0.5">
               <button
                 type="button"
-                className="text-nblue font-bold hover:underline"
-                onClick={locate}
-              >
-                {form.locateAgainButton}
-              </button>
-              <button
-                type="button"
                 className="text-nred font-bold hover:underline"
                 onClick={() => onChange(null)}
               >
