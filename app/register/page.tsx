@@ -708,8 +708,8 @@ export default function RegisterPage() {
                       type="button"
                       className={`group relative flex items-center gap-4 p-4 sm:p-5 text-right rounded-2xl border transition-all duration-300 hover:-translate-y-0.5 ${
                         paymentType === 'now'
-                          ? 'border-nblue bg-white text-nblue shadow-[0_20px_40px_rgba(16,63,145,0.14)]'
-                          : 'border-ink-200/40 bg-white/70 backdrop-blur-md text-ink-700 hover:bg-white hover:shadow-[0_20px_40px_rgba(16,63,145,0.1)] hover:border-nblue/30'
+                          ? 'border-nblue bg-white text-nblue shadow-[0_3px_10px_rgba(16,63,145,0.025)]'
+                          : 'border-ink-200/40 bg-white/70 backdrop-blur-md text-ink-700 hover:bg-white hover:shadow-[0_3px_10px_rgba(16,63,145,0.015)] hover:border-nblue/30'
                       }`}
                       onClick={() => setPaymentType('now')}
                     >
@@ -729,8 +729,8 @@ export default function RegisterPage() {
                       type="button"
                       className={`group relative flex items-center gap-4 p-4 sm:p-5 text-right rounded-2xl border transition-all duration-300 hover:-translate-y-0.5 ${
                         paymentType === 'later'
-                          ? 'border-nblue bg-white text-nblue shadow-[0_20px_40px_rgba(16,63,145,0.14)]'
-                          : 'border-ink-200/40 bg-white/70 backdrop-blur-md text-ink-700 hover:bg-white hover:shadow-[0_20px_40px_rgba(16,63,145,0.1)] hover:border-nblue/30'
+                          ? 'border-nblue bg-white text-nblue shadow-[0_3px_10px_rgba(16,63,145,0.025)]'
+                          : 'border-ink-200/40 bg-white/70 backdrop-blur-md text-ink-700 hover:bg-white hover:shadow-[0_3px_10px_rgba(16,63,145,0.015)] hover:border-nblue/30'
                       }`}
                       onClick={() => setPaymentType('later')}
                     >
