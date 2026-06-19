@@ -134,7 +134,7 @@ export default async function LandingPage() {
           </span>
           
           <p className="text-[clamp(1.15rem,2.5vw,1.45rem)] leading-[1.85] text-ink-800 font-body mb-10 max-w-2xl">
-            نادي نبراس هو نادٍ قيمي يهدف إلى <span className="text-ncyan-600 font-bold">تنمية مهارات الطالب</span> عن طريق برامج متنوعة، تجمع بين <span className="text-ncyan-600 font-bold">القيم والثقافة والترفيه</span> بشكل هادف وممتع.
+            نادي نبراس هو أحد برامج جمعية وثبة لتنمية الشباب والنشء، يهدف إلى <span className="text-ncyan-600 font-bold">تنمية مهارات الطالب</span> عن طريق برامج متنوعة، تجمع بين <span className="text-ncyan-600 font-bold">القيم والثقافة والترفيه</span> بشكل هادف وممتع.
           </p>
 
           {/* Core Features list centered */}
