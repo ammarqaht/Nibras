@@ -344,32 +344,47 @@ export default async function LandingPage() {
       </section>
 
       {/* ============================ CTA BAND ============================ */}
-      <section className="px-6 py-24 sm:py-32 relative overflow-hidden bg-transparent">
-        {/* Subtle background dots for a premium feel */}
-        <div className="absolute inset-0 pointer-events-none opacity-[0.02] bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:24px_24px]" />
-        
-        <div className="relative mx-auto max-w-4xl text-center">
-          <h2 className="font-display text-5xl sm:text-7xl mb-6 bg-gradient-to-r from-nblue via-brand to-nred bg-clip-text text-transparent leading-[1.15] tracking-tight">
-            جاهز تنطلق معنا؟
-          </h2>
-          <p className="text-ink-500 mb-10 text-lg sm:text-2xl font-body max-w-xl mx-auto leading-relaxed">
-            سجّل الآن واحجز مكانك في نادي نبراس.
-          </p>
-          <Link
-            href="/register"
-            className="group inline-flex items-center justify-center px-10 py-4 text-lg font-bold bg-brand text-white rounded-2xl hover:bg-brand-600 hover:scale-[1.03] hover:shadow-[0_12px_32px_rgba(255,159,28,0.3)] active:scale-95 transition-all duration-300 gap-2.5"
-          >
-            <span>{landing.ctaPrimary}</span>
-            <svg
-              className="w-5 h-5 transition-transform duration-300 group-hover:-translate-x-1"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2.5}
+      <section className="px-6 py-20 sm:py-24">
+        <div
+          className="reveal mx-auto max-w-4xl rounded-3xl p-8 sm:p-12 md:p-16 relative overflow-hidden"
+          style={{ background: 'linear-gradient(135deg, #103F91 0%, #071F4A 100%)', color: '#fff' }}
+        >
+          {/* Glowing gradients matching the footer and landing hero */}
+          <div
+            aria-hidden
+            className="absolute inset-0 pointer-events-none opacity-90"
+            style={{
+              background:
+                'radial-gradient(circle at 80% 10%, rgba(255,159,28,0.2) 0%, transparent 50%), radial-gradient(circle at 20% 90%, rgba(18,179,213,0.3) 0%, transparent 60%)'
+            }}
+          />
+          
+          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
+            <div className="flex flex-col items-center md:items-start text-center md:text-right max-w-xl">
+              <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl mb-3 text-white leading-tight">
+                جاهز تنطلق معنا؟
+              </h2>
+              <p className="text-cream-100/80 text-base sm:text-lg font-body leading-relaxed">
+                سجّل الآن واحجز مكانك في نادي نبراس.
+              </p>
+            </div>
+            
+            <Link
+              href="/register"
+              className="shrink-0 group inline-flex items-center justify-center px-10 py-4 text-lg font-bold bg-brand text-white rounded-2xl hover:bg-brand-600 hover:scale-[1.03] hover:shadow-[0_12px_32px_rgba(255,159,28,0.3)] active:scale-95 transition-all duration-300 gap-2.5"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-          </Link>
+              <span>{landing.ctaPrimary}</span>
+              <svg
+                className="w-5 h-5 transition-transform duration-300 group-hover:-translate-x-1"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2.5}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+            </Link>
+          </div>
         </div>
       </section>
 
