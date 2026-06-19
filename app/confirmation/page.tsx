@@ -258,7 +258,7 @@ export default function ConfirmationPage() {
                   }`}>
                     <div className="flex items-center gap-1.5 font-bold">
                       <CardIcon className="w-4 h-4 text-ink-500" />
-                      <span className="text-ink-800">بطاقة عضوية رقمية</span>
+                      <span className="text-ink-800">رقم العضوية</span>
                     </div>
                     <Brand variant="icon" imgClassName="h-9 w-auto" />
                   </div>
