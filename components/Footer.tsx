@@ -58,7 +58,7 @@ export default function Footer({
               <img
                 src="/wathbah-white.png"
                 alt="جمعية وثبة"
-                className="h-9 w-auto opacity-80 transition-opacity hover:opacity-100 select-none"
+                className="h-9 w-auto select-none"
               />
             </div>
             <p className="mt-4 font-display text-blue-100/80 tracking-wide text-sm">{customTagline || origFooter.tagline}</p>
