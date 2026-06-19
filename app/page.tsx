@@ -349,7 +349,7 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      <Footer tagline={landing.tagline} social={footer.social} />
+      <Footer tagline={footer.tagline} social={footer.social} />
       <LandingMotion />
     </main>
   );

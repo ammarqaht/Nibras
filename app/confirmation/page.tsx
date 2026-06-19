@@ -228,8 +228,8 @@ export default function ConfirmationPage() {
               {/* Membership badge */}
               <div className="card p-10 text-center pop-in">
                 {/* Emerald Pulsing success circle */}
-                <div className="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-5 bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.35)] animate-[pulse_2s_infinite]">
-                  <svg className="w-9 h-9" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <div className="mx-auto w-14 h-14 rounded-full flex items-center justify-center mb-5 bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.3)] animate-[pulse_2s_infinite]">
+                  <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                     <path
                       d="M5 13l4 4L19 7"
                       stroke="currentColor"
@@ -243,7 +243,7 @@ export default function ConfirmationPage() {
                 <p className="text-sm font-bold tracking-wide text-emerald-600 mb-1">
                   {confirmation.eyebrow}
                 </p>
-                <h1 className="font-display text-3xl text-ink-900 mt-2 mb-8">{welcomeText}</h1>
+                <h1 className="font-display text-xl sm:text-2xl text-ink-900 mt-2 mb-8">{welcomeText}</h1>
 
                 {/* Digital Membership Card Layout */}
                 <div className={`bg-white rounded-2xl py-7 px-6 text-ink-900 relative overflow-hidden transition-all duration-300 ${getCardBorderClass(studentStage)}`}>
@@ -260,7 +260,7 @@ export default function ConfirmationPage() {
                       <CardIcon className="w-4 h-4 text-ink-500" />
                       <span className="text-ink-800">بطاقة عضوية رقمية</span>
                     </div>
-                    <Brand variant="icon" imgClassName="h-7 w-auto" />
+                    <Brand variant="icon" imgClassName="h-9 w-auto" />
                   </div>
 
                   {/* Card Body */}
@@ -321,7 +321,7 @@ export default function ConfirmationPage() {
               <div className="flex flex-col sm:flex-row gap-3 mt-6">
                 <Link 
                   href="/register" 
-                  className="btn font-bold text-white bg-nblue hover:bg-nblue-600 hover:shadow-[0_8px_24px_rgba(16,63,145,0.22)] hover:-translate-y-0.5 border-none transition-all duration-300 flex-1 py-3.5 text-center"
+                  className="btn font-bold text-white bg-brand hover:bg-brand-600 hover:shadow-[0_8px_24px_rgba(255,159,28,0.22)] hover:-translate-y-0.5 border-none transition-all duration-300 flex-1 py-3.5 text-center"
                 >
                   {confirmation.registerAnother}
                 </Link>

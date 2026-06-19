@@ -120,10 +120,10 @@ export default function RegisterPage() {
   const [paymentType, setPaymentType] = useState<'now' | 'later'>('later');
   const [paymentReceipt, setPaymentReceipt] = useState<string | null>(null);
   const [bankInfo, setBankInfo] = useState({
-    bankName: 'مصرف الراجحي',
-    accountNumber: '1234567890123456',
-    iban: 'SA1234567890123456789012',
-    accountOwner: 'نادي نبراس الصيفي'
+    bankName: 'مصرف الانماء',
+    accountNumber: '68206153287000',
+    iban: 'SA7905000068206153287000',
+    accountOwner: 'جمعية وثبة لتنمية الشباب والنشء'
   });
 
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -211,10 +211,10 @@ export default function RegisterPage() {
         if (data.settings) {
           const s = data.settings;
           setBankInfo({
-            bankName: s.bankName || 'مصرف الراجحي',
-            accountNumber: s.bankAccount || '1234567890123456',
-            iban: s.bankIban || 'SA1234567890123456789012',
-            accountOwner: s.bankOwner || 'نادي نبراس الصيفي'
+            bankName: s.bankName || 'مصرف الانماء',
+            accountNumber: s.bankAccount || '68206153287000',
+            iban: s.bankIban || 'SA7905000068206153287000',
+            accountOwner: s.bankOwner || 'جمعية وثبة لتنمية الشباب والنشء'
           });
         }
       })
@@ -708,8 +708,8 @@ export default function RegisterPage() {
                       type="button"
                       className={`group relative flex items-center gap-4 p-4 sm:p-5 text-right rounded-2xl border transition-all duration-300 hover:-translate-y-0.5 ${
                         paymentType === 'now'
-                          ? 'border-nblue bg-white text-nblue shadow-[0_20px_40px_rgba(16,63,145,0.14)]'
-                          : 'border-ink-200/40 bg-white/70 backdrop-blur-md text-ink-700 hover:bg-white hover:shadow-[0_20px_40px_rgba(16,63,145,0.1)] hover:border-nblue/30'
+                          ? 'border-nblue bg-white text-nblue shadow-[0_3px_10px_rgba(16,63,145,0.025)]'
+                          : 'border-ink-200/40 bg-white/70 backdrop-blur-md text-ink-700 hover:bg-white hover:shadow-[0_3px_10px_rgba(16,63,145,0.015)] hover:border-nblue/30'
                       }`}
                       onClick={() => setPaymentType('now')}
                     >
@@ -729,8 +729,8 @@ export default function RegisterPage() {
                       type="button"
                       className={`group relative flex items-center gap-4 p-4 sm:p-5 text-right rounded-2xl border transition-all duration-300 hover:-translate-y-0.5 ${
                         paymentType === 'later'
-                          ? 'border-nblue bg-white text-nblue shadow-[0_20px_40px_rgba(16,63,145,0.14)]'
-                          : 'border-ink-200/40 bg-white/70 backdrop-blur-md text-ink-700 hover:bg-white hover:shadow-[0_20px_40px_rgba(16,63,145,0.1)] hover:border-nblue/30'
+                          ? 'border-nblue bg-white text-nblue shadow-[0_3px_10px_rgba(16,63,145,0.025)]'
+                          : 'border-ink-200/40 bg-white/70 backdrop-blur-md text-ink-700 hover:bg-white hover:shadow-[0_3px_10px_rgba(16,63,145,0.015)] hover:border-nblue/30'
                       }`}
                       onClick={() => setPaymentType('later')}
                     >
@@ -782,15 +782,15 @@ export default function RegisterPage() {
                         </div>
 
                         {/* Account Number */}
-                        <div className="flex items-center justify-between gap-3 bg-cream-50/50 rounded-xl px-4 py-2 border border-ink-100">
-                          <div>
+                        <div className="flex items-center justify-between gap-3 bg-cream-50/50 rounded-xl px-4 py-2 border border-ink-100 min-w-0">
+                          <div className="min-w-0 flex-1">
                             <span className="text-[9px] text-ink-400 block">رقم الحساب</span>
-                            <span className="font-mono text-sm tracking-wider text-ink-900" dir="ltr">{bankInfo.accountNumber}</span>
+                            <span className="font-mono text-xs sm:text-sm tracking-wider text-ink-900 block truncate" dir="ltr">{bankInfo.accountNumber}</span>
                           </div>
                           <button
                             type="button"
                             onClick={() => handleCopyText(bankInfo.accountNumber, 'account')}
-                            className="p-2 rounded-lg bg-white border border-ink-200 hover:border-nblue/40 text-ink-500 hover:text-nblue active:scale-95 transition-all shadow-sm"
+                            className="shrink-0 p-2 rounded-lg bg-white border border-ink-200 hover:border-nblue/40 text-ink-500 hover:text-nblue active:scale-95 transition-all shadow-sm"
                             title="نسخ رقم الحساب"
                           >
                             {copiedField === 'account' ? (
@@ -802,15 +802,15 @@ export default function RegisterPage() {
                         </div>
 
                         {/* IBAN */}
-                        <div className="flex items-center justify-between gap-3 bg-cream-50/50 rounded-xl px-4 py-2 border border-ink-100">
-                          <div>
+                        <div className="flex items-center justify-between gap-3 bg-cream-50/50 rounded-xl px-4 py-2 border border-ink-100 min-w-0">
+                          <div className="min-w-0 flex-1">
                             <span className="text-[9px] text-ink-400 block">الآيبان IBAN</span>
-                            <span className="font-mono text-xs sm:text-sm tracking-wider text-ink-900" dir="ltr">{bankInfo.iban}</span>
+                            <span className="font-mono text-[11px] sm:text-sm tracking-normal xs:tracking-wider text-ink-900 block select-all break-all" dir="ltr">{bankInfo.iban}</span>
                           </div>
                           <button
                             type="button"
                             onClick={() => handleCopyText(bankInfo.iban, 'iban')}
-                            className="p-2 rounded-lg bg-white border border-ink-200 hover:border-nblue/40 text-ink-500 hover:text-nblue active:scale-95 transition-all shadow-sm"
+                            className="shrink-0 p-2 rounded-lg bg-white border border-ink-200 hover:border-nblue/40 text-ink-500 hover:text-nblue active:scale-95 transition-all shadow-sm"
                             title="نسخ الآيبان"
                           >
                             {copiedField === 'iban' ? (
@@ -924,7 +924,7 @@ export default function RegisterPage() {
                     className="btn w-2/3 btn-lg font-bold text-white bg-brand hover:bg-brand-600 hover:shadow-[0_8px_24px_rgba(255,159,28,0.22)] hover:-translate-y-0.5 border-none transition-all duration-300 disabled:opacity-50 disabled:pointer-events-none"
                     disabled={busy}
                   >
-                    {busy ? 'جاري إتمام التسجيل...' : 'تأكيد وإتمام التسجيل'}
+                    {busy ? 'جاري إتمام التسجيل...' : 'إتمام التسجيل'}
                   </button>
                 </div>
               </form>

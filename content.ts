@@ -157,14 +157,14 @@ export const confirmation = {
 
 /* -------------------- SHARED — footer / social -------------------- */
 export const footer = {
-  tagline: 'اكتشف – جرّب – انطلق',
+  tagline: 'بيئة آمنة.. لجيلٍ واعد وقيم راسخة',
   rights: '© ١٤٤٧هـ نادي نبراس — جميع الحقوق محفوظة',
   // TODO: replace placeholder links with the real association channels.
   social: [
-    { key: 'whatsapp', label: 'واتساب', href: 'https://wa.me/000000000000' },
-    { key: 'snapchat', label: 'سناب شات', href: 'https://www.snapchat.com/add/nibras' },
-    { key: 'youtube', label: 'يوتيوب', href: 'https://www.youtube.com/@nibras' },
-    { key: 'x', label: 'إكس (X)', href: 'https://x.com/nibras' }
+    { key: 'whatsapp', label: 'واتساب', href: 'https://wa.me/966531223515' },
+    { key: 'snapchat', label: 'سناب شات', href: 'https://www.snapchat.com/add/wathbah1_sa' },
+    { key: 'youtube', label: 'يوتيوب', href: 'https://www.youtube.com/@wathbah1_sa' },
+    { key: 'x', label: 'إكس (X)', href: 'https://x.com/wathbah1_sa' }
   ]
 };
 
@@ -176,8 +176,8 @@ export const membership = {
 
 /* -------------------- BANK DETAILS -------------------- */
 export const defaultBankDetails = {
-  bankName: 'مصرف الراجحي',
-  accountNumber: '1234567890123456',
-  iban: 'SA1234567890123456789012',
-  accountOwner: 'نادي نبراس الصيفي'
+  bankName: 'مصرف الانماء',
+  accountNumber: '68206153287000',
+  iban: 'SA7905000068206153287000',
+  accountOwner: 'جمعية وثبة لتنمية الشباب والنشء'
 };
