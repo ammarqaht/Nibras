@@ -706,29 +706,45 @@ export default function RegisterPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <button
                       type="button"
-                      className={`group relative flex flex-col items-center justify-center p-6 text-center rounded-2xl border transition-all duration-300 hover:-translate-y-0.5 ${
+                      className={`group relative flex items-center gap-4 p-4 sm:p-5 text-right rounded-2xl border transition-all duration-300 hover:-translate-y-0.5 ${
                         paymentType === 'now'
-                          ? 'border-brand bg-white text-brand shadow-[0_20px_40px_rgba(255,159,28,0.14)]'
-                          : 'border-ink-200/40 bg-white/70 backdrop-blur-md text-ink-700 hover:bg-white hover:shadow-[0_20px_40px_rgba(255,159,28,0.12)] hover:border-brand/30'
+                          ? 'border-nblue bg-white text-nblue shadow-[0_20px_40px_rgba(16,63,145,0.14)]'
+                          : 'border-ink-200/40 bg-white/70 backdrop-blur-md text-ink-700 hover:bg-white hover:shadow-[0_20px_40px_rgba(16,63,145,0.1)] hover:border-nblue/30'
                       }`}
                       onClick={() => setPaymentType('now')}
                     >
-                      <CreditCardIcon className={`w-10 h-10 mb-3 transition-transform duration-300 group-hover:scale-110 ${paymentType === 'now' ? 'text-brand' : 'text-ink-400 group-hover:text-brand/80'}`} />
-                      <span className="font-display text-lg font-bold">الدفع الآن</span>
-                      <span className="text-xs mt-1.5 opacity-80">تحويل بنكي ورفع صورة الإيصال فوراً</span>
+                      <div className={`shrink-0 w-12 h-12 rounded-xl flex items-center justify-center shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:-rotate-3 ${
+                        paymentType === 'now'
+                          ? 'bg-nblue text-white border border-nblue shadow-sm'
+                          : 'bg-nblue-50 text-nblue border border-nblue-200/60'
+                      }`}>
+                        <CreditCardIcon className="w-6 h-6" />
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className={`font-display text-base sm:text-lg font-bold transition-colors ${paymentType === 'now' ? 'text-nblue' : 'text-ink-900'}`}>الدفع الآن</span>
+                        <span className={`text-[11px] sm:text-xs mt-1 transition-colors leading-normal ${paymentType === 'now' ? 'text-nblue/70' : 'text-ink-500 group-hover:text-ink-700'}`}>تحويل بنكي ورفع صورة الإيصال فوراً</span>
+                      </div>
                     </button>
                     <button
                       type="button"
-                      className={`group relative flex flex-col items-center justify-center p-6 text-center rounded-2xl border transition-all duration-300 hover:-translate-y-0.5 ${
+                      className={`group relative flex items-center gap-4 p-4 sm:p-5 text-right rounded-2xl border transition-all duration-300 hover:-translate-y-0.5 ${
                         paymentType === 'later'
-                          ? 'border-brand bg-white text-brand shadow-[0_20px_40px_rgba(255,159,28,0.14)]'
-                          : 'border-ink-200/40 bg-white/70 backdrop-blur-md text-ink-700 hover:bg-white hover:shadow-[0_20px_40px_rgba(255,159,28,0.12)] hover:border-brand/30'
+                          ? 'border-nblue bg-white text-nblue shadow-[0_20px_40px_rgba(16,63,145,0.14)]'
+                          : 'border-ink-200/40 bg-white/70 backdrop-blur-md text-ink-700 hover:bg-white hover:shadow-[0_20px_40px_rgba(16,63,145,0.1)] hover:border-nblue/30'
                       }`}
                       onClick={() => setPaymentType('later')}
                     >
-                      <HourglassIcon className={`w-10 h-10 mb-3 transition-transform duration-300 group-hover:scale-110 ${paymentType === 'later' ? 'text-brand' : 'text-ink-400 group-hover:text-brand/80'}`} />
-                      <span className="font-display text-lg font-bold">الدفع الآجل</span>
-                      <span className="text-xs mt-1.5 opacity-80">سداد لاحق لدى مقر النادي بعد المراجعة</span>
+                      <div className={`shrink-0 w-12 h-12 rounded-xl flex items-center justify-center shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:rotate-3 ${
+                        paymentType === 'later'
+                          ? 'bg-nblue text-white border border-nblue shadow-sm'
+                          : 'bg-nblue-50 text-nblue border border-nblue-200/60'
+                      }`}>
+                        <HourglassIcon className="w-6 h-6" />
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className={`font-display text-base sm:text-lg font-bold transition-colors ${paymentType === 'later' ? 'text-nblue' : 'text-ink-900'}`}>الدفع الآجل</span>
+                        <span className={`text-[11px] sm:text-xs mt-1 transition-colors leading-normal ${paymentType === 'later' ? 'text-nblue/70' : 'text-ink-500 group-hover:text-ink-700'}`}>سداد لاحق لدى مقر النادي بعد المراجعة</span>
+                      </div>
                     </button>
                   </div>
                 </div>
@@ -739,7 +755,7 @@ export default function RegisterPage() {
                     
                     {/* Digital Bank Card (styled like homepage details cards) */}
                     <div 
-                      className="relative overflow-hidden rounded-2xl p-6 sm:p-7 bg-white/70 backdrop-blur-md border border-ink-200/40 card-transition hover:bg-white hover:shadow-[0_20px_40px_rgba(255,159,28,0.12)] hover:border-brand/30 shadow-[0_8px_32px_rgba(255,159,28,0.06)] select-none"
+                      className="relative overflow-hidden rounded-2xl p-6 sm:p-7 bg-white/70 backdrop-blur-md border border-ink-200/40 card-transition hover:bg-white hover:shadow-[0_20px_40px_rgba(16,63,145,0.12)] hover:border-nblue/30 shadow-[0_8px_32px_rgba(16,63,145,0.06)] select-none"
                     >
                       {/* Subtle pattern background */}
                       <div className="absolute inset-0 opacity-[0.02] pointer-events-none bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:16px_16px]" />
@@ -808,7 +824,7 @@ export default function RegisterPage() {
 
                       {/* Toast / Copy Feedback Alert */}
                       {copiedField && (
-                        <div className="absolute bottom-2 right-1/2 translate-x-1/2 bg-amber-500 text-white text-[10px] sm:text-xs font-bold px-4 py-1.5 rounded-full shadow-lg border border-amber-400 animate-bounce">
+                        <div className="absolute bottom-2 right-1/2 translate-x-1/2 bg-nblue text-white text-[10px] sm:text-xs font-bold px-4 py-1.5 rounded-full shadow-lg border border-nblue/30 animate-bounce">
                           تم نسخ البيانات بنجاح! ✓
                         </div>
                       )}
