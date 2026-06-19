@@ -344,26 +344,40 @@ export default async function LandingPage() {
       </section>
 
       {/* ============================ CTA BAND ============================ */}
-      <section className="px-6 py-24">
+      <section
+        className="w-full relative overflow-hidden py-24 sm:py-32 text-center my-10 select-none"
+        style={{
+          background: 'linear-gradient(135deg, #103F91 0%, #071F4A 100%)',
+          clipPath: 'polygon(0 4vw, 100% 0, 100% calc(100% - 4vw), 0 100%)',
+          color: '#fff'
+        }}
+      >
         <div
-          className="reveal mx-auto max-w-4xl rounded-3xl px-8 py-16 text-center relative overflow-hidden"
-          style={{ background: 'linear-gradient(135deg, #103F91 0%, #071F4A 100%)', color: '#fff' }}
-        >
-          <div
-            aria-hidden
-            className="absolute inset-0 pointer-events-none opacity-90"
-            style={{
-              background:
-                'radial-gradient(circle at 80% 10%, rgba(255,159,28,0.2) 0%, transparent 50%), radial-gradient(circle at 20% 90%, rgba(18,179,213,0.3) 0%, transparent 60%)'
-            }}
-          />
-          <div className="relative">
-            <h2 className="font-display text-3xl sm:text-5xl mb-4">جاهز تنطلق معنا؟</h2>
-            <p className="text-cream-200/80 mb-9 text-lg">سجّل الآن واحجز مكانك في نادي نبراس.</p>
-            <Link href="/register" className="btn btn-primary btn-lg">
-              {landing.ctaPrimary}
-            </Link>
-          </div>
+          aria-hidden
+          className="absolute inset-0 pointer-events-none opacity-90"
+          style={{
+            background:
+              'radial-gradient(circle at 80% 10%, rgba(255,159,28,0.2) 0%, transparent 50%), radial-gradient(circle at 20% 90%, rgba(18,179,213,0.3) 0%, transparent 60%)'
+          }}
+        />
+        <div className="relative mx-auto max-w-3xl px-6 py-6 sm:py-8">
+          <h2 className="font-display text-4xl sm:text-6xl mb-4 leading-tight">جاهز تنطلق معنا؟</h2>
+          <p className="text-cream-200/80 mb-9 text-base sm:text-xl font-body max-w-lg mx-auto leading-relaxed">سجّل الآن واحجز مكانك في نادي نبراس.</p>
+          <Link
+            href="/register"
+            className="group inline-flex items-center justify-center px-10 py-4 text-lg font-bold bg-brand text-white rounded-2xl hover:bg-brand-600 hover:scale-[1.03] hover:shadow-[0_12px_32px_rgba(255,159,28,0.3)] active:scale-95 transition-all duration-300 gap-2.5"
+          >
+            <span>{landing.ctaPrimary}</span>
+            <svg
+              className="w-5 h-5 transition-transform duration-300 group-hover:-translate-x-1"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2.5}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+          </Link>
         </div>
       </section>
 
