@@ -722,7 +722,7 @@ export default function RegisterPage() {
                       </div>
                       <div className="flex flex-col min-w-0">
                         <span className={`font-display text-base sm:text-lg font-bold transition-colors ${paymentType === 'now' ? 'text-nblue' : 'text-ink-900'}`}>الدفع الآن</span>
-                        <span className={`text-[11px] sm:text-xs mt-1 transition-colors leading-normal ${paymentType === 'now' ? 'text-nblue/70' : 'text-ink-500 group-hover:text-ink-700'}`}>تحويل بنكي ورفع صورة الإيصال فوراً</span>
+                        <span className={`text-[11px] sm:text-xs mt-1 transition-colors leading-normal ${paymentType === 'now' ? 'text-nblue/70' : 'text-ink-500 group-hover:text-ink-700'}`}>تحويل بنكي ورفع صورة الإيصال</span>
                       </div>
                     </button>
                     <button
@@ -743,7 +743,7 @@ export default function RegisterPage() {
                       </div>
                       <div className="flex flex-col min-w-0">
                         <span className={`font-display text-base sm:text-lg font-bold transition-colors ${paymentType === 'later' ? 'text-nblue' : 'text-ink-900'}`}>الدفع الآجل</span>
-                        <span className={`text-[11px] sm:text-xs mt-1 transition-colors leading-normal ${paymentType === 'later' ? 'text-nblue/70' : 'text-ink-500 group-hover:text-ink-700'}`}>سداد لاحق لدى مقر النادي بعد المراجعة</span>
+                        <span className={`text-[11px] sm:text-xs mt-1 transition-colors leading-normal ${paymentType === 'later' ? 'text-nblue/70' : 'text-ink-500 group-hover:text-ink-700'}`}>التحويل في وقت لاحق</span>
                       </div>
                     </button>
                   </div>
@@ -895,7 +895,7 @@ export default function RegisterPage() {
                     </div>
                     <h4 className="font-display text-lg text-ink-900 font-bold">ملاحظة بشأن الدفع الآجل</h4>
                     <p className="text-sm text-ink-500 max-w-md mx-auto leading-relaxed">
-                      عند إتمام التسجيل، سيتم حفظ مقعد الطالب بوضع "غير مسدد". يمكنك سداد الرسوم لاحقاً نقداً أو عبر الشبكة لدى المشرفين في مقر النادي لتفعيل الاشتراك بالكامل.
+                      سيعتبر الطالب في حالة الانتظار حتى يتم الدفع عن طريق التحويل أو من خلال مقر النادي
                     </p>
                   </div>
                 )}
