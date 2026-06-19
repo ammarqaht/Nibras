@@ -250,18 +250,41 @@ export default function RegisterPage() {
     try {
       const saved = localStorage.getItem('nibras_register_form');
       if (saved) {
-        const data = JSON.parse(saved);
-        if (data.studentName) setStudentName(data.studentName);
-        if (data.nationalId) setNationalId(data.nationalId);
-        if (data.guardianPhone) setGuardianPhone(data.guardianPhone);
-        if (data.studentPhone) setStudentPhone(data.studentPhone);
-        if (data.stage) setStage(data.stage);
-        if (data.grade) setGrade(data.grade);
-        if (data.neighborhood) setNeighborhood(data.neighborhood);
-        if (data.coords) setCoords(data.coords);
-        if (data.mapLink) setMapLink(data.mapLink);
-        if (data.hasCondition !== undefined) setHasCondition(data.hasCondition);
-        if (data.conditionNote) setConditionNote(data.conditionNote);
+        let data = null;
+        let timestamp = null;
+        
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed && parsed.values) {
+            data = parsed.values;
+            timestamp = parsed.timestamp;
+          } else {
+            // Fallback to load old format if exists
+            data = parsed;
+          }
+        } catch {
+          // invalid json, ignore
+        }
+
+        const fiveMinutes = 5 * 60 * 1000;
+        if (timestamp && Date.now() - timestamp > fiveMinutes) {
+          localStorage.removeItem('nibras_register_form');
+          return;
+        }
+
+        if (data) {
+          if (data.studentName) setStudentName(data.studentName);
+          if (data.nationalId) setNationalId(data.nationalId);
+          if (data.guardianPhone) setGuardianPhone(data.guardianPhone);
+          if (data.studentPhone) setStudentPhone(data.studentPhone);
+          if (data.stage) setStage(data.stage);
+          if (data.grade) setGrade(data.grade);
+          if (data.neighborhood) setNeighborhood(data.neighborhood);
+          if (data.coords) setCoords(data.coords);
+          if (data.mapLink) setMapLink(data.mapLink);
+          if (data.hasCondition !== undefined) setHasCondition(data.hasCondition);
+          if (data.conditionNote) setConditionNote(data.conditionNote);
+        }
       }
     } catch (e) {
       console.error('Failed to load persisted form data', e);
@@ -271,6 +294,15 @@ export default function RegisterPage() {
   // Save form data to localStorage on change
   useEffect(() => {
     try {
+      const hasAnyValue = [
+        studentName, nationalId, guardianPhone, studentPhone,
+        stage, grade, neighborhood, coords, mapLink, hasCondition, conditionNote
+      ].some(val => val !== '' && val !== null && val !== undefined);
+
+      if (!hasAnyValue) {
+        return; // Avoid writing empty states to local storage on mount
+      }
+
       const data = {
         studentName,
         nationalId,
@@ -284,7 +316,11 @@ export default function RegisterPage() {
         hasCondition,
         conditionNote
       };
-      localStorage.setItem('nibras_register_form', JSON.stringify(data));
+      const payload = {
+        values: data,
+        timestamp: Date.now()
+      };
+      localStorage.setItem('nibras_register_form', JSON.stringify(payload));
     } catch (e) {
       console.error('Failed to persist form data', e);
     }
