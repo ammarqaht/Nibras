@@ -476,7 +476,7 @@ export default function RegisterPage() {
               <div className="absolute top-[15px] left-0 right-0 h-[3px] bg-ink-200 z-0 rounded-full" />
               {/* Line Connector Active Fill */}
               <div 
-                className="absolute top-[15px] right-0 h-[3px] bg-nblue z-0 transition-all duration-500 rounded-full" 
+                className="absolute top-[15px] right-0 h-[3px] bg-brand z-0 transition-all duration-500 rounded-full" 
                 style={{ 
                   width: step === 'payment' ? '50%' : '0%'
                 }} 
@@ -486,13 +486,13 @@ export default function RegisterPage() {
               <div className="flex flex-col items-center relative z-10 flex-1">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-300 ${
                   step === 'form' 
-                    ? 'bg-nblue text-white border-nblue shadow-[0_0_12px_rgba(16,63,145,0.25)]' 
-                    : 'bg-white text-nblue border-nblue'
+                    ? 'bg-brand text-white border-brand shadow-[0_0_12px_rgba(255,159,28,0.25)]' 
+                    : 'bg-brand text-white border-brand'
                 }`}>
                   ١
                 </div>
                 <span className={`text-xs font-semibold mt-2 absolute whitespace-nowrap top-8 transition-colors duration-300 ${
-                  step === 'form' ? 'text-nblue-900 font-bold' : 'text-ink-400'
+                  step === 'form' ? 'text-brand-600 font-bold' : 'text-ink-500 font-bold'
                 }`}>
                   بيانات الطالب
                 </span>
@@ -502,13 +502,13 @@ export default function RegisterPage() {
               <div className="flex flex-col items-center relative z-10 flex-1">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-300 ${
                   step === 'payment' 
-                    ? 'bg-nblue text-white border-nblue shadow-[0_0_12px_rgba(16,63,145,0.25)]' 
+                    ? 'bg-brand text-white border-brand shadow-[0_0_12px_rgba(255,159,28,0.25)]' 
                     : 'bg-white text-ink-300 border-ink-200'
                 }`}>
                   ٢
                 </div>
                 <span className={`text-xs font-semibold mt-2 absolute whitespace-nowrap top-8 transition-colors duration-300 ${
-                  step === 'payment' ? 'text-nblue-900 font-bold' : 'text-ink-400'
+                  step === 'payment' ? 'text-brand-600 font-bold' : 'text-ink-400'
                 }`}>
                   طريقة السداد
                 </span>
@@ -639,8 +639,8 @@ export default function RegisterPage() {
                       type="button"
                       className={`choice flex-1 py-3 text-center transition-all duration-300 ${
                         hasCondition === false
-                          ? '!border-2 !border-nblue !bg-nblue !text-white font-bold scale-[1.02] shadow-[0_6px_16px_rgba(16,63,145,0.25)]'
-                          : 'border-ink-200 bg-white/70 hover:border-nblue/40 hover:scale-[1.01]'
+                          ? '!border-2 !border-brand !bg-brand !text-white font-bold scale-[1.02] shadow-[0_6px_16px_rgba(255,159,28,0.25)]'
+                          : 'border-ink-200 bg-white/70 hover:border-brand/40 hover:scale-[1.01]'
                       }`}
                       onClick={() => setHasCondition(false)}
                     >
@@ -650,8 +650,8 @@ export default function RegisterPage() {
                       type="button"
                       className={`choice flex-1 py-3 text-center transition-all duration-300 ${
                         hasCondition === true
-                          ? '!border-2 !border-nblue !bg-nblue !text-white font-bold scale-[1.02] shadow-[0_6px_16px_rgba(16,63,145,0.25)]'
-                          : 'border-ink-200 bg-white/70 hover:border-nblue/40 hover:scale-[1.01]'
+                          ? '!border-2 !border-brand !bg-brand !text-white font-bold scale-[1.02] shadow-[0_6px_16px_rgba(255,159,28,0.25)]'
+                          : 'border-ink-200 bg-white/70 hover:border-brand/40 hover:scale-[1.01]'
                       }`}
                       onClick={() => setHasCondition(true)}
                     >
@@ -686,7 +686,7 @@ export default function RegisterPage() {
                 <button
                   type="submit"
                   disabled={busy}
-                  className="btn btn-lg w-full font-bold text-white bg-nblue hover:bg-nblue-600 hover:shadow-[0_8px_24px_rgba(16,63,145,0.22)] hover:-translate-y-0.5 border-none transition-all duration-300 disabled:opacity-50 disabled:pointer-events-none"
+                  className="btn btn-lg w-full font-bold text-white bg-brand hover:bg-brand-600 hover:shadow-[0_8px_24px_rgba(255,159,28,0.22)] hover:-translate-y-0.5 border-none transition-all duration-300 disabled:opacity-50 disabled:pointer-events-none"
                 >
                   التالي: طريقة السداد
                 </button>
@@ -706,27 +706,27 @@ export default function RegisterPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <button
                       type="button"
-                      className={`group relative flex flex-col items-center justify-center p-6 text-center rounded-2xl border-2 transition-all duration-300 hover:-translate-y-0.5 ${
+                      className={`group relative flex flex-col items-center justify-center p-6 text-center rounded-2xl border transition-all duration-300 hover:-translate-y-0.5 ${
                         paymentType === 'now'
-                          ? 'border-nblue bg-nblue-50/70 text-nblue shadow-[0_12px_24px_rgba(16,63,145,0.12)]'
-                          : 'border-ink-200/60 bg-white/70 backdrop-blur-md text-ink-700 hover:border-nblue/40'
+                          ? 'border-brand bg-white text-brand shadow-[0_20px_40px_rgba(255,159,28,0.14)]'
+                          : 'border-ink-200/40 bg-white/70 backdrop-blur-md text-ink-700 hover:bg-white hover:shadow-[0_20px_40px_rgba(255,159,28,0.12)] hover:border-brand/30'
                       }`}
                       onClick={() => setPaymentType('now')}
                     >
-                      <CreditCardIcon className={`w-10 h-10 mb-3 transition-transform duration-300 group-hover:scale-110 ${paymentType === 'now' ? 'text-nblue' : 'text-ink-400 group-hover:text-nblue/80'}`} />
+                      <CreditCardIcon className={`w-10 h-10 mb-3 transition-transform duration-300 group-hover:scale-110 ${paymentType === 'now' ? 'text-brand' : 'text-ink-400 group-hover:text-brand/80'}`} />
                       <span className="font-display text-lg font-bold">الدفع الآن</span>
                       <span className="text-xs mt-1.5 opacity-80">تحويل بنكي ورفع صورة الإيصال فوراً</span>
                     </button>
                     <button
                       type="button"
-                      className={`group relative flex flex-col items-center justify-center p-6 text-center rounded-2xl border-2 transition-all duration-300 hover:-translate-y-0.5 ${
+                      className={`group relative flex flex-col items-center justify-center p-6 text-center rounded-2xl border transition-all duration-300 hover:-translate-y-0.5 ${
                         paymentType === 'later'
-                          ? 'border-nblue bg-nblue-50/70 text-nblue shadow-[0_12px_24px_rgba(16,63,145,0.12)]'
-                          : 'border-ink-200/60 bg-white/70 backdrop-blur-md text-ink-700 hover:border-nblue/40'
+                          ? 'border-brand bg-white text-brand shadow-[0_20px_40px_rgba(255,159,28,0.14)]'
+                          : 'border-ink-200/40 bg-white/70 backdrop-blur-md text-ink-700 hover:bg-white hover:shadow-[0_20px_40px_rgba(255,159,28,0.12)] hover:border-brand/30'
                       }`}
                       onClick={() => setPaymentType('later')}
                     >
-                      <HourglassIcon className={`w-10 h-10 mb-3 transition-transform duration-300 group-hover:scale-110 ${paymentType === 'later' ? 'text-nblue' : 'text-ink-400 group-hover:text-nblue/80'}`} />
+                      <HourglassIcon className={`w-10 h-10 mb-3 transition-transform duration-300 group-hover:scale-110 ${paymentType === 'later' ? 'text-brand' : 'text-ink-400 group-hover:text-brand/80'}`} />
                       <span className="font-display text-lg font-bold">الدفع الآجل</span>
                       <span className="text-xs mt-1.5 opacity-80">سداد لاحق لدى مقر النادي بعد المراجعة</span>
                     </button>
@@ -737,15 +737,9 @@ export default function RegisterPage() {
                 {paymentType === 'now' && (
                   <div className="space-y-5 border-t border-ink-200/60 pt-6 fade-in">
                     
-                    {/* Digital Bank Card (White card with gradient border) */}
+                    {/* Digital Bank Card (styled like homepage details cards) */}
                     <div 
-                      className="relative overflow-hidden rounded-3xl p-6 sm:p-7 shadow-[0_12px_32px_rgba(16,63,145,0.06)] select-none animate-pulse-subtle"
-                      style={{
-                        backgroundImage: 'linear-gradient(white, white), linear-gradient(135deg, #0c2e6b, #103f91)',
-                        backgroundOrigin: 'border-box',
-                        backgroundClip: 'padding-box, border-box',
-                        border: '2px solid transparent'
-                      }}
+                      className="relative overflow-hidden rounded-2xl p-6 sm:p-7 bg-white/70 backdrop-blur-md border border-ink-200/40 card-transition hover:bg-white hover:shadow-[0_20px_40px_rgba(255,159,28,0.12)] hover:border-brand/30 shadow-[0_8px_32px_rgba(255,159,28,0.06)] select-none"
                     >
                       {/* Subtle pattern background */}
                       <div className="absolute inset-0 opacity-[0.02] pointer-events-none bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:16px_16px]" />
@@ -911,7 +905,7 @@ export default function RegisterPage() {
                   </button>
                   <button
                     type="submit"
-                    className="btn w-2/3 btn-lg font-bold text-white bg-nblue hover:bg-nblue-600 hover:shadow-[0_8px_24px_rgba(16,63,145,0.22)] hover:-translate-y-0.5 border-none transition-all duration-300 disabled:opacity-50 disabled:pointer-events-none"
+                    className="btn w-2/3 btn-lg font-bold text-white bg-brand hover:bg-brand-600 hover:shadow-[0_8px_24px_rgba(255,159,28,0.22)] hover:-translate-y-0.5 border-none transition-all duration-300 disabled:opacity-50 disabled:pointer-events-none"
                     disabled={busy}
                   >
                     {busy ? 'جاري إتمام التسجيل...' : 'تأكيد وإتمام التسجيل'}
