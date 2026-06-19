@@ -43,7 +43,7 @@ export default function SettingsPage() {
         setClubNameAr(s.clubNameAr || 'نادي نبراس');
         setLandingTagline(s.landingTagline || 'اكتشف – جرّب – انطلق');
         setLandingTaglineSub(s.landingTaglineSub || 'مكان واحد يجمع كل شغفك');
-        setLandingIntro(s.landingIntro || 'نادي نبراس هو نادٍ قيمي يهدف إلى تنمية مهارات الطالب عن طريق برامج متنوعة، تجمع بين القيم والثقافة والترفيه بشكل هادف وممتع.');
+        setLandingIntro(s.landingIntro || 'نادي نبراس هو أحد برامج جمعية وثبة لتنمية الشباب والنشء، يهدف إلى تنمية مهارات الطالب عن طريق برامج متنوعة، تجمع بين القيم والثقافة والترفيه بشكل هادف وممتع.');
         setClubTargetGroupValue(s.clubTargetGroupValue || 'الابتدائي العليا – متوسط – ثانوي');
         setClubDatesValue(s.clubDatesValue || 'الثلاثاء 15 محرم – الخميس 9 صفر');
         setClubTimeValue(s.clubTimeValue || '4:00 عصراً – 9:00 مساءً');

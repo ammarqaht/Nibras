@@ -30,7 +30,7 @@ export default function SiteHeader({ showCta = true }: { showCta?: boolean }) {
         <img
           src="/wathbah-color.png"
           alt="جمعية وثبة"
-          className="h-10 sm:h-11 w-auto object-contain select-none"
+          className="h-8 sm:h-11 w-auto object-contain select-none"
         />
       </div>
     </header>

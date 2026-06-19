@@ -52,9 +52,9 @@ export default function Footer({
       <div className="mx-auto max-w-6xl px-6 sm:px-8 py-12 relative z-10">
         <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-8">
           <div className="flex flex-col items-center sm:items-start text-center sm:text-right">
-            <div className="flex flex-col sm:flex-row items-center gap-4">
+            <div className="flex flex-row items-center gap-4">
               <Brand variant="lockup" imgClassName="h-11 w-auto brightness-0 invert" />
-              <div className="hidden sm:block h-6 w-[1px] bg-white/20 self-center" />
+              <div className="h-6 w-[1px] bg-white/20 self-center" />
               <img
                 src="/wathbah-white.png"
                 alt="جمعية وثبة"
