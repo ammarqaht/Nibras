@@ -46,9 +46,8 @@ export const RocketIcon = ({ className }: P) => (
 );
 export const TargetIcon = ({ className }: P) => (
   <svg {...base(className)}>
-    <circle cx="12" cy="12" r="9" />
-    <circle cx="12" cy="12" r="5" />
-    <circle cx="12" cy="12" r="1.5" />
+    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+    <circle cx="12" cy="7" r="4" />
   </svg>
 );
 export const CalendarIcon = ({ className }: P) => (

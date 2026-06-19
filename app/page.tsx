@@ -204,14 +204,14 @@ export default async function LandingPage() {
               icon={<TargetIcon className="w-6 h-6" />}
               label={clubDetails.targetGroup.label}
               value={
-                <div className="flex flex-wrap gap-2 mt-1.5">
-                  <span className="inline-flex items-center text-[14px] font-semibold px-3.5 py-1 rounded-full border border-ncyan-600/20 bg-ncyan-50 text-ncyan-600 select-none animate-pulse-subtle">
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  <span className="inline-flex items-center text-xs font-semibold px-2.5 py-0.5 rounded-full border border-ncyan-600/20 bg-ncyan-50 text-ncyan-600 select-none animate-pulse-subtle">
                     ابتدائي عليا
                   </span>
-                  <span className="inline-flex items-center text-[14px] font-semibold px-3.5 py-1 rounded-full border border-brand-600/20 bg-brand-50 text-brand-600 select-none animate-pulse-subtle">
+                  <span className="inline-flex items-center text-xs font-semibold px-2.5 py-0.5 rounded-full border border-brand-600/20 bg-brand-50 text-brand-600 select-none animate-pulse-subtle">
                     متوسط
                   </span>
-                  <span className="inline-flex items-center text-[14px] font-semibold px-3.5 py-1 rounded-full border border-nred-600/20 bg-nred-50 text-nred-600 select-none animate-pulse-subtle">
+                  <span className="inline-flex items-center text-xs font-semibold px-2.5 py-0.5 rounded-full border border-nred-600/20 bg-nred-50 text-nred-600 select-none animate-pulse-subtle">
                     ثانوي
                   </span>
                 </div>
