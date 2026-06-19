@@ -56,43 +56,37 @@ export default async function LandingPage() {
           />
 
           {/* Journey Timeline */}
-          <div className="reveal-hero mx-auto max-w-xl mt-12 mb-6 px-4">
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-14 relative w-full sm:w-fit mx-auto">
+          <div className="reveal-hero mx-auto max-w-xl mt-12 mb-6 px-2">
+            <div className="flex flex-row items-center justify-center gap-2 sm:gap-14 relative w-full sm:w-fit mx-auto">
               
-              {/* Connector line for desktop */}
-              <div className="hidden sm:block absolute top-7 left-[64px] right-[64px] h-[2px] bg-gradient-to-r from-nblue/30 via-brand/30 to-ncyan/30 z-0" />
+              {/* Connector line */}
+              <div className="absolute top-[22px] sm:top-7 left-[48px] right-[48px] sm:left-[64px] sm:right-[64px] h-[2px] bg-gradient-to-r from-nblue/30 via-brand/30 to-ncyan/30 z-0" />
               
               {/* Step 1: Discover */}
-              <div className="flex flex-col items-center text-center relative z-10 group w-32">
-                <div className="w-14 h-14 rounded-2xl bg-ncyan-50 text-ncyan-600 border border-ncyan-200/60 flex items-center justify-center shadow-sm group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
-                  <DiscoverIcon className="w-7 h-7" />
+              <div className="flex flex-col items-center text-center relative z-10 group w-24 sm:w-32">
+                <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-ncyan-50 text-ncyan-600 border border-ncyan-200/60 flex items-center justify-center shadow-sm group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
+                  <DiscoverIcon className="w-5 h-5 sm:w-7 sm:h-7" />
                 </div>
-                <span className="font-body text-lg font-bold text-ink-900 mt-3">اكتشف</span>
-                <span className="text-xs text-ink-400 mt-1 font-semibold">اهتمامات جديدة</span>
+                <span className="font-body text-sm sm:text-lg font-bold text-ink-900 mt-2 sm:mt-3">اكتشف</span>
+                <span className="text-[10px] sm:text-xs text-ink-400 mt-0.5 sm:mt-1 font-semibold">اهتمامات جديدة</span>
               </div>
-              
-              {/* Arrow divider for mobile */}
-              <div className="sm:hidden text-ink-300 text-lg">↓</div>
 
               {/* Step 2: Try */}
-              <div className="flex flex-col items-center text-center relative z-10 group w-32">
-                <div className="w-14 h-14 rounded-2xl bg-brand-50 text-brand border border-brand-200/60 flex items-center justify-center shadow-sm group-hover:scale-110 group-hover:-rotate-3 transition-all duration-300">
-                  <TryIcon className="w-7 h-7" />
+              <div className="flex flex-col items-center text-center relative z-10 group w-24 sm:w-32">
+                <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-brand-50 text-brand border border-brand-200/60 flex items-center justify-center shadow-sm group-hover:scale-110 group-hover:-rotate-3 transition-all duration-300">
+                  <TryIcon className="w-5 h-5 sm:w-7 sm:h-7" />
                 </div>
-                <span className="font-body text-lg font-bold text-ink-900 mt-3">جرّب</span>
-                <span className="text-xs text-ink-400 mt-1 font-semibold">تجارب تفاعلية</span>
+                <span className="font-body text-sm sm:text-lg font-bold text-ink-900 mt-2 sm:mt-3">جرّب</span>
+                <span className="text-[10px] sm:text-xs text-ink-400 mt-0.5 sm:mt-1 font-semibold">تجارب تفاعلية</span>
               </div>
 
-              {/* Arrow divider for mobile */}
-              <div className="sm:hidden text-ink-300 text-lg">↓</div>
-
               {/* Step 3: Launch */}
-              <div className="flex flex-col items-center text-center relative z-10 group w-32">
-                <div className="w-14 h-14 rounded-2xl bg-nblue-50 text-nblue border border-nblue-200/60 flex items-center justify-center shadow-sm group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
-                  <RocketIcon className="w-7 h-7" />
+              <div className="flex flex-col items-center text-center relative z-10 group w-24 sm:w-32">
+                <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-nblue-50 text-nblue border border-nblue-200/60 flex items-center justify-center shadow-sm group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
+                  <RocketIcon className="w-5 h-5 sm:w-7 sm:h-7" />
                 </div>
-                <span className="font-body text-lg font-bold text-ink-900 mt-3">انطلق</span>
-                <span className="text-xs text-ink-400 mt-1 font-semibold">بقيمك ومهاراتك</span>
+                <span className="font-body text-sm sm:text-lg font-bold text-ink-900 mt-2 sm:mt-3">انطلق</span>
+                <span className="text-[10px] sm:text-xs text-ink-400 mt-0.5 sm:mt-1 font-semibold">بقيمك ومهاراتك</span>
               </div>
 
             </div>
