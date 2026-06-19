@@ -139,16 +139,16 @@ export default async function LandingPage() {
 
           {/* Core Features list centered */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-2xl border-t border-ink-200/60 pt-8">
-            <div className="font-display text-base sm:text-lg font-bold px-6 py-3 rounded-full bg-nblue-50 text-nblue border border-nblue/10 tracking-wide text-center flex items-center justify-center w-full shadow-sm hover:scale-[1.01] transition-transform duration-300">
+            <div className="font-body text-base sm:text-lg font-bold px-6 py-3 rounded-full bg-nblue-50 text-nblue border border-nblue/10 tracking-wide text-center flex items-center justify-center w-full shadow-sm hover:scale-[1.01] transition-transform duration-300">
               بيئة تربوية آمنة وتفاعلية
             </div>
-            <div className="font-display text-base sm:text-lg font-bold px-6 py-3 rounded-full bg-ncyan-50 text-ncyan border border-ncyan/10 tracking-wide text-center flex items-center justify-center w-full shadow-sm hover:scale-[1.01] transition-transform duration-300">
+            <div className="font-body text-base sm:text-lg font-bold px-6 py-3 rounded-full bg-ncyan-50 text-ncyan border border-ncyan/10 tracking-wide text-center flex items-center justify-center w-full shadow-sm hover:scale-[1.01] transition-transform duration-300">
               ورش عمل وتجارب عملية
             </div>
-            <div className="font-display text-base sm:text-lg font-bold px-6 py-3 rounded-full bg-brand-50 text-brand border border-brand/10 tracking-wide text-center flex items-center justify-center w-full shadow-sm hover:scale-[1.01] transition-transform duration-300">
+            <div className="font-body text-base sm:text-lg font-bold px-6 py-3 rounded-full bg-brand-50 text-brand border border-brand/10 tracking-wide text-center flex items-center justify-center w-full shadow-sm hover:scale-[1.01] transition-transform duration-300">
               إشراف كادر تربوي متميز
             </div>
-            <div className="font-display text-base sm:text-lg font-bold px-6 py-3 rounded-full bg-nred-50 text-nred border border-nred/10 tracking-wide text-center flex items-center justify-center w-full shadow-sm hover:scale-[1.01] transition-transform duration-300">
+            <div className="font-body text-base sm:text-lg font-bold px-6 py-3 rounded-full bg-nred-50 text-nred-600 border border-nred/10 tracking-wide text-center flex items-center justify-center w-full shadow-sm hover:scale-[1.01] transition-transform duration-300">
               برامج قيمية وترفيهية متوازنة
             </div>
           </div>
