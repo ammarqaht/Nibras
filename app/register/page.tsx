@@ -782,15 +782,15 @@ export default function RegisterPage() {
                         </div>
 
                         {/* Account Number */}
-                        <div className="flex items-center justify-between gap-3 bg-cream-50/50 rounded-xl px-4 py-2 border border-ink-100">
-                          <div>
+                        <div className="flex items-center justify-between gap-3 bg-cream-50/50 rounded-xl px-4 py-2 border border-ink-100 min-w-0">
+                          <div className="min-w-0 flex-1">
                             <span className="text-[9px] text-ink-400 block">رقم الحساب</span>
-                            <span className="font-mono text-sm tracking-wider text-ink-900" dir="ltr">{bankInfo.accountNumber}</span>
+                            <span className="font-mono text-xs sm:text-sm tracking-wider text-ink-900 block truncate" dir="ltr">{bankInfo.accountNumber}</span>
                           </div>
                           <button
                             type="button"
                             onClick={() => handleCopyText(bankInfo.accountNumber, 'account')}
-                            className="p-2 rounded-lg bg-white border border-ink-200 hover:border-nblue/40 text-ink-500 hover:text-nblue active:scale-95 transition-all shadow-sm"
+                            className="shrink-0 p-2 rounded-lg bg-white border border-ink-200 hover:border-nblue/40 text-ink-500 hover:text-nblue active:scale-95 transition-all shadow-sm"
                             title="نسخ رقم الحساب"
                           >
                             {copiedField === 'account' ? (
@@ -802,15 +802,15 @@ export default function RegisterPage() {
                         </div>
 
                         {/* IBAN */}
-                        <div className="flex items-center justify-between gap-3 bg-cream-50/50 rounded-xl px-4 py-2 border border-ink-100">
-                          <div>
+                        <div className="flex items-center justify-between gap-3 bg-cream-50/50 rounded-xl px-4 py-2 border border-ink-100 min-w-0">
+                          <div className="min-w-0 flex-1">
                             <span className="text-[9px] text-ink-400 block">الآيبان IBAN</span>
-                            <span className="font-mono text-xs sm:text-sm tracking-wider text-ink-900" dir="ltr">{bankInfo.iban}</span>
+                            <span className="font-mono text-[11px] sm:text-sm tracking-normal xs:tracking-wider text-ink-900 block select-all break-all" dir="ltr">{bankInfo.iban}</span>
                           </div>
                           <button
                             type="button"
                             onClick={() => handleCopyText(bankInfo.iban, 'iban')}
-                            className="p-2 rounded-lg bg-white border border-ink-200 hover:border-nblue/40 text-ink-500 hover:text-nblue active:scale-95 transition-all shadow-sm"
+                            className="shrink-0 p-2 rounded-lg bg-white border border-ink-200 hover:border-nblue/40 text-ink-500 hover:text-nblue active:scale-95 transition-all shadow-sm"
                             title="نسخ الآيبان"
                           >
                             {copiedField === 'iban' ? (
@@ -924,7 +924,7 @@ export default function RegisterPage() {
                     className="btn w-2/3 btn-lg font-bold text-white bg-brand hover:bg-brand-600 hover:shadow-[0_8px_24px_rgba(255,159,28,0.22)] hover:-translate-y-0.5 border-none transition-all duration-300 disabled:opacity-50 disabled:pointer-events-none"
                     disabled={busy}
                   >
-                    {busy ? 'جاري إتمام التسجيل...' : 'تأكيد وإتمام التسجيل'}
+                    {busy ? 'جاري إتمام التسجيل...' : 'إتمام التسجيل'}
                   </button>
                 </div>
               </form>
