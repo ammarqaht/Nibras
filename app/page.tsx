@@ -95,6 +95,24 @@ export default async function LandingPage() {
           <p className="reveal-hero mt-8 text-ink-500 text-[clamp(1.05rem,2.2vw,1.4rem)] font-semibold">
             {landing.taglineSub}
           </p>
+
+          <div className="reveal-hero mt-8">
+            <Link
+              href="/register"
+              className="group inline-flex items-center justify-center px-8 py-3.5 text-base sm:text-lg font-bold border-2 border-brand text-brand hover:bg-brand hover:text-white rounded-2xl hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-[0_12px_32px_rgba(255,159,28,0.25)] active:scale-95 transition-all duration-300 gap-2.5 bg-transparent"
+            >
+              <span>سجّل الآن</span>
+              <svg
+                className="w-5 h-5 transition-transform duration-300 group-hover:-translate-x-1"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2.5}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+            </Link>
+          </div>
         </div>
       </section>
 
