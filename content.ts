@@ -157,7 +157,7 @@ export const confirmation = {
 
 /* -------------------- SHARED — footer / social -------------------- */
 export const footer = {
-  tagline: 'اكتشف – جرّب – انطلق',
+  tagline: 'بيئة آمنة.. لجيلٍ واعد وقيم راسخة',
   rights: '© ١٤٤٧هـ نادي نبراس — جميع الحقوق محفوظة',
   // TODO: replace placeholder links with the real association channels.
   social: [
