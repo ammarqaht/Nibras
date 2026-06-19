@@ -21,6 +21,12 @@ const HIGHLIGHT_ICONS: Record<string, (p: { className?: string }) => JSX.Element
   learn: RocketIcon
 };
 
+const GLOW_SHADOWS: Record<string, string> = {
+  discover: 'hover:shadow-[0_20px_40px_rgba(255,159,28,0.14)] hover:border-brand/30',
+  try: 'hover:shadow-[0_20px_40px_rgba(18,179,213,0.14)] hover:border-ncyan/30',
+  learn: 'hover:shadow-[0_20px_40px_rgba(229,46,37,0.14)] hover:border-nred/30'
+};
+
 export default async function LandingPage() {
   const { site, landing, clubDetails, footer } = await getMergedSettings();
   const loc = clubDetails.location;
@@ -37,7 +43,7 @@ export default async function LandingPage() {
           className="absolute inset-0 pointer-events-none"
           style={{
             background:
-              'radial-gradient(60rem 36rem at 50% 18%, rgba(245,166,35,0.10), transparent 60%), radial-gradient(50rem 36rem at 80% 60%, rgba(43,175,217,0.07), transparent 60%), radial-gradient(40rem 30rem at 15% 70%, rgba(30,91,168,0.06), transparent 60%)'
+              'radial-gradient(60rem 36rem at 50% 18%, rgba(255,159,28,0.10), transparent 60%), radial-gradient(50rem 36rem at 80% 60%, rgba(18,179,213,0.07), transparent 60%), radial-gradient(40rem 30rem at 15% 70%, rgba(16,63,145,0.06), transparent 60%)'
           }}
         />
         <div className="relative mx-auto max-w-4xl text-center">
@@ -49,10 +55,50 @@ export default async function LandingPage() {
             draggable={false}
           />
 
-          <h1 className="reveal-hero font-display text-ink-900 mt-8 leading-tight text-[clamp(1.6rem,5vw,3.2rem)]">
-            {landing.tagline}
-          </h1>
-          <p className="reveal-hero mt-4 text-ink-500 text-[clamp(1.05rem,2.2vw,1.4rem)]">
+          {/* Journey Timeline */}
+          <div className="reveal-hero mx-auto max-w-xl mt-12 mb-6 px-4">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-14 relative w-full sm:w-fit mx-auto">
+              
+              {/* Connector line for desktop */}
+              <div className="hidden sm:block absolute top-7 left-[64px] right-[64px] h-[2px] bg-gradient-to-r from-nblue/30 via-brand/30 to-ncyan/30 z-0" />
+              
+              {/* Step 1: Discover */}
+              <div className="flex flex-col items-center text-center relative z-10 group w-32">
+                <div className="w-14 h-14 rounded-2xl bg-ncyan-50 text-ncyan-600 border border-ncyan-200/60 flex items-center justify-center shadow-sm group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
+                  <DiscoverIcon className="w-7 h-7" />
+                </div>
+                <span className="font-body text-lg font-bold text-ink-900 mt-3">اكتشف</span>
+                <span className="text-xs text-ink-400 mt-1 font-semibold">اهتمامات جديدة</span>
+              </div>
+              
+              {/* Arrow divider for mobile */}
+              <div className="sm:hidden text-ink-300 text-lg">↓</div>
+
+              {/* Step 2: Try */}
+              <div className="flex flex-col items-center text-center relative z-10 group w-32">
+                <div className="w-14 h-14 rounded-2xl bg-brand-50 text-brand border border-brand-200/60 flex items-center justify-center shadow-sm group-hover:scale-110 group-hover:-rotate-3 transition-all duration-300">
+                  <TryIcon className="w-7 h-7" />
+                </div>
+                <span className="font-body text-lg font-bold text-ink-900 mt-3">جرّب</span>
+                <span className="text-xs text-ink-400 mt-1 font-semibold">تجارب تفاعلية</span>
+              </div>
+
+              {/* Arrow divider for mobile */}
+              <div className="sm:hidden text-ink-300 text-lg">↓</div>
+
+              {/* Step 3: Launch */}
+              <div className="flex flex-col items-center text-center relative z-10 group w-32">
+                <div className="w-14 h-14 rounded-2xl bg-nblue-50 text-nblue border border-nblue-200/60 flex items-center justify-center shadow-sm group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
+                  <RocketIcon className="w-7 h-7" />
+                </div>
+                <span className="font-body text-lg font-bold text-ink-900 mt-3">انطلق</span>
+                <span className="text-xs text-ink-400 mt-1 font-semibold">بقيمك ومهاراتك</span>
+              </div>
+
+            </div>
+          </div>
+
+          <p className="reveal-hero mt-8 text-ink-500 text-[clamp(1.05rem,2.2vw,1.4rem)] font-semibold">
             {landing.taglineSub}
           </p>
         </div>
@@ -81,36 +127,79 @@ export default async function LandingPage() {
       </div>
 
       {/* ============================ ABOUT / INTRO ============================ */}
-      <section id="about" className="px-6 py-20 sm:py-28">
-        <div className="mx-auto max-w-3xl text-center reveal">
+      {/* ============================ ABOUT / INTRO ============================ */}
+      <section id="about" className="px-6 py-20 sm:py-28 relative overflow-hidden">
+        {/* Subtle background glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-nblue/5 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="mx-auto max-w-3xl text-center reveal flex flex-col items-center">
           <span
-            className="inline-block text-sm font-medium px-3 py-1 rounded-full mb-5"
-            style={{ background: 'var(--accent-soft)', color: '#7a4d00' }}
+            className="font-display inline-block text-lg sm:text-xl font-bold px-6 py-2.5 rounded-full mb-7 bg-nblue-50 text-nblue border border-nblue/10 tracking-wide"
           >
-            عن النادي
+            ما هو نادي نبراس؟
           </span>
-          <p className="text-[clamp(1.2rem,2.6vw,1.7rem)] leading-[1.9] text-ink-800 font-body">
-            {landing.intro}
+          
+          <p className="text-[clamp(1.15rem,2.5vw,1.45rem)] leading-[1.85] text-ink-800 font-body mb-10 max-w-2xl">
+            نادي نبراس هو نادٍ قيمي يهدف إلى <span className="text-ncyan-600 font-bold">تنمية مهارات الطالب</span> عن طريق برامج متنوعة، تجمع بين <span className="text-ncyan-600 font-bold">القيم والثقافة والترفيه</span> بشكل هادف وممتع.
           </p>
+
+          {/* Core Features list centered */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 w-full max-w-2xl border-t border-ink-200/60 pt-8">
+            <div className="flex items-center justify-center gap-3">
+              <span className="shrink-0 w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center shadow-sm">
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              </span>
+              <span className="text-sm font-semibold text-ink-800">بيئة تربوية آمنة وتفاعلية</span>
+            </div>
+            <div className="flex items-center justify-center gap-3">
+              <span className="shrink-0 w-8 h-8 rounded-lg bg-ncyan-50 border border-ncyan-100 text-ncyan-600 flex items-center justify-center shadow-sm">
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              </span>
+              <span className="text-sm font-semibold text-ink-800">ورش عمل وتجارب عملية</span>
+            </div>
+            <div className="flex items-center justify-center gap-3">
+              <span className="shrink-0 w-8 h-8 rounded-lg bg-brand-50 border border-brand-100 text-brand-600 flex items-center justify-center shadow-sm">
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              </span>
+              <span className="text-sm font-semibold text-ink-800">إشراف كادر تربوي متميز</span>
+            </div>
+            <div className="flex items-center justify-center gap-3">
+              <span className="shrink-0 w-8 h-8 rounded-lg bg-nblue-50 border border-nblue-100 text-nblue flex items-center justify-center shadow-sm">
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              </span>
+              <span className="text-sm font-semibold text-ink-800">برامج قيمية وترفهية متوازنة</span>
+            </div>
+          </div>
         </div>
 
         {/* discover / try / launch */}
         <div
-          className="reveal mx-auto max-w-5xl mt-16 grid grid-cols-1 sm:grid-cols-3 gap-5"
+          className="reveal mx-auto max-w-5xl mt-16 grid grid-cols-1 sm:grid-cols-3 gap-6"
           data-stagger
         >
-          {landing.highlights.map((h) => {
+          {landing.highlights.map((h, idx) => {
             const Icon = HIGHLIGHT_ICONS[h.icon] ?? DiscoverIcon;
+            const glowClass = GLOW_SHADOWS[h.icon] ?? 'hover:shadow-[0_20px_40px_rgba(255,159,28,0.14)]';
             return (
-              <div key={h.title} className="card p-7 text-center">
+              <div
+                key={h.title}
+                className={`group relative card p-8 text-center bg-white/70 backdrop-blur-md border border-ink-200/40 rounded-2xl card-transition hover:bg-white ${glowClass}`}
+              >
+                {/* Animated Icon Container */}
                 <div
-                  className="mx-auto w-14 h-14 rounded-2xl flex items-center justify-center mb-5"
+                  className="mx-auto w-16 h-16 rounded-2xl flex items-center justify-center mb-6 transition-all duration-300 group-hover:scale-110 group-hover:rotate-3 shadow-md"
                   style={{ background: h.color || 'var(--accent)', color: '#fff' }}
                 >
-                  <Icon className="w-7 h-7" />
+                  <Icon className="w-8 h-8" />
                 </div>
-                <h3 className="font-display text-2xl text-ink-900 mb-2">{h.title}</h3>
-                <p className="text-ink-500 leading-relaxed">{h.desc}</p>
+                
+                {/* Title */}
+                <h3 className="font-display text-2xl text-ink-900 mb-3">{h.title}</h3>
+                
+                {/* Description */}
+                <p className="text-ink-500 leading-relaxed font-body text-sm sm:text-base">
+                  {h.desc}
+                </p>
               </div>
             );
           })}
@@ -120,28 +209,76 @@ export default async function LandingPage() {
       {/* ============================ CLUB DETAILS ============================ */}
       <section className="px-6 pb-8">
         <div className="mx-auto max-w-5xl">
-          <h2 className="reveal font-display text-3xl sm:text-4xl text-ink-900 text-center mb-12">
-            تفاصيل النادي
-          </h2>
+          <div className="reveal text-center mb-12">
+            <span
+              className="font-display inline-block text-lg sm:text-xl font-bold px-6 py-2.5 rounded-full bg-nblue-50 text-nblue border border-nblue/10 tracking-wide"
+            >
+              تفاصيل النادي
+            </span>
+          </div>
 
           <div className="reveal grid grid-cols-1 sm:grid-cols-2 gap-5" data-stagger>
             <DetailCard
               icon={<TargetIcon className="w-6 h-6" />}
               label={clubDetails.targetGroup.label}
-              value={clubDetails.targetGroup.value}
+              value={
+                <div className="flex flex-wrap gap-2 mt-1.5">
+                  <span className="inline-flex items-center text-[14px] font-semibold px-3.5 py-1 rounded-full border border-ncyan-600/20 bg-ncyan-50 text-ncyan-600 select-none animate-pulse-subtle">
+                    ابتدائي عليا
+                  </span>
+                  <span className="inline-flex items-center text-[14px] font-semibold px-3.5 py-1 rounded-full border border-brand-600/20 bg-brand-50 text-brand-600 select-none animate-pulse-subtle">
+                    متوسط
+                  </span>
+                  <span className="inline-flex items-center text-[14px] font-semibold px-3.5 py-1 rounded-full border border-nred-600/20 bg-nred-50 text-nred-600 select-none animate-pulse-subtle">
+                    ثانوي
+                  </span>
+                </div>
+              }
               note={clubDetails.targetGroup.note}
               tone="blue"
             />
             <DetailCard
               icon={<CalendarIcon className="w-6 h-6" />}
               label={clubDetails.dates.label}
-              value={clubDetails.dates.value}
+              value={
+                <div className="flex items-center gap-4 mt-1 select-none">
+                  <div className="text-center">
+                    <div className="font-display text-[22px] font-semibold text-ink-900 leading-none">15</div>
+                    <div className="text-[13px] text-ink-700 mt-1.5 font-semibold font-body">محرم</div>
+                  </div>
+                  <div className="flex items-center justify-center text-ncyan-600/70">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </div>
+                  <div className="text-center">
+                    <div className="font-display text-[22px] font-semibold text-ink-900 leading-none">09</div>
+                    <div className="text-[13px] text-ink-700 mt-1.5 font-semibold font-body">صفر</div>
+                  </div>
+                </div>
+              }
               tone="cyan"
             />
             <DetailCard
               icon={<ClockIcon className="w-6 h-6" />}
               label={clubDetails.time.label}
-              value={clubDetails.time.value}
+              value={
+                <div className="flex items-center gap-4 mt-1 select-none">
+                  <div className="flex items-baseline gap-1">
+                    <span className="font-display text-[22px] font-semibold text-ink-900 leading-none">4:00</span>
+                    <span className="text-sm font-semibold font-body text-ink-700">م</span>
+                  </div>
+                  <div className="flex items-center justify-center text-brand-600/70">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </div>
+                  <div className="flex items-baseline gap-1">
+                    <span className="font-display text-[22px] font-semibold text-ink-900 leading-none">9:00</span>
+                    <span className="text-sm font-semibold font-body text-ink-700">م</span>
+                  </div>
+                </div>
+              }
               note={clubDetails.time.note}
               tone="orange"
             />
@@ -159,13 +296,13 @@ export default async function LandingPage() {
               href={loc.mapsLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="card block overflow-hidden group"
+              className="card block overflow-hidden group bg-white/70 backdrop-blur-md border border-ink-200/40 rounded-2xl card-transition hover:bg-white hover:shadow-[0_20px_40px_rgba(255,159,28,0.12)] hover:border-brand/30"
             >
               <div className="grid grid-cols-1 md:grid-cols-2">
                 <div className="p-7 flex flex-col justify-center">
                   <div className="flex items-center gap-3 mb-3">
                     <span
-                      className="w-11 h-11 rounded-xl flex items-center justify-center"
+                      className="w-11 h-11 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3 shadow-sm"
                       style={{ background: 'var(--accent)', color: '#fff' }}
                     >
                       <PinIcon className="w-6 h-6" />
@@ -210,14 +347,14 @@ export default async function LandingPage() {
       <section className="px-6 py-24">
         <div
           className="reveal mx-auto max-w-4xl rounded-3xl px-8 py-16 text-center relative overflow-hidden"
-          style={{ background: 'linear-gradient(135deg, #1E5BA8 0%, #113669 100%)', color: '#fff' }}
+          style={{ background: 'linear-gradient(135deg, #103F91 0%, #071F4A 100%)', color: '#fff' }}
         >
           <div
             aria-hidden
             className="absolute inset-0 pointer-events-none opacity-90"
             style={{
               background:
-                'radial-gradient(circle at 80% 10%, rgba(245,166,35,0.2) 0%, transparent 50%), radial-gradient(circle at 20% 90%, rgba(43,175,217,0.3) 0%, transparent 60%)'
+                'radial-gradient(circle at 80% 10%, rgba(255,159,28,0.2) 0%, transparent 50%), radial-gradient(circle at 20% 90%, rgba(18,179,213,0.3) 0%, transparent 60%)'
             }}
           />
           <div className="relative">
@@ -245,7 +382,7 @@ function DetailCard({
 }: {
   icon: React.ReactNode;
   label: string;
-  value: string;
+  value: React.ReactNode;
   note?: string;
   tone: 'orange' | 'blue' | 'cyan' | 'red';
 }) {
@@ -255,16 +392,24 @@ function DetailCard({
     cyan: 'var(--cyan)',
     red: 'var(--red)'
   };
+
+  const glowClass: Record<typeof tone, string> = {
+    orange: 'hover:shadow-[0_20px_40px_rgba(255,159,28,0.12)] hover:border-brand/30',
+    blue: 'hover:shadow-[0_20px_40px_rgba(16,63,145,0.12)] hover:border-nblue/30',
+    cyan: 'hover:shadow-[0_20px_40px_rgba(18,179,213,0.12)] hover:border-ncyan/30',
+    red: 'hover:shadow-[0_20px_40px_rgba(229,46,37,0.12)] hover:border-nred/30'
+  };
+
   return (
-    <div className="card p-7 flex items-start gap-4">
+    <div className={`group card p-7 flex items-start gap-4 bg-white/70 backdrop-blur-md border border-ink-200/40 rounded-2xl card-transition hover:bg-white ${glowClass[tone]}`}>
       <span
-        className="shrink-0 w-12 h-12 rounded-xl flex items-center justify-center"
+        className="shrink-0 w-12 h-12 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3 shadow-sm"
         style={{ background: toneVar[tone], color: '#fff' }}
       >
         {icon}
       </span>
       <div>
-        <div className="label !mb-1">{label}</div>
+        <div className="label !mb-1 transition-colors group-hover:text-ink-700">{label}</div>
         <div className="font-display text-xl text-ink-900 leading-snug">{value}</div>
         {note && <div className="text-sm text-ink-500 mt-1">{note}</div>}
       </div>

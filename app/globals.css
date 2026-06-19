@@ -63,13 +63,13 @@
   --ink-soft:  #6B6B6B;
   --line:      #E8E4DF;
 
-  /* Nibras brand identity (replaces Medad gold/sage/rose) */
-  --accent:      #F5A623; /* orange  — primary */
-  --accent-soft: #F8BC5A;
-  --accent-deep: #E08A0C;
-  --blue:        #1E5BA8;
-  --cyan:        #2BAFD9;
-  --red:         #FB3B1E;
+  /* Nibras brand identity matching the announcement poster */
+  --accent:      #FF9F1C; /* bright yellow/orange — primary */
+  --accent-soft: #FFB752; /* lighter yellow/orange for hover/focus */
+  --accent-deep: #E68500; /* darker orange for active states */
+  --blue:        #103F91; /* royal blue from the bottom of the poster */
+  --cyan:        #12B3D5; /* turquoise/teal from the poster */
+  --red:         #E52E25; /* vibrant red from the top of the poster */
 }
 
 * { box-sizing: border-box; }
@@ -118,7 +118,7 @@ body::after {
   transition: border-color 200ms ease, box-shadow 200ms ease;
 }
 .field:focus,
-.input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px rgba(245,166,35,0.12); }
+.input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 4px rgba(16,63,145,0.12); }
 .field::placeholder,
 .input::placeholder { color: #B5B0A7; }
 .field[dir="ltr"],
@@ -152,7 +152,7 @@ body::after {
   cursor: pointer;
 }
 .btn-primary { background: var(--accent); color: #fff; }
-.btn-primary:hover { background: var(--accent-deep); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(245,166,35,0.28); }
+.btn-primary:hover { background: var(--accent-deep); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(255,159,28,0.35), 0 0 0 4px rgba(255,159,28,0.15); }
 .btn-secondary { background: #fff; color: var(--ink); border-color: var(--line); }
 .btn-secondary:hover { border-color: var(--accent); color: var(--accent-deep); }
 .btn-ghost { background: transparent; color: var(--ink-soft); }
@@ -275,7 +275,7 @@ body::after {
   display: flex;
   width: max-content;
   direction: ltr;
-  animation: marquee 18s linear infinite;
+  animation: marquee 55s linear infinite;
 }
 .marquee-content {
   display: flex;
@@ -346,5 +346,12 @@ select.field,
 select.input {
   min-height: 48px;
   line-height: 1.2;
+}
+
+/* Custom card transition to prevent transform conflict with GSAP entry animations */
+.card-transition {
+  transition: background-color 250ms cubic-bezier(0.4, 0, 0.2, 1), 
+              border-color 250ms cubic-bezier(0.4, 0, 0.2, 1), 
+              box-shadow 250ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 

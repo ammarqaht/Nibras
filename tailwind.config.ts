@@ -33,34 +33,34 @@ const config: Config = {
         },
         // Primary accent (replaces Medad "gold") — Nibras orange.
         brand: {
-          DEFAULT: '#F5A623',
-          400: '#F8BC5A',
-          500: '#F5A623',
-          600: '#E08A0C',
-          50: '#FEF4E2'
+          DEFAULT: '#FF9F1C',
+          400: '#FFB752',
+          500: '#FF9F1C',
+          600: '#E68500',
+          50: '#FFF8EC'
         },
         // Secondary pops sampled from the logo.
         nblue: {
-          DEFAULT: '#1E5BA8',
-          600: '#184B8C',
-          400: '#5A86C2',
-          50: '#EAF1F9'
+          DEFAULT: '#103F91',
+          600: '#0C2F6E',
+          400: '#3F6CB8',
+          50: '#EEF3FA'
         },
         ncyan: {
-          DEFAULT: '#2BAFD9',
-          600: '#1F8FB4',
-          50: '#E8F6FB'
+          DEFAULT: '#12B3D5',
+          600: '#0E92AF',
+          50: '#E7F7FB'
         },
         nred: {
-          DEFAULT: '#FB3B1E',
-          600: '#D92E14',
-          50: '#FDEAE6'
+          DEFAULT: '#E52E25',
+          600: '#C2231B',
+          50: '#FDEAE8'
         }
       },
       boxShadow: {
         soft: '0 2px 12px rgba(45, 35, 20, 0.06)',
         elevated: '0 8px 32px rgba(45, 35, 20, 0.08)',
-        brand: '0 0 0 1px rgba(245, 166, 35, 0.18), 0 2px 12px rgba(245, 166, 35, 0.10)'
+        brand: '0 0 0 1px rgba(255, 159, 28, 0.18), 0 2px 12px rgba(255, 159, 28, 0.10)'
       },
       borderRadius: { xl2: '14px' },
       transitionTimingFunction: { gentle: 'cubic-bezier(0.4, 0, 0.2, 1)' }

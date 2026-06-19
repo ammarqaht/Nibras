@@ -56,10 +56,10 @@ export default function LocationPicker({
       <p className="hint mb-3">{form.locationNote}</p>
 
       {!value && (
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-col items-start gap-2">
           <button
             type="button"
-            className="btn btn-secondary"
+            className="btn btn-secondary w-full sm:w-auto font-medium"
             onClick={locate}
             disabled={status === 'locating'}
           >
@@ -76,10 +76,10 @@ export default function LocationPicker({
 
           <button
             type="button"
-            className="btn btn-secondary"
+            className="text-xs font-semibold text-nblue hover:underline focus:outline-none transition-colors duration-200 mt-1.5"
             onClick={() => setShowMapInput((v) => !v)}
           >
-            <HomeIcon /> لست في المنزل
+            لست في المنزل؟
           </button>
         </div>
       )}
@@ -89,7 +89,7 @@ export default function LocationPicker({
       {/* Google Maps link input — shown when "لست في المنزل" is clicked */}
       {showMapInput && !value && (
         <div className="mt-4 fade-in">
-          <label className="label">رابط موقع قوقل ماب</label>
+          <label className="label">رابط موقع المنزل (خرائط قوقل)</label>
           <input
             type="url"
             className="field"
@@ -99,51 +99,57 @@ export default function LocationPicker({
             dir="ltr"
           />
           <p className="hint mt-2">
-            افتح تطبيق خرائط Google، حدد موقع منزلك، ثم انسخ الرابط والصقه هنا.
+            انسخ موقع المنزل من خرائط قوقل
           </p>
         </div>
       )}
 
       {value && (
-        <div className="fade-in">
-          <div className="flex items-center gap-2 mb-3 text-sm" style={{ color: 'var(--blue)' }}>
-            <CheckIcon />
-            <span className="font-medium">{form.locationCaptured}</span>
-            <span className="text-ink-400" dir="ltr">
-              ({value.lat}, {value.lng})
-            </span>
-          </div>
-
-          <div className="rounded-xl overflow-hidden border border-ink-200 shadow-soft">
+        <div className="rounded-xl p-3 border border-emerald-200/80 bg-emerald-50/60 flex items-center gap-3.5 fade-in shadow-sm">
+          {/* Small square map on the right (RTL first child) */}
+          <div className="w-16 h-16 rounded-lg overflow-hidden shrink-0 border border-emerald-200 bg-white">
             <iframe
-              title="موقع الطالب"
-              src={`https://maps.google.com/maps?q=${value.lat},${value.lng}&z=16&output=embed`}
-              className="w-full h-56 block"
+              title="موقع المنزل المصغر"
+              src={`https://maps.google.com/maps?q=${value.lat},${value.lng}&z=15&output=embed`}
+              className="w-full h-full block border-none"
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
             />
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 mt-3">
-            <button type="button" className="btn btn-ghost text-sm" onClick={locate}>
-              {form.locateAgainButton}
-            </button>
-            <button
-              type="button"
-              className="btn btn-ghost text-sm"
-              onClick={() => onChange(null)}
-              style={{ color: 'var(--red)' }}
-            >
-              {form.locateClearButton}
-            </button>
-            <a
-              href={`https://www.google.com/maps?q=${value.lat},${value.lng}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-ghost text-sm mr-auto"
-            >
-              فتح في خرائط Google ↗
-            </a>
+          {/* Coordinates and Actions on the left of the map */}
+          <div className="flex-1 flex flex-col gap-1">
+            <div className="flex flex-wrap items-center gap-1.5 text-xs text-emerald-800 font-bold">
+              <span>📍 تم التقاط موقع المنزل</span>
+              <span className="text-emerald-600/90 font-mono tracking-tighter" dir="ltr">
+                ({value.lat}, {value.lng})
+              </span>
+            </div>
+            
+            <div className="flex flex-wrap items-center gap-4 text-xs mt-0.5">
+              <button
+                type="button"
+                className="text-nblue font-bold hover:underline"
+                onClick={locate}
+              >
+                {form.locateAgainButton}
+              </button>
+              <button
+                type="button"
+                className="text-nred font-bold hover:underline"
+                onClick={() => onChange(null)}
+              >
+                {form.locateClearButton}
+              </button>
+              <a
+                href={`https://www.google.com/maps?q=${value.lat},${value.lng}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-emerald-700 font-bold hover:underline mr-auto"
+              >
+                فتح قوقل ماب ↗
+              </a>
+            </div>
           </div>
         </div>
       )}
