@@ -120,10 +120,10 @@ export default function RegisterPage() {
   const [paymentType, setPaymentType] = useState<'now' | 'later'>('later');
   const [paymentReceipt, setPaymentReceipt] = useState<string | null>(null);
   const [bankInfo, setBankInfo] = useState({
-    bankName: 'مصرف الراجحي',
-    accountNumber: '1234567890123456',
-    iban: 'SA1234567890123456789012',
-    accountOwner: 'نادي نبراس الصيفي'
+    bankName: 'مصرف الانماء',
+    accountNumber: '68206153287000',
+    iban: 'SA7905000068206153287000',
+    accountOwner: 'جمعية وثبة لتنمية الشباب والنشء'
   });
 
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -211,10 +211,10 @@ export default function RegisterPage() {
         if (data.settings) {
           const s = data.settings;
           setBankInfo({
-            bankName: s.bankName || 'مصرف الراجحي',
-            accountNumber: s.bankAccount || '1234567890123456',
-            iban: s.bankIban || 'SA1234567890123456789012',
-            accountOwner: s.bankOwner || 'نادي نبراس الصيفي'
+            bankName: s.bankName || 'مصرف الانماء',
+            accountNumber: s.bankAccount || '68206153287000',
+            iban: s.bankIban || 'SA7905000068206153287000',
+            accountOwner: s.bankOwner || 'جمعية وثبة لتنمية الشباب والنشء'
           });
         }
       })
