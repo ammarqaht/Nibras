@@ -25,8 +25,13 @@ export async function GET(req: NextRequest) {
 
     let students = await getStudents();
 
-    // Role-based scoping: supervisor only sees their group's students
-    if (supervisor.role !== 'admin') {
+    // Role-based scoping: supervisor only sees their group's students if they are not in a global role.
+    const roles = supervisor.role.split(',').map(r => r.trim());
+    const isGlobal = roles.some(r =>
+      ['admin', 'finance', 'cultural_supervisor', 'social_supervisor', 'general_supervisor', 'attendance_supervisor'].includes(r)
+    );
+
+    if (!isGlobal) {
       const allowedGroupIds = supervisor.groupIds
         .split(',')
         .map(id => parseInt(id.trim(), 10))
@@ -90,7 +95,12 @@ export async function PUT(req: NextRequest) {
     }
 
     // Check permissions
-    if (supervisor.role !== 'admin') {
+    const roles = supervisor.role.split(',').map(r => r.trim());
+    const isGlobal = roles.some(r =>
+      ['admin', 'finance', 'cultural_supervisor', 'social_supervisor', 'general_supervisor', 'attendance_supervisor'].includes(r)
+    );
+
+    if (!isGlobal) {
       // If supervisor, check if they are allowed to edit this student (student must be in their group)
       const allowedGroupIds = supervisor.groupIds
         .split(',')
