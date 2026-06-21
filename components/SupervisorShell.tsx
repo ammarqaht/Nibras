@@ -19,7 +19,7 @@ const LINKS: NavLink[] = [
   { href: '/supervisor/attendance', label: 'الحضور' },
   { href: '/supervisor/points', label: 'النقاط' },
   { href: '/supervisor/groups', label: 'المجموعات' },
-  { href: '/supervisor/payments', label: 'المدفوعات' },
+  { href: '/supervisor/payments', label: 'المدفوعات', financeOnly: true },
   { href: '/supervisor/invoices', label: 'الفواتير' },
   { href: '/supervisor/finance', label: 'المالية', financeOnly: true },
   { href: '/supervisor/announcements', label: 'الإشعارات' },

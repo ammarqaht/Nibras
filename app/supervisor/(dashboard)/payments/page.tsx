@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { pushToast } from '@/components/Toast';
+import { useSupervisor } from '@/components/SupervisorShell';
 
 type Student = {
   id: number; membershipNo: number; studentName: string;
@@ -20,6 +21,9 @@ function isReview(s: Student) {
 }
 
 export default function PaymentsPage() {
+  const { user } = useSupervisor();
+  const allowed = user?.role === 'admin' || user?.role === 'finance';
+
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>('all');
@@ -30,7 +34,7 @@ export default function PaymentsPage() {
     setStudents((await r.json().catch(() => ({ students: [] }))).students ?? []);
     setLoading(false);
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => { if (allowed) load(); else setLoading(false); }, [allowed]);
 
   const filtered = useMemo(() => {
     return students.filter((s) => {
@@ -66,6 +70,10 @@ export default function PaymentsPage() {
   }
 
   const reviewCount = students.filter(isReview).length;
+
+  if (user && !allowed) {
+    return <div className="card p-10 text-center text-ink-500">هذه الصفحة متاحة للمالية والمدير العام فقط.</div>;
+  }
 
   return (
     <div>
