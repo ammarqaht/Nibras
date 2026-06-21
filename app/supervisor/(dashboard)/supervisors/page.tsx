@@ -1,17 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { pushToast } from '@/components/Toast';
+import { useSupervisor } from '@/components/SupervisorShell';
 
-type Supervisor = {
-  id: number;
-  name: string;
-  email: string;
-  role: string;
-  groupIds: string;
-  createdAt: string;
-};
+type Sup = { id: number; name: string; email: string; role: string; groupIds: string; createdAt: string };
+type Group = { id: number; name: string };
 
-const roleMapAr: Record<string, string> = {
+const ROLE_MAP: Record<string, string> = {
   admin: 'مدير عام',
   attendance_supervisor: 'مشرف تحضير',
   social_supervisor: 'مشرف اجتماعية',
@@ -20,289 +16,332 @@ const roleMapAr: Record<string, string> = {
   general_supervisor: 'مشرف عام'
 };
 
+const getRoleLabel = (roleStr: string) => {
+  if (roleStr === 'admin') return 'مدير عام';
+  if (roleStr === 'finance') return 'المالية';
+  return roleStr
+    .split(',')
+    .map((r) => ROLE_MAP[r.trim()] || r)
+    .filter(Boolean)
+    .join('، ');
+};
+
 export default function SupervisorsPage() {
-  const [supervisors, setSupervisors] = useState<Supervisor[]>([]);
+  const { user } = useSupervisor();
+  const [list, setList] = useState<Sup[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
-  const [authorized, setAuthorized] = useState(true);
+  const [busy, setBusy] = useState(false);
 
-  // Form states
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [addName, setAddName] = useState('');
-  const [addEmail, setAddEmail] = useState('');
-  const [addPassword, setAddPassword] = useState('');
-  const [addRole, setAddRole] = useState('general_supervisor');
-  const [submitting, setSubmitting] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [accountType, setAccountType] = useState<'admin' | 'supervisor' | 'finance'>('supervisor');
+  const [selectedRoles, setSelectedRoles] = useState<string[]>(['general_supervisor']);
+  const [groupIds, setGroupIds] = useState<number[]>([]);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [isEditingPrimary, setIsEditingPrimary] = useState(false);
 
-  const fetchSupervisors = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/supervisor/supervisors');
-      if (res.status === 401) {
-        setAuthorized(false);
-        return;
-      }
-      const data = await res.json();
-      if (res.ok) {
-        setSupervisors(data.supervisors || []);
-      } else {
-        setAuthorized(false);
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  async function load() {
+    const [r, gr] = await Promise.all([
+      fetch('/api/supervisor/supervisors', { cache: 'no-store' }),
+      fetch('/api/supervisor/groups', { cache: 'no-store' })
+    ]);
+    if (r.status === 401) { setLoading(false); return; }
+    setList((await r.json().catch(() => ({ supervisors: [] }))).supervisors ?? []);
+    setGroups((await gr.json().catch(() => ({ groups: [] }))).groups ?? []);
+    setLoading(false);
+  }
+  useEffect(() => { load(); }, []);
 
-  useEffect(() => {
-    fetchSupervisors();
-  }, []);
-
-  const handleAddSupervisor = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!addName.trim() || !addEmail.trim() || !addPassword.trim() || !addRole) {
-      setErrorMsg('يرجى تعبئة جميع الحقول الإلزامية');
-      return;
-    }
-
-    setSubmitting(true);
-    setErrorMsg('');
-    try {
-      const res = await fetch('/api/supervisor/supervisors', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: addName,
-          email: addEmail,
-          password: addPassword,
-          role: addRole
-        })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setSupervisors(prev => [...prev, data.supervisor]);
-        setShowAddModal(false);
-        // Reset states
-        setAddName('');
-        setAddEmail('');
-        setAddPassword('');
-        setAddRole('general_supervisor');
-      } else {
-        setErrorMsg(data.error || 'فشل إضافة المشرف');
-      }
-    } catch (err) {
-      setErrorMsg('حدث خطأ في الشبكة، يرجى المحاولة لاحقاً');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDeleteSupervisor = async (id: number, name: string) => {
-    if (!confirm(`هل أنت متأكد من حذف المشرف (${name})؟ لا يمكن التراجع عن هذا الإجراء.`)) return;
-
-    try {
-      const res = await fetch(`/api/supervisor/supervisors?id=${id}`, {
-        method: 'DELETE'
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setSupervisors(prev => prev.filter(s => s.id !== id));
-      } else {
-        alert(data.error || 'فشل حذف المشرف');
-      }
-    } catch (err) {
-      console.error(err);
-      alert('حدث خطأ في الشبكة');
-    }
-  };
-
-  if (!authorized) {
-    return (
-      <div className="card p-8 bg-red-50 border border-red-200 text-center max-w-xl mx-auto mt-12 font-body">
-        <span className="text-4xl">⚠️</span>
-        <h2 className="font-display text-xl text-red-800 mt-3 mb-2">غير مصرح بالدخول</h2>
-        <p className="text-red-600 text-sm">عذراً، هذه الصفحة مخصصة فقط للمدير العام (admin).</p>
-      </div>
-    );
+  if (user && user.role !== 'admin') {
+    return <div className="card p-10 text-center text-ink-500">هذه الصفحة متاحة للمدير العام فقط.</div>;
   }
 
+  function toggleGroup(id: number) {
+    setGroupIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  function cancelEdit() {
+    setName('');
+    setEmail('');
+    setPassword('');
+    setAccountType('supervisor');
+    setSelectedRoles(['general_supervisor']);
+    setGroupIds([]);
+    setEditingId(null);
+    setIsEditingPrimary(false);
+  }
+
+  function startEdit(s: Sup) {
+    setEditingId(s.id);
+    setName(s.name);
+    setEmail(s.email);
+    setPassword('');
+    const primary = s.email === 'admin' || s.email === 'admin@nibras.com';
+    setIsEditingPrimary(primary);
+    if (s.role === 'admin') {
+      setAccountType('admin');
+      setSelectedRoles(['general_supervisor']);
+      setGroupIds([]);
+    } else if (s.role === 'finance') {
+      setAccountType('finance');
+      setSelectedRoles([]);
+      setGroupIds([]);
+    } else {
+      setAccountType('supervisor');
+      setSelectedRoles(s.role.split(',').map((r) => r.trim()).filter(Boolean));
+      setGroupIds(s.groupIds.split(',').map((id) => parseInt(id.trim(), 10)).filter((id) => !isNaN(id)));
+    }
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim() || !email.trim()) return pushToast('error', 'أكمل الحقول الإلزامية');
+    if (!editingId && !password) return pushToast('error', 'يرجى إدخال كلمة مرور للمشرف الجديد');
+
+    let finalRole = accountType === 'admin' ? 'admin' : accountType === 'finance' ? 'finance' : '';
+    let finalGroupIds = '';
+
+    if (accountType === 'supervisor') {
+      if (selectedRoles.length === 0) {
+        return pushToast('error', 'يرجى اختيار دور وظيفي واحد على الأقل للمشرف');
+      }
+      if (selectedRoles.includes('groups_supervisor') && groupIds.length === 0) {
+        return pushToast('error', 'يجب تحديد المجموعات/الأسر المسؤول عنها مشرف الأسر');
+      }
+      finalRole = selectedRoles.join(',');
+      finalGroupIds = selectedRoles.includes('groups_supervisor') ? groupIds.join(',') : '';
+    }
+
+    setBusy(true);
+
+    const payload: any = {
+      name: name.trim(),
+      email: email.trim(),
+      role: finalRole,
+      groupIds: finalGroupIds
+    };
+
+    if (editingId) {
+      payload.id = editingId;
+      if (password) payload.password = password;
+    } else {
+      payload.password = password;
+    }
+
+    const r = await fetch('/api/supervisor/supervisors', {
+      method: editingId ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    setBusy(false);
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return pushToast('error', j.error ?? (editingId ? 'فشل تعديل المشرف' : 'فشل إضافة المشرف'));
+
+    pushToast('success', editingId ? 'تم تعديل بيانات المشرف' : 'تمت إضافة المشرف');
+    cancelEdit();
+    load();
+  }
+
+  async function del(s: Sup) {
+    if (!confirm(`حذف المشرف «${s.name}»؟`)) return;
+    const r = await fetch(`/api/supervisor/supervisors?id=${s.id}`, { method: 'DELETE' });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return pushToast('error', j.error ?? 'فشل الحذف');
+    pushToast('info', 'تم حذف المشرف');
+    load();
+  }
+
+  const groupNames = (ids: string) =>
+    ids.split(',').map((id) => groups.find((g) => String(g.id) === id.trim())?.name).filter(Boolean).join('، ');
+
   return (
-    <div className="space-y-8">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="font-display text-4xl text-ink-900">إدارة المشرفين</h1>
-          <p className="text-ink-500 mt-2">إضافة المشرفين الجدد لنادي نبراس الصيفي وتوزيع الأدوار والصلاحيات عليهم.</p>
-        </div>
-        <div>
-          <button 
-            onClick={() => setShowAddModal(true)}
-            className="btn btn-primary flex items-center gap-2"
-          >
-            ➕ إضافة مشرف جديد
-          </button>
-        </div>
+    <div>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-ink-900 mb-1">المشرفون</h1>
+        <p className="text-sm text-ink-500">إدارة حسابات المشرفين وصلاحياتهم.</p>
       </div>
 
-      {/* Supervisors Table Card */}
-      <div className="card bg-white overflow-hidden">
-        {loading ? (
-          <div className="py-20 text-center text-ink-500 font-body">جاري تحميل المشرفين…</div>
-        ) : supervisors.length === 0 ? (
-          <div className="py-20 text-center text-ink-400 font-body">لا يوجد مشرفين مضافين حالياً.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-right border-collapse text-sm">
-              <thead>
-                <tr className="bg-cream-50/70 border-b border-ink-200/60 text-ink-500 text-xs font-bold uppercase tracking-wider">
-                  <th className="p-4 pr-6">الاسم</th>
-                  <th className="p-4">اسم المستخدم / البريد</th>
-                  <th className="p-4">الدور الصلاحية</th>
-                  <th className="p-4">تاريخ الإضافة</th>
-                  <th className="p-4 pl-6 text-left">التحكم</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-ink-100">
-                {supervisors.map(sup => (
-                  <tr key={sup.id} className="hover:bg-cream-50/40 transition-colors">
-                    <td className="p-4 pr-6 font-semibold text-ink-900">{sup.name}</td>
-                    <td className="p-4 text-ink-600 ltr text-right">{sup.email}</td>
-                    <td className="p-4">
-                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${sup.role === 'admin' ? 'bg-blue-100 text-blue-800' : 'bg-cream-200/60 text-ink-700'}`}>
-                        {roleMapAr[sup.role] || sup.role}
-                      </span>
-                    </td>
-                    <td className="p-4 text-ink-400">
-                      {new Date(sup.createdAt).toLocaleDateString('ar-SA')}
-                    </td>
-                    <td className="p-4 pl-6 text-left">
-                      {sup.email !== 'admin' && sup.email !== 'admin@nibras.com' ? (
-                        <button
-                          onClick={() => handleDeleteSupervisor(sup.id, sup.name)}
-                          className="btn btn-danger btn-sm py-1 px-2.5"
-                        >
-                          🗑️ حذف
-                        </button>
-                      ) : (
-                        <span className="text-xs text-ink-300 font-medium">حساب أساسي</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <form onSubmit={handleSubmit} className="card p-6 space-y-4 self-start">
+          <h2 className="text-lg font-bold text-ink-900">{editingId ? 'تعديل المشرف' : 'إضافة مشرف'}</h2>
+          <div>
+            <label className="label">الاسم</label>
+            <input className="field" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
-        )}
-      </div>
-
-      {/* Add Supervisor Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-950/40 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
-          <div className="bg-white rounded-3xl w-full max-w-md card shadow-xl p-6 sm:p-8 relative">
-            {/* Modal Header */}
-            <div className="flex items-start justify-between border-b border-ink-100 pb-4 mb-6">
-              <div>
-                <h2 className="font-display text-2xl text-ink-900">إضافة مشرف جديد</h2>
-                <p className="text-xs text-ink-400 mt-1">تعبئة بيانات الاعتماد واختيار صلاحية المشرف.</p>
-              </div>
-              <button 
-                onClick={() => setShowAddModal(false)}
-                className="w-8 h-8 rounded-full bg-cream-50 hover:bg-cream-100 text-ink-600 flex items-center justify-center transition-colors"
+          <div>
+            <label className="label">البريد / اسم المستخدم</label>
+            <input className="field" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </div>
+          <div>
+            <label className="label">
+              كلمة المرور {editingId && <span className="text-xs text-ink-400 font-normal">(اتركها فارغة للإبقاء على الحالية)</span>}
+            </label>
+            <input className="field" dir="ltr" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={editingId ? '••••••••' : ''} />
+          </div>
+          <div>
+            <label className="label">نوع الحساب</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={isEditingPrimary}
+                className={`choice flex-1 ${accountType === 'supervisor' ? 'is-active' : ''} ${isEditingPrimary ? 'opacity-50 cursor-not-allowed' : ''}`}
+                onClick={() => setAccountType('supervisor')}
               >
-                ✕
+                مشرف
+              </button>
+              <button
+                type="button"
+                disabled={isEditingPrimary}
+                className={`choice flex-1 ${accountType === 'finance' ? 'is-active' : ''} ${isEditingPrimary ? 'opacity-50 cursor-not-allowed' : ''}`}
+                onClick={() => setAccountType('finance')}
+              >
+                مالية
+              </button>
+              <button
+                type="button"
+                disabled={isEditingPrimary}
+                className={`choice flex-1 ${accountType === 'admin' ? 'is-active' : ''} ${isEditingPrimary ? 'opacity-50 cursor-not-allowed' : ''}`}
+                onClick={() => setAccountType('admin')}
+              >
+                مدير عام
               </button>
             </div>
-
-            {errorMsg && (
-              <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold text-center">
-                {errorMsg}
-              </div>
-            )}
-
-            <form onSubmit={handleAddSupervisor} className="space-y-4">
-              {/* Name */}
-              <div>
-                <label className="label mb-1 block">الاسم الكامل للمشرف</label>
-                <input 
-                  type="text" 
-                  required
-                  value={addName}
-                  onChange={e => setAddName(e.target.value)}
-                  className="input w-full"
-                  placeholder="أحمد علي الغامدي"
-                  disabled={submitting}
-                />
-              </div>
-
-              {/* Email / Username */}
-              <div>
-                <label className="label mb-1 block">اسم المستخدم أو البريد الإلكتروني</label>
-                <input 
-                  type="text" 
-                  required
-                  value={addEmail}
-                  onChange={e => setAddEmail(e.target.value)}
-                  className="input w-full ltr text-left"
-                  placeholder="ahmed"
-                  disabled={submitting}
-                />
-              </div>
-
-              {/* Password */}
-              <div>
-                <label className="label mb-1 block">كلمة المرور</label>
-                <input 
-                  type="password" 
-                  required
-                  value={addPassword}
-                  onChange={e => setAddPassword(e.target.value)}
-                  className="input w-full ltr text-left"
-                  placeholder="••••••••"
-                  disabled={submitting}
-                />
-              </div>
-
-              {/* Role Selector */}
-              <div>
-                <label className="label mb-1 block">الدور الوظيفي / الصلاحية</label>
-                <select
-                  value={addRole}
-                  onChange={e => setAddRole(e.target.value)}
-                  className="input w-full font-semibold"
-                  disabled={submitting}
-                >
-                  <option value="admin">مدير عام</option>
-                  <option value="attendance_supervisor">مشرف تحضير</option>
-                  <option value="social_supervisor">مشرف اجتماعية</option>
-                  <option value="cultural_supervisor">مشرف ثقافية</option>
-                  <option value="groups_supervisor">مشرف أسر</option>
-                  <option value="general_supervisor">مشرف عام</option>
-                </select>
-              </div>
-
-              {/* Modal Footer */}
-              <div className="mt-8 pt-4 border-t border-ink-100 flex items-center justify-end gap-3">
-                <button 
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="btn btn-secondary"
-                  disabled={submitting}
-                >
-                  إلغاء
-                </button>
-                <button 
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={submitting}
-                >
-                  {submitting ? 'جاري الإضافة...' : '➕ إضافة المشرف'}
-                </button>
-              </div>
-            </form>
           </div>
+
+          {accountType === 'supervisor' && (
+            <div className="space-y-3">
+              <label className="label font-semibold">الأدوار والوظائف المشرف عليها (تحديد متعدد)</label>
+              <div className="grid grid-cols-1 gap-2">
+                {[
+                  { key: 'attendance_supervisor', label: 'مشرف تحضير' },
+                  { key: 'social_supervisor', label: 'مشرف اجتماعية' },
+                  { key: 'cultural_supervisor', label: 'مشرف ثقافية' },
+                  { key: 'groups_supervisor', label: 'مشرف أسر' },
+                  { key: 'general_supervisor', label: 'مشرف عام' }
+                ].map((r) => {
+                  const active = selectedRoles.includes(r.key);
+                  return (
+                    <label key={r.key} className="flex items-center gap-2.5 cursor-pointer p-2 rounded-lg border border-ink-200 hover:bg-cream-50 transition-colors select-none">
+                      <input
+                        type="checkbox"
+                        checked={active}
+                        onChange={() => {
+                          setSelectedRoles((prev) =>
+                            prev.includes(r.key) ? prev.filter((x) => x !== r.key) : [...prev, r.key]
+                          );
+                        }}
+                        className="rounded text-brand w-5 h-5 focus:ring-brand cursor-pointer"
+                      />
+                      <span className="text-sm font-semibold text-ink-900">{r.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {accountType === 'supervisor' && selectedRoles.includes('groups_supervisor') && (
+            <div>
+              <label className="label font-semibold text-brand-600">المجموعات المسؤول عنها (إجباري لمشرف الأسر) <span className="text-red-500">*</span></label>
+              {groups.length === 0 ? (
+                <p className="text-xs text-ink-400">لا توجد مجموعات بعد — أنشئها من صفحة المجموعات.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {groups.map((g) => (
+                    <button
+                      type="button"
+                      key={g.id}
+                      onClick={() => toggleGroup(g.id)}
+                      className={`choice py-1.5 px-3 text-xs ${groupIds.includes(g.id) ? 'is-active' : ''}`}
+                    >
+                      {g.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <button type="submit" disabled={busy} className="btn btn-primary flex-1">{busy ? '...' : editingId ? 'حفظ التعديلات' : 'إضافة المشرف'}</button>
+            {editingId && (
+              <button type="button" onClick={cancelEdit} className="btn btn-secondary">إلغاء</button>
+            )}
+          </div>
+        </form>
+
+        <div className="card p-6 lg:col-span-2">
+          <h2 className="text-lg font-bold text-ink-900 mb-4">الحسابات ({list.length})</h2>
+          {loading ? (
+            <p className="text-center py-10 text-ink-400 text-sm">جارٍ التحميل…</p>
+          ) : (
+            <>
+              <div className="hidden lg:block overflow-x-auto scroll-soft">
+                <table className="tbl">
+                  <thead>
+                    <tr><th>الاسم</th><th>المستخدم</th><th>الصلاحية</th><th>المجموعات</th><th></th></tr>
+                  </thead>
+                  <tbody>
+                    {list.map((s) => {
+                      const primary = s.email === 'admin' || s.email === 'admin@nibras.com';
+                      return (
+                        <tr key={s.id}>
+                          <td className="font-medium">{s.name}</td>
+                          <td dir="ltr" className="text-right text-ink-500">{s.email}</td>
+                          <td>
+                            <span className={`pill ${s.role === 'admin' ? 'pill-blue' : s.role === 'finance' ? 'pill-green' : 'pill-gray'}`}>
+                              {getRoleLabel(s.role)}
+                            </span>
+                          </td>
+                          <td className="text-ink-500 text-sm">{s.role === 'admin' ? 'الكل' : groupNames(s.groupIds) || '—'}</td>
+                          <td>
+                            <div className="flex items-center gap-1.5 justify-end">
+                              <button onClick={() => startEdit(s)} className="btn btn-secondary py-1 px-3 text-xs">تعديل</button>
+                              {!primary && (
+                                <button onClick={() => del(s)} className="btn btn-danger py-1 px-3 text-xs">حذف</button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <ul className="lg:hidden divide-y divide-ink-200">
+                {list.map((s) => {
+                  const primary = s.email === 'admin' || s.email === 'admin@nibras.com';
+                  return (
+                    <li key={s.id} className="py-3 flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-ink-900 truncate">{s.name}</span>
+                          <span className={`pill shrink-0 ${s.role === 'admin' ? 'pill-blue' : s.role === 'finance' ? 'pill-green' : 'pill-gray'}`}>
+                            {getRoleLabel(s.role)}
+                          </span>
+                        </div>
+                        <div dir="ltr" className="text-xs text-ink-400 mt-0.5 text-right truncate">{s.email}</div>
+                        <div className="text-xs text-ink-500 mt-0.5">
+                          المجموعات: {s.role === 'admin' ? 'الكل' : groupNames(s.groupIds) || '—'}
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1.5 shrink-0 items-end">
+                        <button onClick={() => startEdit(s)} className="btn btn-secondary py-1 px-3 text-xs">تعديل</button>
+                        {!primary && (
+                          <button onClick={() => del(s)} className="btn btn-danger py-1 px-3 text-xs">حذف</button>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

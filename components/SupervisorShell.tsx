@@ -14,17 +14,17 @@ export const useSupervisor = () => useContext(SupervisorContext);
 type NavLink = { href: string; label: string; adminOnly?: boolean; financeOnly?: boolean };
 
 const LINKS: NavLink[] = [
-  { href: '/supervisor2', label: 'الرئيسية' },
-  { href: '/supervisor2/students', label: 'الطلاب' },
-  { href: '/supervisor2/attendance', label: 'الحضور' },
-  { href: '/supervisor2/points', label: 'النقاط' },
-  { href: '/supervisor2/groups', label: 'المجموعات' },
-  { href: '/supervisor2/payments', label: 'المدفوعات' },
-  { href: '/supervisor2/invoices', label: 'الفواتير' },
-  { href: '/supervisor2/finance', label: 'المالية', financeOnly: true },
-  { href: '/supervisor2/announcements', label: 'الإشعارات' },
-  { href: '/supervisor2/supervisors', label: 'المشرفون', adminOnly: true },
-  { href: '/supervisor2/settings', label: 'الإعدادات', adminOnly: true }
+  { href: '/supervisor', label: 'الرئيسية' },
+  { href: '/supervisor/students', label: 'الطلاب' },
+  { href: '/supervisor/attendance', label: 'الحضور' },
+  { href: '/supervisor/points', label: 'النقاط' },
+  { href: '/supervisor/groups', label: 'المجموعات' },
+  { href: '/supervisor/payments', label: 'المدفوعات' },
+  { href: '/supervisor/invoices', label: 'الفواتير' },
+  { href: '/supervisor/finance', label: 'المالية', financeOnly: true },
+  { href: '/supervisor/announcements', label: 'الإشعارات' },
+  { href: '/supervisor/supervisors', label: 'المشرفون', adminOnly: true },
+  { href: '/supervisor/settings', label: 'الإعدادات', adminOnly: true }
 ];
 
 export default function SupervisorShell({ children }: { children: React.ReactNode }) {
@@ -40,7 +40,7 @@ export default function SupervisorShell({ children }: { children: React.ReactNod
       try {
         const r = await fetch('/api/supervisor/auth/me', { cache: 'no-store' });
         if (r.status === 401) {
-          router.replace('/supervisor2/login');
+          router.replace('/supervisor/login');
           return;
         }
         const j = await r.json();
@@ -48,7 +48,7 @@ export default function SupervisorShell({ children }: { children: React.ReactNod
         setUser(j.user);
         setStatus('authed');
       } catch {
-        router.replace('/supervisor2/login');
+        router.replace('/supervisor/login');
       }
     })();
     return () => {
@@ -63,8 +63,42 @@ export default function SupervisorShell({ children }: { children: React.ReactNod
 
   async function logout() {
     await fetch('/api/supervisor/auth/logout', { method: 'POST' });
-    router.replace('/supervisor2/login');
+    router.replace('/supervisor/login');
   }
+
+  // Idle timeout auto-logout (5 minutes of inactivity)
+  useEffect(() => {
+    if (status !== 'authed') return;
+
+    let timeoutId: NodeJS.Timeout;
+
+    const resetTimer = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        logout();
+      }, 5 * 60 * 1000); // 5 minutes
+    };
+
+    // Events that count as active interaction
+    const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+    const handleActivity = () => {
+      resetTimer();
+    };
+
+    events.forEach((event) => {
+      window.addEventListener(event, handleActivity);
+    });
+
+    // Initialize timer
+    resetTimer();
+
+    return () => {
+      clearTimeout(timeoutId);
+      events.forEach((event) => {
+        window.removeEventListener(event, handleActivity);
+      });
+    };
+  }, [status]);
 
   if (status === 'loading') {
     return (
@@ -85,7 +119,7 @@ export default function SupervisorShell({ children }: { children: React.ReactNod
       (!l.adminOnly || user?.role === 'admin') &&
       (!l.financeOnly || user?.role === 'admin' || user?.role === 'finance')
   );
-  const isActive = (href: string) => (href === '/supervisor2' ? path === href : path.startsWith(href));
+  const isActive = (href: string) => (href === '/supervisor' ? path === href : path.startsWith(href));
 
   return (
     <SupervisorContext.Provider value={{ user }}>
@@ -103,7 +137,7 @@ export default function SupervisorShell({ children }: { children: React.ReactNod
               >
                 {menuOpen ? <CloseIcon /> : <MenuIcon />}
               </button>
-              <Brand href="/supervisor2" variant="lockup" imgClassName="h-9 w-auto" />
+              <Brand href="/supervisor" variant="lockup" imgClassName="h-9 w-auto" />
               <nav className="hidden lg:flex items-center gap-1">
                 {links.map((l) => (
                   <Link

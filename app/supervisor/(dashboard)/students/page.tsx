@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { stages } from '@/content';
+import { pushToast } from '@/components/Toast';
+import { useSupervisor } from '@/components/SupervisorShell';
 
 type Student = {
   id: number;
@@ -20,1143 +22,587 @@ type Student = {
   conditionNote: string | null;
   createdAt: string;
   paymentStatus: string;
-  groupId: number | null;
-  registrationStatus: string;
   paymentType: string;
   paymentReceipt: string | null;
+  registrationStatus: string;
+  groupId: number | null;
 };
 
-type Group = {
-  id: number;
-  name: string;
-  stage: string;
-};
+type Group = { id: number; name: string; stage: string };
+
+function paymentPill(s: Student) {
+  if (s.paymentStatus === 'paid') return { cls: 'pill-green', label: 'مدفوع' };
+  if (s.paymentType === 'now' && s.paymentReceipt) return { cls: 'pill-yellow', label: 'بانتظار المراجعة 📑' };
+  return { cls: 'pill-red', label: 'لم يدفع' };
+}
+function regPill(status: string) {
+  if (status === 'approved') return { cls: 'pill-green', label: 'مقبول' };
+  if (status === 'rejected') return { cls: 'pill-red', label: 'مرفوض' };
+  return { cls: 'pill-yellow', label: 'قيد المراجعة' };
+}
 
 export default function StudentsPage() {
+  const { user } = useSupervisor();
+  const isAdmin = user?.role === 'admin';
+
   const [students, setStudents] = useState<Student[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<Student | null>(null);
 
-  // Filters state
+  // filters
   const [search, setSearch] = useState('');
-  const [stage, setStage] = useState('');
-  const [neighborhood, setNeighborhood] = useState('');
-  const [paymentStatus, setPaymentStatus] = useState('');
-  const [registrationStatus, setRegistrationStatus] = useState('');
-  const [groupId, setGroupId] = useState('');
+  const [fStage, setFStage] = useState('');
+  const [fPay, setFPay] = useState('');
+  const [fReg, setFReg] = useState(() =>
+    typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('registrationStatus') || '' : ''
+  );
+  const [fGroup, setFGroup] = useState('');
 
-  // Selected student for modal / editing
-  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-  const [editMode, setEditMode] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-
-  // Editable fields in modal
-  const [editName, setEditName] = useState('');
-  const [editNationalId, setEditNationalId] = useState('');
-  const [editGuardianPhone, setEditGuardianPhone] = useState('');
-  const [editStudentPhone, setEditStudentPhone] = useState('');
-  const [editStage, setEditStage] = useState('');
-  const [editGrade, setEditGrade] = useState('');
-  const [editNeighborhood, setEditNeighborhood] = useState('');
-  const [editMapLink, setEditMapLink] = useState('');
-  const [editHasCondition, setEditHasCondition] = useState(false);
-  const [editConditionNote, setEditConditionNote] = useState('');
-  const [editPaymentStatus, setEditPaymentStatus] = useState('unpaid');
-  const [editRegistrationStatus, setEditRegistrationStatus] = useState('pending');
-  const [editGroupId, setEditGroupId] = useState<string>('');
-
-  // Add manual student states
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [addName, setAddName] = useState('');
-  const [addNationalId, setAddNationalId] = useState('');
-  const [addGuardianPhone, setAddGuardianPhone] = useState('');
-  const [addStudentPhone, setAddStudentPhone] = useState('');
-  const [addStage, setAddStage] = useState('ابتدائي');
-  const [addGrade, setAddGrade] = useState('');
-  const [addNeighborhood, setAddNeighborhood] = useState('');
-  const [addMapLink, setAddMapLink] = useState('');
-  const [addHasCondition, setAddHasCondition] = useState(false);
-  const [addConditionNote, setAddConditionNote] = useState('');
-  const [addPaymentStatus, setAddPaymentStatus] = useState('unpaid');
-  const [addRegistrationStatus, setAddRegistrationStatus] = useState('approved');
-  const [addGroupId, setAddGroupId] = useState('');
-  const [adding, setAdding] = useState(false);
-
-  const handleDeleteStudent = async () => {
-    if (!selectedStudent) return;
-    if (!confirm(`هل أنت متأكد من حذف الطالب ${selectedStudent.studentName} نهائياً؟ لا يمكن التراجع عن هذا الإجراء.`)) return;
-    
-    setDeleting(true);
-    try {
-      const res = await fetch(`/api/supervisor/students?id=${selectedStudent.id}`, {
-        method: 'DELETE'
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setStudents(prev => prev.filter(item => item.id !== selectedStudent.id));
-        setSelectedStudent(null);
-      } else {
-        alert(data.error || 'فشل حذف الطالب');
-      }
-    } catch (err) {
-      console.error(err);
-      alert('حدث خطأ في الشبكة');
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  const handleCopyWhatsapp = () => {
-    if (!selectedStudent) return;
-    const groupName = groups.find(g => g.id === selectedStudent.groupId)?.name || 'غير مصنف';
-    const text = `*بيانات تسجيل الطالب في نادي نبراس:*
-اسم الطالب: ${selectedStudent.studentName}
-رقم العضوية: #${selectedStudent.membershipNo}
-المرحلة/الصف: ${selectedStudent.stage} — ${selectedStudent.grade}
-الحي السكني: ${selectedStudent.neighborhood}
-جوال ولي الأمر: ${selectedStudent.guardianPhone}
-جوال الطالب: ${selectedStudent.studentPhone || 'لا يوجد'}
-حالة التسجيل: ${selectedStudent.registrationStatus === 'approved' ? 'مقبول' : selectedStudent.registrationStatus === 'rejected' ? 'مرفوض' : 'قيد الانتظار'}
-حالة الدفع: ${selectedStudent.paymentStatus === 'paid' ? 'مدفوع' : 'لم يدفع'}
-رابط الموقع: ${selectedStudent.mapLink || (selectedStudent.locationLat && selectedStudent.locationLng ? `https://www.google.com/maps?q=${selectedStudent.locationLat},${selectedStudent.locationLng}` : 'غير متوفر')}`;
-
-    navigator.clipboard.writeText(text);
-    alert('تم نسخ البيانات المنسقة للواتساب بنجاح! ✅');
-  };
-
-  const handleExportCSV = () => {
-    if (students.length === 0) return;
-    
-    const headers = ['العضوية', 'اسم الطالب', 'الهوية', 'جوال ولي الأمر', 'جوال الطالب', 'المرحلة', 'الصف', 'الحي', 'المجموعة', 'حالة التسجيل', 'حالة الدفع', 'رابط الموقع'];
-    
-    const rows = students.map(s => {
-      const groupName = groups.find(g => g.id === s.groupId)?.name || 'غير مصنف';
-      const mapLinkStr = s.mapLink || (s.locationLat && s.locationLng ? `https://www.google.com/maps?q=${s.locationLat},${s.locationLng}` : '');
-      return [
-        s.membershipNo,
-        s.studentName,
-        s.nationalId,
-        s.guardianPhone,
-        s.studentPhone || '',
-        s.stage,
-        s.grade,
-        s.neighborhood,
-        groupName,
-        s.registrationStatus === 'approved' ? 'مقبول' : s.registrationStatus === 'rejected' ? 'مرفوض' : 'انتظار',
-        s.paymentStatus === 'paid' ? 'مدفوع' : 'لم يدفع',
-        mapLinkStr
-      ];
-    });
-    
-    const csvContent = "\uFEFF" + [headers.join(','), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))].join('\n');
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `nibras_students_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const handleAddStudent = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!addName || !addNationalId || !addGuardianPhone || !addStage || !addGrade || !addNeighborhood) {
-      alert('يرجى إكمال جميع الحقول الإلزامية');
-      return;
-    }
-    setAdding(true);
-    try {
-      const res = await fetch('/api/supervisor/students', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          studentName: addName,
-          nationalId: addNationalId,
-          guardianPhone: addGuardianPhone,
-          studentPhone: addStudentPhone || null,
-          stage: addStage,
-          grade: addGrade,
-          neighborhood: addNeighborhood,
-          mapLink: addMapLink || null,
-          hasCondition: addHasCondition,
-          conditionNote: addHasCondition ? addConditionNote : null,
-          paymentStatus: addPaymentStatus,
-          registrationStatus: addRegistrationStatus,
-          groupId: addGroupId || null
-        })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setStudents(prev => [data.student, ...prev]);
-        setShowAddModal(false);
-        // Reset states
-        setAddName('');
-        setAddNationalId('');
-        setAddGuardianPhone('');
-        setAddStudentPhone('');
-        setAddStage('ابتدائي');
-        setAddGrade('');
-        setAddNeighborhood('');
-        setAddMapLink('');
-        setAddHasCondition(false);
-        setAddConditionNote('');
-        setAddPaymentStatus('unpaid');
-        setAddRegistrationStatus('approved');
-        setAddGroupId('');
-      } else {
-        alert(data.error || 'فشل إضافة الطالب');
-      }
-    } catch (err) {
-      console.error(err);
-      alert('حدث خطأ في الشبكة');
-    } finally {
-      setAdding(false);
-    }
-  };
-
-  const fetchStudents = useCallback(async () => {
-    setLoading(true);
-    try {
-      const q = new URLSearchParams({
-        search,
-        stage,
-        neighborhood,
-        paymentStatus,
-        registrationStatus,
-        groupId
-      });
-      const res = await fetch(`/api/supervisor/students?${q.toString()}`);
-      const data = await res.json();
-      if (res.ok) {
-        setStudents(data.students || []);
-      }
-    } catch (err) {
-      console.error('Error fetching students', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [search, stage, neighborhood, paymentStatus, registrationStatus, groupId]);
-
-  const fetchGroups = async () => {
-    try {
-      const res = await fetch('/api/supervisor/groups');
-      const data = await res.json();
-      if (res.ok) {
-        setGroups(data.groups || []);
-      }
-    } catch (err) {
-      console.error('Error fetching groups', err);
-    }
-  };
+  async function load() {
+    const [sr, gr] = await Promise.all([
+      fetch('/api/supervisor/students', { cache: 'no-store' }),
+      fetch('/api/supervisor/groups', { cache: 'no-store' })
+    ]);
+    const sj = await sr.json().catch(() => ({ students: [] }));
+    const gj = await gr.json().catch(() => ({ groups: [] }));
+    setStudents(sj.students ?? []);
+    setGroups(gj.groups ?? []);
+    setLoading(false);
+  }
 
   useEffect(() => {
-    fetchStudents();
-  }, [fetchStudents]);
-
-  useEffect(() => {
-    fetchGroups();
+    load();
   }, []);
 
-  const openStudentDetails = (s: Student) => {
-    setSelectedStudent(s);
-    setEditMode(false);
-    
-    // Set edit states
-    setEditName(s.studentName);
-    setEditNationalId(s.nationalId);
-    setEditGuardianPhone(s.guardianPhone);
-    setEditStudentPhone(s.studentPhone || '');
-    setEditStage(s.stage);
-    setEditGrade(s.grade);
-    setEditNeighborhood(s.neighborhood);
-    setEditMapLink(s.mapLink || '');
-    setEditHasCondition(s.hasCondition);
-    setEditConditionNote(s.conditionNote || '');
-    setEditPaymentStatus(s.paymentStatus);
-    setEditRegistrationStatus(s.registrationStatus);
-    setEditGroupId(s.groupId !== null ? s.groupId.toString() : '');
-  };
-
-  const handleSaveChanges = async () => {
-    if (!selectedStudent) return;
-    setSaving(true);
-    try {
-      const res = await fetch('/api/supervisor/students', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: selectedStudent.id,
-          studentName: editName,
-          nationalId: editNationalId,
-          guardianPhone: editGuardianPhone,
-          studentPhone: editStudentPhone || null,
-          stage: editStage,
-          grade: editGrade,
-          neighborhood: editNeighborhood,
-          mapLink: editMapLink || null,
-          hasCondition: editHasCondition,
-          conditionNote: editHasCondition ? editConditionNote : null,
-          paymentStatus: editPaymentStatus,
-          groupId: editGroupId ? parseInt(editGroupId, 10) : null,
-          registrationStatus: editRegistrationStatus
-        })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        // Update local list
-        setStudents(prev => prev.map(item => item.id === selectedStudent.id ? data.student : item));
-        setSelectedStudent(data.student);
-        setEditMode(false);
-      } else {
-        alert(data.error || 'فشل حفظ التعديلات');
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return students.filter((s) => {
+      if (q) {
+        const hit =
+          s.studentName.toLowerCase().includes(q) ||
+          s.nationalId.includes(q) ||
+          s.guardianPhone.includes(q) ||
+          (s.studentPhone ?? '').includes(q) ||
+          String(s.membershipNo).includes(q);
+        if (!hit) return false;
       }
-    } catch (err) {
-      console.error(err);
-      alert('حدث خطأ في الشبكة');
-    } finally {
-      setSaving(false);
-    }
-  };
+      if (fStage && s.stage !== fStage) return false;
+      if (fPay && s.paymentStatus !== fPay) return false;
+      if (fReg && s.registrationStatus !== fReg) return false;
+      if (fGroup && String(s.groupId) !== fGroup) return false;
+      return true;
+    });
+  }, [students, search, fStage, fPay, fReg, fGroup]);
 
-  const handleConfirmPayment = async () => {
-    if (!selectedStudent) return;
-    if (!confirm(`هل أنت متأكد من تأكيد استلام الدفع للطالب ${selectedStudent.studentName}؟`)) return;
-    setSaving(true);
-    try {
-      const res = await fetch('/api/supervisor/students', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: selectedStudent.id,
-          paymentStatus: 'paid'
-        })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setStudents(prev => prev.map(item => item.id === selectedStudent.id ? data.student : item));
-        setSelectedStudent(data.student);
-        alert('تم تأكيد الدفع بنجاح! ✅');
-      } else {
-        alert(data.error || 'فشل تأكيد الدفع');
-      }
-    } catch (err) {
-      console.error(err);
-      alert('حدث خطأ في الشبكة');
-    } finally {
-      setSaving(false);
-    }
-  };
+  // optimistic local update after a PUT
+  function applyUpdate(updated: Student) {
+    setStudents((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+    setSelected((prev) => (prev && prev.id === updated.id ? updated : prev));
+  }
 
-  const currentGradeOptions = stages.find(s => s.key === editStage)?.grades || [];
+  function exportCsv() {
+    const headers = [
+      'رقم العضوية', 'اسم الطالب', 'رقم الهوية', 'جوال ولي الأمر', 'جوال الطالب',
+      'المرحلة', 'الصف', 'الحي', 'حالة الدفع', 'نوع الدفع', 'حالة التسجيل', 'حالة صحية'
+    ];
+    const esc = (v: unknown) => {
+      const str = String(v ?? '');
+      return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+    };
+    const rows = filtered.map((s) => [
+      s.membershipNo, s.studentName, s.nationalId, s.guardianPhone, s.studentPhone ?? '',
+      s.stage, s.grade, s.neighborhood,
+      s.paymentStatus === 'paid' ? 'مدفوع' : 'غير مدفوع',
+      s.paymentType === 'now' ? 'فوري' : 'آجل',
+      s.registrationStatus === 'approved' ? 'مقبول' : s.registrationStatus === 'rejected' ? 'مرفوض' : 'قيد المراجعة',
+      s.hasCondition ? 'نعم' : 'لا'
+    ]);
+    const csv = '﻿' + [headers.join(','), ...rows.map((r) => r.map(esc).join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `nibras-students-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   return (
-    <div className="space-y-8">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div>
+      <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
         <div>
-          <h1 className="font-display text-4xl text-ink-900">إدارة الطلاب</h1>
-          <p className="text-ink-500 mt-2">عرض بيانات الطلاب المسجلين، تعديل حالاتهم، وتوزيعهم على المجموعات.</p>
+          <h1 className="text-2xl font-bold text-ink-900 mb-1">سجل الطلاب</h1>
+          <p className="text-sm text-ink-500">{filtered.length} طالب من أصل {students.length}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <button 
-            onClick={handleExportCSV}
-            className="btn btn-secondary flex items-center gap-2"
-          >
-            📥 تصدير البيانات (CSV)
-          </button>
-          <button 
-            onClick={() => setShowAddModal(true)}
-            className="btn btn-primary flex items-center gap-2"
-          >
-            ➕ إضافة طالب جديد
-          </button>
+        <button onClick={exportCsv} className="btn btn-secondary text-sm">⬇︎ تصدير CSV</button>
+      </div>
+
+      {/* Filters */}
+      <div className="card p-4 mb-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+          <input
+            className="field lg:col-span-1"
+            placeholder="بحث بالاسم / الهوية / الجوال / العضوية…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <select className="field" value={fStage} onChange={(e) => setFStage(e.target.value)}>
+            <option value="">كل المراحل</option>
+            {stages.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+          </select>
+          <select className="field" value={fPay} onChange={(e) => setFPay(e.target.value)}>
+            <option value="">كل حالات الدفع</option>
+            <option value="paid">مدفوع</option>
+            <option value="unpaid">غير مدفوع</option>
+          </select>
+          <select className="field" value={fReg} onChange={(e) => setFReg(e.target.value)}>
+            <option value="">كل حالات التسجيل</option>
+            <option value="pending">قيد المراجعة</option>
+            <option value="approved">مقبول</option>
+            <option value="rejected">مرفوض</option>
+          </select>
+          <select className="field" value={fGroup} onChange={(e) => setFGroup(e.target.value)}>
+            <option value="">كل المجموعات</option>
+            {groups.map((g) => <option key={g.id} value={String(g.id)}>{g.name}</option>)}
+          </select>
         </div>
       </div>
 
-      {/* Filters Card */}
-      <div className="card p-6 bg-white space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Search */}
-          <div className="sm:col-span-2">
-            <label className="label mb-1.5 block">بحث بالاسم، الهوية، أو الجوال</label>
-            <input
-              type="text"
-              placeholder="ابحث هنا..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="input w-full"
-            />
-          </div>
-
-          {/* Stage */}
-          <div>
-            <label className="label mb-1.5 block">المرحلة</label>
-            <select
-              value={stage}
-              onChange={(e) => setStage(e.target.value)}
-              className="input w-full"
-            >
-              <option value="">كل المراحل</option>
-              {stages.map(s => (
-                <option key={s.key} value={s.key}>{s.label}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Neighborhood */}
-          <div>
-            <label className="label mb-1.5 block">الحي السكني</label>
-            <input
-              type="text"
-              placeholder="مثال: النخيل"
-              value={neighborhood}
-              onChange={(e) => setNeighborhood(e.target.value)}
-              className="input w-full"
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-          {/* Registration Status */}
-          <div>
-            <label className="label mb-1.5 block">حالة التسجيل</label>
-            <select
-              value={registrationStatus}
-              onChange={(e) => setRegistrationStatus(e.target.value)}
-              className="input w-full"
-            >
-              <option value="">كل الحالات</option>
-              <option value="pending">قيد الانتظار</option>
-              <option value="approved">مقبول</option>
-              <option value="rejected">مرفوض</option>
-            </select>
-          </div>
-
-          {/* Payment Status */}
-          <div>
-            <label className="label mb-1.5 block">حالة الدفع</label>
-            <select
-              value={paymentStatus}
-              onChange={(e) => setPaymentStatus(e.target.value)}
-              className="input w-full"
-            >
-              <option value="">الكل</option>
-              <option value="paid">تم الدفع</option>
-              <option value="unpaid">لم يدفع</option>
-            </select>
-          </div>
-
-          {/* Group */}
-          <div>
-            <label className="label mb-1.5 block">المجموعة</label>
-            <select
-              value={groupId}
-              onChange={(e) => setGroupId(e.target.value)}
-              className="input w-full"
-            >
-              <option value="">كل المجموعات</option>
-              <option value="none">غير مصنف</option>
-              {groups.map(g => (
-                <option key={g.id} value={g.id}>{g.name} ({g.stage})</option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Students Table */}
-      <div className="card bg-white overflow-hidden">
+      {/* Table */}
+      <div className="card p-0 overflow-hidden">
         {loading ? (
-          <div className="py-20 text-center text-ink-500 font-body">جاري تحميل بيانات الطلاب…</div>
-        ) : students.length === 0 ? (
-          <div className="py-20 text-center text-ink-500 font-body">لم يتم العثور على نتائج تطابق البحث.</div>
+          <p className="text-center py-16 text-ink-400 text-sm">جارٍ التحميل…</p>
+        ) : filtered.length === 0 ? (
+          <p className="text-center py-16 text-ink-400 text-sm">لا يوجد طلاب مطابقون.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-right border-collapse">
-              <thead>
-                <tr className="bg-cream-50/70 border-b border-ink-200/60 text-ink-500 text-xs font-bold uppercase tracking-wider">
-                  <th className="p-4 pr-6">العضوية</th>
-                  <th className="p-4">اسم الطالب</th>
-                  <th className="p-4">المرحلة / الصف</th>
-                  <th className="p-4">الحي</th>
-                  <th className="p-4">المجموعة</th>
-                  <th className="p-4">التسجيل</th>
-                  <th className="p-4">الرسوم</th>
-                  <th className="p-4 pl-6 text-left">التفاصيل</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-ink-100 text-sm">
-                {students.map((s) => {
-                  const studentGroup = groups.find(g => g.id === s.groupId);
-                  return (
-                    <tr 
-                      key={s.id} 
-                      className={`hover:bg-cream-50/40 transition-colors duration-150 cursor-pointer ${s.hasCondition ? 'bg-red-50/20' : ''}`}
-                      onClick={() => openStudentDetails(s)}
-                    >
-                      <td className="p-4 pr-6 font-display font-semibold text-ink-900">
-                        #{s.membershipNo}
-                      </td>
-                      <td className="p-4">
-                        <div className="font-semibold text-ink-900 flex items-center gap-2">
+          <>
+            {/* desktop: table */}
+            <div className="hidden lg:block overflow-x-auto scroll-soft">
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>الطالب</th>
+                    <th>العضوية</th>
+                    <th>المرحلة / الصف</th>
+                    <th>الدفع</th>
+                    <th>التسجيل</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((s) => {
+                    const pp = paymentPill(s);
+                    const rp = regPill(s.registrationStatus);
+                    return (
+                      <tr key={s.id} className="cursor-pointer" onClick={() => setSelected(s)}>
+                        <td className="font-medium">
                           {s.studentName}
-                          {s.hasCondition && (
-                            <span 
-                              className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-100 text-red-600 text-[10px] font-bold"
-                              title={`حالة صحية: ${s.conditionNote}`}
-                            >
-                              🚨
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="p-4 text-ink-500">
-                        {s.stage} — {s.grade}
-                      </td>
-                      <td className="p-4 text-ink-500">
-                        {s.neighborhood}
-                      </td>
-                      <td className="p-4">
-                        {studentGroup ? (
-                          <span className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-800 text-xs font-semibold">
-                            {studentGroup.name}
-                          </span>
-                        ) : (
-                          <span className="text-ink-300 text-xs">—</span>
-                        )}
-                      </td>
-                      <td className="p-4">
-                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${s.registrationStatus === 'approved' ? 'bg-green-100 text-green-800' : s.registrationStatus === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                          {s.registrationStatus === 'approved' ? 'مقبول' : s.registrationStatus === 'rejected' ? 'مرفوض' : 'انتظار'}
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        {s.paymentStatus === 'paid' ? (
-                          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800">
-                            مدفوع
-                          </span>
-                        ) : s.paymentType === 'now' && s.paymentReceipt ? (
-                          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 flex items-center gap-1 w-max">
-                            بانتظار المراجعة 📑
-                          </span>
-                        ) : (
-                          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800">
-                            لم يدفع
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-4 pl-6 text-left" onClick={(e) => e.stopPropagation()}>
-                        <button 
-                          onClick={() => openStudentDetails(s)}
-                          className="btn btn-secondary btn-sm"
-                        >
-                          عرض
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                          {s.hasCondition && <span title="حالة صحية" className="mr-1">🚨</span>}
+                        </td>
+                        <td dir="ltr" className="text-right font-mono text-ink-500">#{s.membershipNo}</td>
+                        <td className="text-ink-500 text-sm">{s.stage} — {s.grade}</td>
+                        <td><span className={`pill ${pp.cls}`}>{pp.label}</span></td>
+                        <td><span className={`pill ${rp.cls}`}>{rp.label}</span></td>
+                        <td>
+                          <button
+                            className="btn btn-secondary py-1 px-3 text-xs"
+                            onClick={(e) => { e.stopPropagation(); setSelected(s); }}
+                          >
+                            عرض
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* mobile: tappable cards (no horizontal scroll) */}
+            <ul className="lg:hidden divide-y divide-ink-200">
+              {filtered.map((s) => {
+                const pp = paymentPill(s);
+                const rp = regPill(s.registrationStatus);
+                return (
+                  <li
+                    key={s.id}
+                    onClick={() => setSelected(s)}
+                    className="py-2.5 px-4 flex items-center gap-3 active:bg-cream-100 cursor-pointer"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-ink-900 truncate">
+                        {s.studentName}
+                        {s.hasCondition && <span title="حالة صحية" className="mr-1">🚨</span>}
+                      </div>
+                      <div className="text-xs text-ink-400 mt-0.5">
+                        <span dir="ltr" className="font-mono">#{s.membershipNo}</span> · {s.stage} — {s.grade}
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        <span className={`pill ${pp.cls}`}>{pp.label}</span>
+                        <span className={`pill ${rp.cls}`}>{rp.label}</span>
+                      </div>
+                    </div>
+                    <span className="text-ink-300 text-xl shrink-0">‹</span>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
         )}
       </div>
 
-      {/* Student Details & Edit Modal */}
-      {selectedStudent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-950/40 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
-          <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto card shadow-xl p-6 sm:p-8 relative">
-            
-            {/* Modal Header */}
-            <div className="flex items-start justify-between border-b border-ink-100 pb-4 mb-6">
-              <div>
-                <h2 className="font-display text-2xl text-ink-900">
-                  {editMode ? 'تعديل بيانات الطالب' : 'تفاصيل ملف الطالب'}
-                </h2>
-                <p className="text-xs text-ink-400 mt-1">عضوية رقم #{selectedStudent.membershipNo}</p>
-              </div>
-              <button 
-                onClick={() => setSelectedStudent(null)}
-                className="w-8 h-8 rounded-full bg-cream-50 hover:bg-cream-100 text-ink-600 flex items-center justify-center transition-colors"
-              >
-                ✕
-              </button>
+      {selected && (
+        <StudentModal
+          student={selected}
+          groups={groups}
+          isAdmin={isAdmin}
+          onClose={() => setSelected(null)}
+          onUpdated={applyUpdate}
+          onDeleted={(id) => {
+            setStudents((prev) => prev.filter((s) => s.id !== id));
+            setSelected(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ============================= MODAL ============================= */
+
+function StudentModal({
+  student,
+  groups,
+  isAdmin,
+  onClose,
+  onUpdated,
+  onDeleted
+}: {
+  student: Student;
+  groups: Group[];
+  isAdmin: boolean;
+  onClose: () => void;
+  onUpdated: (s: Student) => void;
+  onDeleted: (id: number) => void;
+}) {
+  const [edit, setEdit] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [form, setForm] = useState<Student>(student);
+
+  useEffect(() => setForm(student), [student]);
+
+  const stageDef = stages.find((s) => s.key === form.stage);
+
+  async function put(patch: Partial<Student>) {
+    setBusy(true);
+    const r = await fetch('/api/supervisor/students', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: student.id, ...patch })
+    });
+    setBusy(false);
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      pushToast('error', j.error ?? 'فشل التحديث');
+      return null;
+    }
+    onUpdated(j.student);
+    return j.student as Student;
+  }
+
+  async function confirmPayment() {
+    const res = await put({ paymentStatus: 'paid' });
+    if (res) pushToast('success', 'تم تأكيد استلام الدفع');
+  }
+
+  async function setReg(status: string) {
+    const res = await put({ registrationStatus: status });
+    if (res) pushToast('success', status === 'approved' ? 'تم قبول الطالب' : status === 'rejected' ? 'تم رفض الطلب' : 'تم التحديث');
+  }
+
+  async function saveEdit() {
+    const res = await put({
+      studentName: form.studentName,
+      nationalId: form.nationalId,
+      guardianPhone: form.guardianPhone,
+      studentPhone: form.studentPhone,
+      stage: form.stage,
+      grade: form.grade,
+      neighborhood: form.neighborhood,
+      hasCondition: form.hasCondition,
+      conditionNote: form.hasCondition ? form.conditionNote : null,
+      groupId: form.groupId
+    });
+    if (res) {
+      pushToast('success', 'تم حفظ التعديلات');
+      setEdit(false);
+    }
+  }
+
+  async function del() {
+    if (!confirm(`حذف الطالب «${student.studentName}» نهائياً؟`)) return;
+    setBusy(true);
+    const r = await fetch(`/api/supervisor/students?id=${student.id}`, { method: 'DELETE' });
+    setBusy(false);
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      return pushToast('error', j.error ?? 'فشل الحذف');
+    }
+    pushToast('info', 'تم حذف الطالب');
+    onDeleted(student.id);
+  }
+
+  async function openReceipt() {
+    if (!student.paymentReceipt) return;
+    try {
+      const res = await fetch(student.paymentReceipt);
+      const blob = await res.blob();
+      window.open(URL.createObjectURL(blob), '_blank');
+    } catch {
+      window.open(student.paymentReceipt, '_blank');
+    }
+  }
+
+  function copyWhatsapp() {
+    const locLine = student.mapLink
+      ? student.mapLink
+      : student.locationLat && student.locationLng
+      ? `https://maps.google.com/?q=${student.locationLat},${student.locationLng}`
+      : 'غير محدد';
+    const msg =
+      `*بيانات تسجيل الطالب في نادي نبراس:*\n` +
+      `اسم الطالب: ${student.studentName}\n` +
+      `رقم العضوية: #${student.membershipNo}\n` +
+      `رقم الهوية: ${student.nationalId}\n` +
+      `المرحلة: ${student.stage} - ${student.grade}\n` +
+      `جوال ولي الأمر: ${student.guardianPhone}\n` +
+      `الحي: ${student.neighborhood}\n` +
+      `الموقع: ${locLine}`;
+    navigator.clipboard.writeText(msg).then(
+      () => pushToast('success', 'تم نسخ بيانات الطالب'),
+      () => pushToast('error', 'تعذّر النسخ')
+    );
+  }
+
+  const pp = paymentPill(student);
+  const rp = regPill(student.registrationStatus);
+  const mapsHref = student.mapLink
+    ? student.mapLink
+    : student.locationLat && student.locationLng
+    ? `https://www.google.com/maps?q=${student.locationLat},${student.locationLng}`
+    : null;
+
+  return (
+    <div className="modal-backdrop flex items-start md:items-center justify-center p-2 sm:p-6 overflow-y-auto" onClick={onClose}>
+      <div className="modal-panel w-full max-w-2xl my-4" onClick={(e) => e.stopPropagation()}>
+        {/* header */}
+        <div className="flex items-start justify-between p-4 sm:p-5 border-b border-ink-200">
+          <div>
+            <h2 className="text-lg sm:text-xl font-bold text-ink-900">{student.studentName}</h2>
+            <div className="flex items-center gap-2 mt-1.5">
+              <span dir="ltr" className="text-xs sm:text-sm font-mono text-ink-500">#{student.membershipNo}</span>
+              <span className={`pill ${pp.cls}`}>{pp.label}</span>
+              <span className={`pill ${rp.cls}`}>{rp.label}</span>
             </div>
+          </div>
+          <button onClick={onClose} className="text-ink-400 hover:text-ink-900 text-2xl leading-none px-2">×</button>
+        </div>
 
-            {/* Health Alert Alert Banner inside Modal */}
-            {selectedStudent.hasCondition && !editMode && (
-              <div className="mb-6 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 flex items-start gap-3">
-                <span className="text-xl shrink-0">🚨</span>
-                <div>
-                  <h4 className="font-bold text-sm">تنبيه حالة صحية أو حساسية:</h4>
-                  <p className="text-xs mt-1 leading-relaxed">{selectedStudent.conditionNote}</p>
-                </div>
+        <div className="p-4 sm:p-5 space-y-4 sm:space-y-5 max-h-[70vh] overflow-y-auto scroll-soft">
+          {edit ? (
+            /* ---------- EDIT MODE ---------- */
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Labeled label="اسم الطالب">
+                <input className="field" value={form.studentName} onChange={(e) => setForm({ ...form, studentName: e.target.value })} />
+              </Labeled>
+              <Labeled label="رقم الهوية">
+                <input className="field" dir="ltr" value={form.nationalId} onChange={(e) => setForm({ ...form, nationalId: e.target.value })} />
+              </Labeled>
+              <Labeled label="جوال ولي الأمر">
+                <input className="field" dir="ltr" value={form.guardianPhone} onChange={(e) => setForm({ ...form, guardianPhone: e.target.value })} />
+              </Labeled>
+              <Labeled label="جوال الطالب">
+                <input className="field" dir="ltr" value={form.studentPhone ?? ''} onChange={(e) => setForm({ ...form, studentPhone: e.target.value })} />
+              </Labeled>
+              <Labeled label="المرحلة">
+                <select className="field" value={form.stage} onChange={(e) => setForm({ ...form, stage: e.target.value, grade: '' })}>
+                  {stages.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+                </select>
+              </Labeled>
+              <Labeled label="الصف">
+                <select className="field" value={form.grade} onChange={(e) => setForm({ ...form, grade: e.target.value })}>
+                  <option value="">اختر الصف</option>
+                  {stageDef?.grades.map((g) => <option key={g} value={g}>{g}</option>)}
+                </select>
+              </Labeled>
+              <Labeled label="الحي السكني">
+                <input className="field" value={form.neighborhood} onChange={(e) => setForm({ ...form, neighborhood: e.target.value })} />
+              </Labeled>
+              <Labeled label="المجموعة / الأسرة">
+                <select
+                  className="field"
+                  value={form.groupId ?? ''}
+                  onChange={(e) => setForm({ ...form, groupId: e.target.value ? parseInt(e.target.value, 10) : null })}
+                >
+                  <option value="">بدون مجموعة</option>
+                  {groups.map((g) => <option key={g.id} value={String(g.id)}>{g.name}</option>)}
+                </select>
+              </Labeled>
+              <div className="sm:col-span-2">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={form.hasCondition}
+                    onChange={(e) => setForm({ ...form, hasCondition: e.target.checked })}
+                  />
+                  يعاني من حساسية / مرض مزمن
+                </label>
+                {form.hasCondition && (
+                  <textarea
+                    className="field mt-2"
+                    rows={2}
+                    placeholder="تفاصيل الحالة"
+                    value={form.conditionNote ?? ''}
+                    onChange={(e) => setForm({ ...form, conditionNote: e.target.value })}
+                  />
+                )}
               </div>
-            )}
-
-            {/* Edit / View fields */}
-            {editMode ? (
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="label mb-1 block">الاسم الرباعي</label>
-                    <input 
-                      type="text" 
-                      value={editName}
-                      onChange={e => setEditName(e.target.value)}
-                      className="input w-full"
-                    />
-                  </div>
-                  <div>
-                    <label className="label mb-1 block">رقم الهوية</label>
-                    <input 
-                      type="text" 
-                      value={editNationalId}
-                      onChange={e => setEditNationalId(e.target.value)}
-                      className="input w-full ltr text-left"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="label mb-1 block">جوال ولي الأمر</label>
-                    <input 
-                      type="text" 
-                      value={editGuardianPhone}
-                      onChange={e => setEditGuardianPhone(e.target.value)}
-                      className="input w-full ltr text-left"
-                    />
-                  </div>
-                  <div>
-                    <label className="label mb-1 block">جوال الطالب (اختياري)</label>
-                    <input 
-                      type="text" 
-                      value={editStudentPhone}
-                      onChange={e => setEditStudentPhone(e.target.value)}
-                      className="input w-full ltr text-left"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="label mb-1 block">المرحلة</label>
-                    <select 
-                      value={editStage}
-                      onChange={e => {
-                        setEditStage(e.target.value);
-                        setEditGrade('');
-                      }}
-                      className="input w-full"
-                    >
-                      {stages.map(s => (
-                        <option key={s.key} value={s.key}>{s.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="label mb-1 block">الصف</label>
-                    <select 
-                      value={editGrade}
-                      onChange={e => setEditGrade(e.target.value)}
-                      className="input w-full"
-                    >
-                      <option value="">اختر الصف</option>
-                      {currentGradeOptions.map(g => (
-                        <option key={g} value={g}>{g}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="label mb-1 block">الحي السكني</label>
-                    <input 
-                      type="text" 
-                      value={editNeighborhood}
-                      onChange={e => setEditNeighborhood(e.target.value)}
-                      className="input w-full"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4">
-                  <div>
-                    <label className="label mb-1 block">رابط خرائط قوقل ماب (إذا لم يتوفر إحداثيات)</label>
-                    <input 
-                      type="text" 
-                      value={editMapLink}
-                      onChange={e => setEditMapLink(e.target.value)}
-                      className="input w-full ltr text-left font-mono text-xs"
-                      placeholder="مثال: https://maps.google.com/..."
-                    />
-                  </div>
-                </div>
-
-                {/* Health condition toggle */}
-                <div className="p-4 rounded-2xl bg-cream-50/50 border border-ink-200/50 space-y-3">
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <input 
-                      type="checkbox"
-                      checked={editHasCondition}
-                      onChange={e => setEditHasCondition(e.target.checked)}
-                      className="rounded text-brand w-5 h-5 focus:ring-brand"
-                    />
-                    <span className="font-semibold text-sm text-ink-900">يعاني الطالب من حساسية أو أمراض مزمنة؟</span>
-                  </label>
-                  {editHasCondition && (
-                    <textarea 
-                      placeholder="توضيح الحساسية أو المرض بالكامل..."
-                      value={editConditionNote}
-                      onChange={e => setEditConditionNote(e.target.value)}
-                      className="input w-full h-20 resize-none"
-                    />
-                  )}
-                </div>
-
-                {/* Actions Status */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-ink-100">
-                  <div>
-                    <label className="label mb-1 block">المجموعة</label>
-                    <select 
-                      value={editGroupId}
-                      onChange={e => setEditGroupId(e.target.value)}
-                      className="input w-full"
-                    >
-                      <option value="">غير مصنف</option>
-                      {groups.map(g => (
-                        <option key={g.id} value={g.id}>{g.name} ({g.stage})</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="label mb-1 block">حالة القبول</label>
-                    <div className="flex items-center gap-2 py-2">
-                      {editPaymentStatus === 'paid' ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium" style={{ background: '#DEF7E5', color: '#1B7A43' }}>✓ مقبول</span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium" style={{ background: '#FEF3CD', color: '#856404' }}>⏳ قيد المراجعة</span>
-                      )}
-                      <span className="text-xs text-ink-400">(تلقائي)</span>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="label mb-1 block">حالة الدفع</label>
-                    <select 
-                      value={editPaymentStatus}
-                      onChange={e => setEditPaymentStatus(e.target.value)}
-                      className="input w-full"
-                    >
-                      <option value="unpaid">لم يدفع</option>
-                      <option value="paid">تم الدفع</option>
-                    </select>
-                  </div>
-                </div>
+            </div>
+          ) : (
+            /* ---------- VIEW MODE ---------- */
+            <>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:gap-x-6">
+                <Info label="رقم الهوية" value={student.nationalId} ltr />
+                <Info label="المرحلة / الصف" value={`${student.stage} — ${student.grade}`} />
+                <Info label="جوال ولي الأمر" value={student.guardianPhone} ltr />
+                <Info label="جوال الطالب" value={student.studentPhone || '—'} ltr />
+                <Info label="الحي السكني" value={student.neighborhood} />
+                <Info label="المجموعة" value={groups.find((g) => g.id === student.groupId)?.name || 'غير محدد'} />
               </div>
-            ) : (
-              <div className="space-y-6">
-                {/* View Details Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-6 text-sm">
-                  <div>
-                    <span className="text-ink-400 block mb-0.5">الاسم الرباعي</span>
-                    <span className="font-semibold text-ink-900">{selectedStudent.studentName}</span>
-                  </div>
-                  <div>
-                    <span className="text-ink-400 block mb-0.5">رقم الهوية الوطنية</span>
-                    <span className="font-semibold text-ink-900 ltr">{selectedStudent.nationalId}</span>
-                  </div>
-                  <div>
-                    <span className="text-ink-400 block mb-0.5">المرحلة الدراسية والصف</span>
-                    <span className="font-semibold text-ink-900">{selectedStudent.stage} — {selectedStudent.grade}</span>
-                  </div>
-                  <div>
-                    <span className="text-ink-400 block mb-0.5">الحي السكني</span>
-                    <span className="font-semibold text-ink-900">{selectedStudent.neighborhood}</span>
-                  </div>
-                  <div>
-                    <span className="text-ink-400 block mb-0.5">رقم جوال ولي الأمر</span>
-                    <span className="font-semibold text-ink-900 ltr">{selectedStudent.guardianPhone}</span>
-                  </div>
-                  <div>
-                    <span className="text-ink-400 block mb-0.5">رقم جوال الطالب</span>
-                    <span className="font-semibold text-ink-900 ltr">{selectedStudent.studentPhone || 'لا يوجد'}</span>
-                  </div>
-                  <div>
-                    <span className="text-ink-400 block mb-0.5">تاريخ تقديم الطلب</span>
-                    <span className="font-semibold text-ink-900">{new Date(selectedStudent.createdAt).toLocaleString('ar-SA')}</span>
-                  </div>
-                  <div>
-                    <span className="text-ink-400 block mb-0.5">المجموعة</span>
-                    <span className="font-semibold text-ink-900">
-                      {groups.find(g => g.id === selectedStudent.groupId)?.name || 'غير مصنف'}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-ink-400 block mb-0.5">نوع السداد</span>
-                    <span className="font-semibold text-ink-900">
-                      {selectedStudent.paymentType === 'now' ? 'دفع فوري (تحويل بنكي)' : 'دفع آجل'}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-ink-400 block mb-0.5">حالة السداد</span>
-                    <span className="font-semibold text-ink-950 flex items-center gap-1.5 font-bold">
-                      {selectedStudent.paymentStatus === 'paid' ? (
-                        <span className="text-green-600">تم الدفع ✅</span>
-                      ) : (
-                        <span className="text-red-500">لم يدفع ❌</span>
-                      )}
-                    </span>
-                  </div>
+
+              {/* health */}
+              {student.hasCondition && (
+                <div className="rounded-lg p-3 text-sm" style={{ background: '#FDEAE6', color: '#C42910' }}>
+                  🚨 <span className="font-semibold">حالة صحية:</span> {student.conditionNote || 'غير موضّحة'}
+                </div>
+              )}
+
+              {/* location */}
+              <div>
+                <div className="label">الموقع</div>
+                {mapsHref ? (
+                  <a href={mapsHref} target="_blank" rel="noopener noreferrer" className="btn btn-secondary text-sm">
+                    📍 فتح الموقع في خرائط Google ↗
+                  </a>
+                ) : (
+                  <span className="text-sm text-ink-400">لم يحدّد الطالب موقعاً.</span>
+                )}
+              </div>
+
+              {/* payment */}
+              <div className="rounded-xl border border-ink-200 p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-semibold text-ink-900">تفاصيل الدفع</span>
+                  <span className="pill pill-gray">{student.paymentType === 'now' ? 'دفع فوري' : 'دفع آجل'}</span>
                 </div>
 
-                {/* Map Coordinates or Google Maps Link block */}
-                {(selectedStudent.locationLat && selectedStudent.locationLng) || selectedStudent.mapLink ? (
-                  <div className="p-4 rounded-2xl border border-ink-200/60 bg-cream-50/50">
-                    <span className="text-ink-400 text-xs block mb-1.5">الموقع الجغرافي المسجل:</span>
-                    <div className="flex items-center justify-between gap-3 text-sm">
-                      <span className="font-semibold text-ink-800">
-                        {selectedStudent.locationLat && selectedStudent.locationLng ? (
-                          <>إحداثيات: {selectedStudent.locationLat.toFixed(5)}, {selectedStudent.locationLng.toFixed(5)}</>
-                        ) : (
-                          <>رابط خرائط قوقل ماب المسجل</>
-                        )}
-                      </span>
-                      <a 
-                        href={selectedStudent.mapLink || `https://www.google.com/maps?q=${selectedStudent.locationLat},${selectedStudent.locationLng}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn btn-secondary btn-sm"
-                      >
-                        عرض على الخريطة ↗
-                      </a>
-                    </div>
-                  </div>
-                ) : null}
-
-                {/* Payment Receipt & Details block */}
-                {selectedStudent.paymentType === 'now' && (
-                  <div className="p-4 rounded-2xl border border-ink-200/60 bg-cream-50/50 space-y-4">
-                    <span className="text-ink-400 text-xs block mb-1">تفاصيل الدفع وإيصال التحويل:</span>
-                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                      <div className="space-y-1">
-                        <span className="text-sm font-semibold text-ink-800 block">إيصال السداد المرفوع:</span>
-                        {selectedStudent.paymentReceipt ? (
-                          <span className="text-xs text-ink-500 block">انقر على الصورة للتكبير أو زر الفتح للمشاهدة بوضوح</span>
-                        ) : (
-                          <span className="text-xs text-red-500 font-semibold block">لم يتم رفع إيصال التحويل البنكي بعد</span>
-                        )}
-                      </div>
-                      
-                      {selectedStudent.paymentReceipt && (
-                        <a 
-                          href={selectedStudent.paymentReceipt} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="btn btn-secondary btn-sm flex items-center gap-1.5"
-                        >
-                          👁️ فتح الإيصال في صفحة جديدة
-                        </a>
-                      )}
-                    </div>
-
-                    {selectedStudent.paymentReceipt && (
-                      <div className="border border-ink-200 rounded-xl overflow-hidden max-w-xs bg-white shadow-sm">
-                        <img 
-                          src={selectedStudent.paymentReceipt} 
-                          alt="إيصال السداد" 
-                          className="w-full h-auto object-cover max-h-48 cursor-zoom-in hover:opacity-95 transition-opacity"
-                          onClick={() => {
-                            window.open(selectedStudent.paymentReceipt!, '_blank');
-                          }}
+                {student.paymentType === 'now' && (
+                  <div className="mb-3">
+                    <div className="label">إيصال التحويل</div>
+                    {student.paymentReceipt ? (
+                      <div className="flex items-center gap-3">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={student.paymentReceipt}
+                          alt="إيصال"
+                          className="w-20 h-20 object-cover rounded-lg border border-ink-200 cursor-pointer"
+                          onClick={openReceipt}
                         />
+                        <button onClick={openReceipt} className="btn btn-ghost text-sm">👁️ فتح الإيصال في صفحة جديدة</button>
                       </div>
+                    ) : (
+                      <span className="text-sm text-ink-400">لم يُرفق إيصال.</span>
                     )}
                   </div>
                 )}
 
-                {/* Confirm Payment Button when unpaid */}
-                {selectedStudent.paymentStatus !== 'paid' && (
-                  <div className="p-4 rounded-2xl border border-yellow-200 bg-yellow-50/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div>
-                      <span className="text-amber-800 font-semibold text-sm block">لم يتم تأكيد السداد بعد</span>
-                      <span className="text-xs text-ink-500">يرجى مراجعة إيصال التحويل (إن وجد) وتأكيد استلام المبلغ بالضغط على الزر المقابل.</span>
-                    </div>
+                {student.paymentStatus !== 'paid' ? (
+                  <div className="rounded-lg p-3" style={{ background: '#FCF3DC' }}>
+                    <p className="text-sm mb-2" style={{ color: '#9A6B00' }}>لم يتم تأكيد السداد بعد.</p>
                     <button
-                      type="button"
-                      onClick={handleConfirmPayment}
-                      className="btn text-white bg-green-600 hover:bg-green-700 border-green-600 hover:border-green-700 flex items-center gap-1.5 w-full sm:w-auto justify-center font-semibold"
-                      disabled={saving}
+                      onClick={confirmPayment}
+                      disabled={busy}
+                      className="btn text-white border-transparent"
+                      style={{ background: '#1B7A43' }}
                     >
-                      {saving ? 'جاري الحفظ...' : '✅ تأكيد استلام الدفع'}
+                      ✅ تأكيد استلام الدفع
                     </button>
                   </div>
+                ) : (
+                  <p className="text-sm font-semibold" style={{ color: '#1B7A43' }}>✓ تم تأكيد استلام الدفع</p>
                 )}
               </div>
-            )}
 
-            {/* Modal Actions Footer */}
-            <div className="mt-8 pt-4 border-t border-ink-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              {editMode ? (
-                <div className="flex items-center justify-end gap-3 w-full">
-                  <button 
-                    onClick={() => setEditMode(false)}
-                    className="btn btn-secondary"
-                    disabled={saving}
-                  >
-                    إلغاء
-                  </button>
-                  <button 
-                    onClick={handleSaveChanges}
-                    className="btn btn-primary"
-                    disabled={saving}
-                  >
-                    {saving ? 'جاري الحفظ…' : 'حفظ التعديلات'}
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div>
-                    <button 
-                      onClick={handleDeleteStudent}
-                      className="btn btn-danger flex items-center gap-2"
-                      disabled={deleting}
-                    >
-                      🗑️ {deleting ? 'جاري الحذف...' : 'حذف الطالب'}
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <button 
-                      onClick={() => setSelectedStudent(null)}
-                      className="btn btn-secondary"
-                    >
-                      إغلاق
-                    </button>
-                    <button 
-                      onClick={() => setEditMode(true)}
-                      className="btn btn-primary"
-                    >
-                      تعديل البيانات
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      {/* Add Student Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-950/40 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
-          <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto card shadow-xl p-6 sm:p-8 relative">
-            {/* Modal Header */}
-            <div className="flex items-start justify-between border-b border-ink-100 pb-4 mb-6">
+              {/* registration status (auto-determined by payment) */}
               <div>
-                <h2 className="font-display text-2xl text-ink-900">إضافة طالب جديد يدوياً</h2>
-                <p className="text-xs text-ink-400 mt-1">تعبئة بيانات الطالب ومستوى قبوله ونظام دفعه.</p>
-              </div>
-              <button 
-                onClick={() => setShowAddModal(false)}
-                className="w-8 h-8 rounded-full bg-cream-50 hover:bg-cream-100 text-ink-600 flex items-center justify-center transition-colors"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleAddStudent} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="label mb-1 block">الاسم الرباعي <span className="req">*</span></label>
-                  <input 
-                    type="text" 
-                    required
-                    value={addName}
-                    onChange={e => setAddName(e.target.value)}
-                    className="input w-full"
-                    placeholder="محمد بن عبدالله بن علي العتيبي"
-                  />
-                </div>
-                <div>
-                  <label className="label mb-1 block">رقم الهوية الوطنية / الإقامة <span className="req">*</span></label>
-                  <input 
-                    type="text" 
-                    required
-                    value={addNationalId}
-                    onChange={e => setAddNationalId(e.target.value)}
-                    className="input w-full ltr text-left"
-                    placeholder="1023456789"
-                  />
+                <div className="label">حالة التسجيل</div>
+                <div className="flex items-center gap-2">
+                  {student.paymentStatus === 'paid' ? (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium" style={{ background: '#DEF7E5', color: '#1B7A43' }}>
+                      ✓ مقبول
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium" style={{ background: '#FEF3CD', color: '#856404' }}>
+                      ⏳ قيد المراجعة
+                    </span>
+                  )}
+                  <span className="text-xs text-ink-400">(يتحدد تلقائياً حسب حالة الدفع)</span>
                 </div>
               </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="label mb-1 block">جوال ولي الأمر <span className="req">*</span></label>
-                  <input 
-                    type="text" 
-                    required
-                    value={addGuardianPhone}
-                    onChange={e => setAddGuardianPhone(e.target.value)}
-                    className="input w-full ltr text-left"
-                    placeholder="0500000000"
-                  />
-                </div>
-                <div>
-                  <label className="label mb-1 block">جوال الطالب (اختياري)</label>
-                  <input 
-                    type="text" 
-                    value={addStudentPhone}
-                    onChange={e => setAddStudentPhone(e.target.value)}
-                    className="input w-full ltr text-left"
-                    placeholder="0500000000"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="label mb-1 block">المرحلة الدراسية <span className="req">*</span></label>
-                  <select 
-                    value={addStage}
-                    onChange={e => {
-                      setAddStage(e.target.value);
-                      setAddGrade('');
-                    }}
-                    className="input w-full"
-                  >
-                    {stages.map(s => (
-                      <option key={s.key} value={s.key}>{s.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="label mb-1 block">الصف الدراسي <span className="req">*</span></label>
-                  <select 
-                    value={addGrade}
-                    onChange={e => setAddGrade(e.target.value)}
-                    required
-                    className="input w-full"
-                  >
-                    <option value="">اختر الصف</option>
-                    {(stages.find(s => s.key === addStage)?.grades || []).map(g => (
-                      <option key={g} value={g}>{g}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="label mb-1 block">الحي السكني <span className="req">*</span></label>
-                  <input 
-                    type="text" 
-                    required
-                    value={addNeighborhood}
-                    onChange={e => setAddNeighborhood(e.target.value)}
-                    className="input w-full"
-                    placeholder="مثال: الياسمين"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4">
-                <div>
-                  <label className="label mb-1 block">رابط خرائط قوقل ماب لموقع المنزل</label>
-                  <input 
-                    type="text" 
-                    value={addMapLink}
-                    onChange={e => setAddMapLink(e.target.value)}
-                    className="input w-full ltr text-left font-mono text-xs"
-                    placeholder="https://maps.app.goo.gl/..."
-                  />
-                </div>
-              </div>
-
-              {/* Health condition toggle */}
-              <div className="p-4 rounded-2xl bg-cream-50/50 border border-ink-200/50 space-y-3">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input 
-                    type="checkbox"
-                    checked={addHasCondition}
-                    onChange={e => setAddHasCondition(e.target.checked)}
-                    className="rounded text-brand w-5 h-5 focus:ring-brand"
-                  />
-                  <span className="font-semibold text-sm text-ink-900">هل يعاني الطالب من حالة صحية أو حساسية؟</span>
-                </label>
-                {addHasCondition && (
-                  <textarea 
-                    placeholder="اكتب تفاصيل الحالة الصحية أو الحساسية هنا بالتفصيل لضمان سلامته..."
-                    value={addConditionNote}
-                    onChange={e => setAddConditionNote(e.target.value)}
-                    className="input w-full h-20 resize-none"
-                    required
-                  />
-                )}
-              </div>
-
-              {/* Administrative options */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-ink-100">
-                <div>
-                  <label className="label mb-1 block">المجموعة</label>
-                  <select 
-                    value={addGroupId}
-                    onChange={e => setAddGroupId(e.target.value)}
-                    className="input w-full"
-                  >
-                    <option value="">غير مصنف</option>
-                    {groups.map(g => (
-                      <option key={g.id} value={g.id}>{g.name} ({g.stage})</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="label mb-1 block">حالة التسجيل</label>
-                  <select 
-                    value={addRegistrationStatus}
-                    onChange={e => setAddRegistrationStatus(e.target.value)}
-                    className="input w-full"
-                  >
-                    <option value="approved">مقبول</option>
-                    <option value="pending">قيد الانتظار</option>
-                    <option value="rejected">مرفوض</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="label mb-1 block">حالة الدفع</label>
-                  <select 
-                    value={addPaymentStatus}
-                    onChange={e => setAddPaymentStatus(e.target.value)}
-                    className="input w-full"
-                  >
-                    <option value="unpaid">لم يدفع</option>
-                    <option value="paid">مدفوع</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Modal Footer */}
-              <div className="mt-8 pt-4 border-t border-ink-100 flex items-center justify-end gap-3">
-                <button 
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="btn btn-secondary"
-                  disabled={adding}
-                >
-                  إلغاء
-                </button>
-                <button 
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={adding}
-                >
-                  {adding ? 'جاري الإضافة...' : '➕ إضافة الطالب'}
-                </button>
-              </div>
-            </form>
-          </div>
+            </>
+          )}
         </div>
-      )}
 
+        {/* footer actions */}
+        <div className="flex items-center justify-between gap-2 p-4 border-t border-ink-200 flex-wrap">
+          <div className="flex gap-2">
+            {edit ? (
+              <>
+                <button onClick={saveEdit} disabled={busy} className="btn btn-primary text-sm">حفظ التعديلات</button>
+                <button onClick={() => { setEdit(false); setForm(student); }} className="btn btn-ghost text-sm">إلغاء</button>
+              </>
+            ) : (
+              <>
+                <button onClick={() => setEdit(true)} className="btn btn-secondary text-sm">✎ تعديل</button>
+              </>
+            )}
+          </div>
+          {isAdmin && !edit && (
+            <button onClick={del} disabled={busy} className="btn btn-danger text-sm">حذف الطالب</button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Info({ label, value, ltr }: { label: string; value: string; ltr?: boolean }) {
+  return (
+    <div>
+      <div className="label !mb-0.5">{label}</div>
+      <div className="text-ink-900 text-sm" dir={ltr ? 'ltr' : undefined} style={ltr ? { textAlign: 'right' } : undefined}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function Labeled({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="label">{label}</label>
+      {children}
     </div>
   );
 }
