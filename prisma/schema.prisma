@@ -40,8 +40,9 @@ model Supervisor {
   name         String
   email        String   @unique
   passwordHash String
-  role         String   @default("supervisor") // 'admin' | 'supervisor'
+  role         String   @default("supervisor") // 'admin' | 'supervisor' | 'finance'
   groupIds     String   @default("")           // comma-separated group IDs (e.g. "1,2")
+  departments  String   @default("")           // comma-separated department keys (e.g. "cultural,families")
   createdAt    DateTime @default(now())
 }
 
@@ -82,4 +83,36 @@ model Announcement {
 model Setting {
   key   String @id
   value String // JSON string
+}
+
+model Invoice {
+  id             Int       @id @default(autoincrement())
+  invoiceNo      Int       @unique
+  title          String
+  vendor         String?
+  invoiceDate    String?   // free-text date as printed on the invoice
+  category       String?   // 'food' | 'supplies' | 'prizes' | 'transport' | 'other'
+  department     String    // department key the invoice is filed under
+  supervisorId   Int       // who entered it (from the session)
+  supervisorName String
+  groupId        Int?      // optional linked group/activity
+  items          String    @default("[]") // JSON: [{ name, qty, price }]
+  subtotal       Float?
+  tax            Float?
+  total          Float
+  currency       String    @default("SAR")
+  imageData      String?   // base64 data URL of the photographed invoice
+  entryMode      String    @default("manual") // 'photo' | 'manual'
+  aiExtracted    Boolean   @default(false)
+  aiConfidence   Float?
+  status         String    @default("pending") // 'pending' | 'approved' | 'rejected' | 'on_hold'
+  settlement     String    @default("unsettled") // 'unsettled' | 'handed_over'
+  reviewedBy     String?   // finance reviewer name
+  reviewNote     String?   // rejection / hold reason
+  settledAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([department])
+  @@index([supervisorId])
+  @@index([status])
 }

@@ -18,6 +18,7 @@ const ROLE_MAP: Record<string, string> = {
 
 const getRoleLabel = (roleStr: string) => {
   if (roleStr === 'admin') return 'مدير عام';
+  if (roleStr === 'finance') return 'المالية';
   return roleStr
     .split(',')
     .map((r) => ROLE_MAP[r.trim()] || r)
@@ -35,7 +36,7 @@ export default function SupervisorsPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [accountType, setAccountType] = useState<'admin' | 'supervisor'>('supervisor');
+  const [accountType, setAccountType] = useState<'admin' | 'supervisor' | 'finance'>('supervisor');
   const [selectedRoles, setSelectedRoles] = useState<string[]>(['general_supervisor']);
   const [groupIds, setGroupIds] = useState<number[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -83,6 +84,10 @@ export default function SupervisorsPage() {
       setAccountType('admin');
       setSelectedRoles(['general_supervisor']);
       setGroupIds([]);
+    } else if (s.role === 'finance') {
+      setAccountType('finance');
+      setSelectedRoles([]);
+      setGroupIds([]);
     } else {
       setAccountType('supervisor');
       setSelectedRoles(s.role.split(',').map((r) => r.trim()).filter(Boolean));
@@ -95,7 +100,7 @@ export default function SupervisorsPage() {
     if (!name.trim() || !email.trim()) return pushToast('error', 'أكمل الحقول الإلزامية');
     if (!editingId && !password) return pushToast('error', 'يرجى إدخال كلمة مرور للمشرف الجديد');
 
-    let finalRole = 'admin';
+    let finalRole = accountType === 'admin' ? 'admin' : accountType === 'finance' ? 'finance' : '';
     let finalGroupIds = '';
 
     if (accountType === 'supervisor') {
@@ -190,6 +195,14 @@ export default function SupervisorsPage() {
               <button
                 type="button"
                 disabled={isEditingPrimary}
+                className={`choice flex-1 ${accountType === 'finance' ? 'is-active' : ''} ${isEditingPrimary ? 'opacity-50 cursor-not-allowed' : ''}`}
+                onClick={() => setAccountType('finance')}
+              >
+                مالية
+              </button>
+              <button
+                type="button"
+                disabled={isEditingPrimary}
                 className={`choice flex-1 ${accountType === 'admin' ? 'is-active' : ''} ${isEditingPrimary ? 'opacity-50 cursor-not-allowed' : ''}`}
                 onClick={() => setAccountType('admin')}
               >
@@ -278,7 +291,7 @@ export default function SupervisorsPage() {
                           <td className="font-medium">{s.name}</td>
                           <td dir="ltr" className="text-right text-ink-500">{s.email}</td>
                           <td>
-                            <span className={`pill ${s.role === 'admin' ? 'pill-blue' : 'pill-gray'}`}>
+                            <span className={`pill ${s.role === 'admin' ? 'pill-blue' : s.role === 'finance' ? 'pill-green' : 'pill-gray'}`}>
                               {getRoleLabel(s.role)}
                             </span>
                           </td>
@@ -306,7 +319,7 @@ export default function SupervisorsPage() {
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="font-semibold text-ink-900 truncate">{s.name}</span>
-                          <span className={`pill shrink-0 ${s.role === 'admin' ? 'pill-blue' : 'pill-gray'}`}>
+                          <span className={`pill shrink-0 ${s.role === 'admin' ? 'pill-blue' : s.role === 'finance' ? 'pill-green' : 'pill-gray'}`}>
                             {getRoleLabel(s.role)}
                           </span>
                         </div>

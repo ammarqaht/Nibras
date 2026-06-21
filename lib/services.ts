@@ -2,6 +2,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { getPrisma, hasDatabase } from './db';
 import crypto from 'crypto';
+import { INVOICE_BASE } from './finance';
 
 // Mutable flag that lets us fallback to JSON if Prisma DB throws any connection/schema errors
 let databaseAvailable = hasDatabase;
@@ -13,6 +14,37 @@ export type SupervisorInfo = {
   passwordHash: string;
   role: string;
   groupIds: string;
+  departments?: string;
+  createdAt: string;
+};
+
+export type InvoiceItem = { name: string; qty: number; price: number };
+
+export type InvoiceInfo = {
+  id: number;
+  invoiceNo: number;
+  title: string;
+  vendor: string | null;
+  invoiceDate: string | null;
+  category: string | null;
+  department: string;
+  supervisorId: number;
+  supervisorName: string;
+  groupId: number | null;
+  items: InvoiceItem[];
+  subtotal: number | null;
+  tax: number | null;
+  total: number;
+  currency: string;
+  imageData: string | null;
+  entryMode: string;
+  aiExtracted: boolean;
+  aiConfidence: number | null;
+  status: string;
+  settlement: string;
+  reviewedBy: string | null;
+  reviewNote: string | null;
+  settledAt: string | null;
   createdAt: string;
 };
 
@@ -93,6 +125,7 @@ const FILE_POINTS = path.join(DATA_DIR, 'points.json');
 const FILE_GROUPS = path.join(DATA_DIR, 'groups.json');
 const FILE_ANNOUNCEMENTS = path.join(DATA_DIR, 'announcements.json');
 const FILE_SETTINGS = path.join(DATA_DIR, 'settings.json');
+const FILE_INVOICES = path.join(DATA_DIR, 'invoices.json');
 
 async function readJsonFile<T>(filePath: string, defaultVal: T): Promise<T> {
   try {
@@ -167,6 +200,7 @@ export async function seedDefaultAdminIfNeeded(): Promise<void> {
         passwordHash: defaultHash,
         role: 'admin',
         groupIds: '',
+        departments: '',
         createdAt: new Date().toISOString()
       });
     }
@@ -184,6 +218,7 @@ export async function seedDefaultAdminIfNeeded(): Promise<void> {
         passwordHash: defaultHash,
         role: 'admin',
         groupIds: '',
+        departments: '',
         createdAt: new Date().toISOString()
       });
     }
@@ -207,6 +242,7 @@ export async function getSupervisorByEmail(email: string): Promise<SupervisorInf
         passwordHash: sup.passwordHash,
         role: sup.role,
         groupIds: sup.groupIds,
+        departments: sup.departments,
         createdAt: sup.createdAt.toISOString()
       };
     } catch (err) {
@@ -234,6 +270,7 @@ export async function getAllSupervisors(): Promise<SupervisorInfo[]> {
       passwordHash: sup.passwordHash,
       role: sup.role,
       groupIds: sup.groupIds,
+      departments: sup.departments,
       createdAt: sup.createdAt.toISOString()
     }));
   } else {
@@ -250,7 +287,8 @@ export async function createSupervisor(data: Omit<SupervisorInfo, 'id' | 'create
         email: data.email,
         passwordHash: data.passwordHash,
         role: data.role,
-        groupIds: data.groupIds
+        groupIds: data.groupIds,
+        departments: data.departments
       }
     });
     return {
@@ -260,6 +298,7 @@ export async function createSupervisor(data: Omit<SupervisorInfo, 'id' | 'create
       passwordHash: sup.passwordHash,
       role: sup.role,
       groupIds: sup.groupIds,
+      departments: sup.departments,
       createdAt: sup.createdAt.toISOString()
     };
   } else {
@@ -303,6 +342,7 @@ export async function updateSupervisor(
   if (data.email !== undefined) updateData.email = data.email;
   if (data.role !== undefined) updateData.role = data.role;
   if (data.groupIds !== undefined) updateData.groupIds = data.groupIds;
+  if (data.departments !== undefined) updateData.departments = data.departments;
   if (data.password) updateData.passwordHash = hashPassword(data.password);
 
   if (hasDatabase) {
@@ -319,6 +359,7 @@ export async function updateSupervisor(
         passwordHash: updated.passwordHash,
         role: updated.role,
         groupIds: updated.groupIds,
+        departments: updated.departments,
         createdAt: updated.createdAt.toISOString()
       };
     } catch {
@@ -334,6 +375,7 @@ export async function updateSupervisor(
     if (updateData.email !== undefined) updated.email = updateData.email;
     if (updateData.role !== undefined) updated.role = updateData.role;
     if (updateData.groupIds !== undefined) updated.groupIds = updateData.groupIds;
+    if (updateData.departments !== undefined) updated.departments = updateData.departments;
     if (updateData.passwordHash !== undefined) updated.passwordHash = updateData.passwordHash;
 
     list[index] = updated;
@@ -837,4 +879,218 @@ export async function createStudentManually(data: Omit<StudentInfo, 'id' | 'memb
   });
 
   return updated!;
+}
+
+// ==================== INVOICE / FINANCE SERVICES ====================
+
+function mapInvoiceRow(r: any): InvoiceInfo {
+  let items: InvoiceItem[] = [];
+  try {
+    items = typeof r.items === 'string' ? JSON.parse(r.items) : r.items || [];
+  } catch {
+    items = [];
+  }
+  return {
+    id: r.id,
+    invoiceNo: r.invoiceNo,
+    title: r.title,
+    vendor: r.vendor ?? null,
+    invoiceDate: r.invoiceDate ?? null,
+    category: r.category ?? null,
+    department: r.department,
+    supervisorId: r.supervisorId,
+    supervisorName: r.supervisorName,
+    groupId: r.groupId ?? null,
+    items,
+    subtotal: r.subtotal ?? null,
+    tax: r.tax ?? null,
+    total: r.total,
+    currency: r.currency || 'SAR',
+    imageData: r.imageData ?? null,
+    entryMode: r.entryMode || 'manual',
+    aiExtracted: !!r.aiExtracted,
+    aiConfidence: r.aiConfidence ?? null,
+    status: r.status || 'pending',
+    settlement: r.settlement || 'unsettled',
+    reviewedBy: r.reviewedBy ?? null,
+    reviewNote: r.reviewNote ?? null,
+    settledAt: r.settledAt
+      ? typeof r.settledAt === 'string'
+        ? r.settledAt
+        : r.settledAt.toISOString()
+      : null,
+    createdAt:
+      typeof r.createdAt === 'string'
+        ? r.createdAt
+        : r.createdAt?.toISOString?.() || new Date().toISOString()
+  };
+}
+
+export type CreateInvoiceInput = {
+  title: string;
+  vendor?: string | null;
+  invoiceDate?: string | null;
+  category?: string | null;
+  department: string;
+  supervisorId: number;
+  supervisorName: string;
+  groupId?: number | null;
+  items: InvoiceItem[];
+  subtotal?: number | null;
+  tax?: number | null;
+  total: number;
+  currency?: string;
+  imageData?: string | null;
+  entryMode?: string;
+  aiExtracted?: boolean;
+  aiConfidence?: number | null;
+};
+
+export async function getInvoices(): Promise<InvoiceInfo[]> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    const list = await prisma.invoice.findMany({ orderBy: { createdAt: 'desc' } });
+    return list.map(mapInvoiceRow);
+  } else {
+    const list = await readJsonFile<any[]>(FILE_INVOICES, []);
+    return list.map(mapInvoiceRow).sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+  }
+}
+
+export async function createInvoice(data: CreateInvoiceInput): Promise<InvoiceInfo> {
+  const itemsJson = JSON.stringify(data.items || []);
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    const count = await prisma.invoice.count();
+    const invoiceNo = INVOICE_BASE + count + 1;
+    const created = await prisma.invoice.create({
+      data: {
+        invoiceNo,
+        title: data.title,
+        vendor: data.vendor ?? null,
+        invoiceDate: data.invoiceDate ?? null,
+        category: data.category ?? null,
+        department: data.department,
+        supervisorId: data.supervisorId,
+        supervisorName: data.supervisorName,
+        groupId: data.groupId ?? null,
+        items: itemsJson,
+        subtotal: data.subtotal ?? null,
+        tax: data.tax ?? null,
+        total: data.total,
+        currency: data.currency || 'SAR',
+        imageData: data.imageData ?? null,
+        entryMode: data.entryMode || 'manual',
+        aiExtracted: !!data.aiExtracted,
+        aiConfidence: data.aiConfidence ?? null
+      }
+    });
+    return mapInvoiceRow(created);
+  } else {
+    const list = await readJsonFile<any[]>(FILE_INVOICES, []);
+    const id = list.length > 0 ? Math.max(...list.map((i) => i.id || 0)) + 1 : 1;
+    const invoiceNo = INVOICE_BASE + list.length + 1;
+    const row = {
+      id,
+      invoiceNo,
+      title: data.title,
+      vendor: data.vendor ?? null,
+      invoiceDate: data.invoiceDate ?? null,
+      category: data.category ?? null,
+      department: data.department,
+      supervisorId: data.supervisorId,
+      supervisorName: data.supervisorName,
+      groupId: data.groupId ?? null,
+      items: itemsJson,
+      subtotal: data.subtotal ?? null,
+      tax: data.tax ?? null,
+      total: data.total,
+      currency: data.currency || 'SAR',
+      imageData: data.imageData ?? null,
+      entryMode: data.entryMode || 'manual',
+      aiExtracted: !!data.aiExtracted,
+      aiConfidence: data.aiConfidence ?? null,
+      status: 'pending',
+      settlement: 'unsettled',
+      reviewedBy: null,
+      reviewNote: null,
+      settledAt: null,
+      createdAt: new Date().toISOString()
+    };
+    list.push(row);
+    await writeJsonFile(FILE_INVOICES, list);
+    return mapInvoiceRow(row);
+  }
+}
+
+export async function updateInvoice(
+  id: number,
+  patch: Partial<{
+    title: string;
+    vendor: string | null;
+    invoiceDate: string | null;
+    category: string | null;
+    department: string;
+    groupId: number | null;
+    items: InvoiceItem[];
+    subtotal: number | null;
+    tax: number | null;
+    total: number;
+    status: string;
+    settlement: string;
+    reviewedBy: string | null;
+    reviewNote: string | null;
+    settledAt: string | null;
+  }>
+): Promise<InvoiceInfo | null> {
+  const dbData: any = {};
+  const simpleKeys = [
+    'title', 'vendor', 'invoiceDate', 'category', 'department', 'groupId',
+    'subtotal', 'tax', 'total', 'status', 'settlement', 'reviewedBy', 'reviewNote'
+  ] as const;
+  for (const k of simpleKeys) {
+    if ((patch as any)[k] !== undefined) dbData[k] = (patch as any)[k];
+  }
+  if (patch.items !== undefined) dbData.items = JSON.stringify(patch.items);
+  if (patch.settledAt !== undefined) dbData.settledAt = patch.settledAt ? new Date(patch.settledAt) : null;
+
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    try {
+      const updated = await prisma.invoice.update({ where: { id }, data: dbData });
+      return mapInvoiceRow(updated);
+    } catch {
+      return null;
+    }
+  } else {
+    const list = await readJsonFile<any[]>(FILE_INVOICES, []);
+    const index = list.findIndex((i) => i.id === id);
+    if (index === -1) return null;
+    const row = { ...list[index] };
+    Object.keys(dbData).forEach((k) => {
+      row[k] = dbData[k] instanceof Date ? dbData[k].toISOString() : dbData[k];
+    });
+    list[index] = row;
+    await writeJsonFile(FILE_INVOICES, list);
+    return mapInvoiceRow(row);
+  }
+}
+
+export async function deleteInvoice(id: number): Promise<boolean> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    try {
+      await prisma.invoice.delete({ where: { id } });
+      return true;
+    } catch {
+      return false;
+    }
+  } else {
+    const list = await readJsonFile<any[]>(FILE_INVOICES, []);
+    const index = list.findIndex((i) => i.id === id);
+    if (index === -1) return false;
+    list.splice(index, 1);
+    await writeJsonFile(FILE_INVOICES, list);
+    return true;
+  }
 }

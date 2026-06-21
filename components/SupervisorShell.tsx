@@ -11,7 +11,7 @@ export type SupervisorUser = { id: number; email: string; name: string; role: st
 const SupervisorContext = createContext<{ user: SupervisorUser | null }>({ user: null });
 export const useSupervisor = () => useContext(SupervisorContext);
 
-type NavLink = { href: string; label: string; adminOnly?: boolean };
+type NavLink = { href: string; label: string; adminOnly?: boolean; financeOnly?: boolean };
 
 const LINKS: NavLink[] = [
   { href: '/supervisor2', label: 'الرئيسية' },
@@ -20,6 +20,8 @@ const LINKS: NavLink[] = [
   { href: '/supervisor2/points', label: 'النقاط' },
   { href: '/supervisor2/groups', label: 'المجموعات' },
   { href: '/supervisor2/payments', label: 'المدفوعات' },
+  { href: '/supervisor2/invoices', label: 'الفواتير' },
+  { href: '/supervisor2/finance', label: 'المالية', financeOnly: true },
   { href: '/supervisor2/announcements', label: 'الإشعارات' },
   { href: '/supervisor2/supervisors', label: 'المشرفون', adminOnly: true },
   { href: '/supervisor2/settings', label: 'الإعدادات', adminOnly: true }
@@ -78,7 +80,11 @@ export default function SupervisorShell({ children }: { children: React.ReactNod
     );
   }
 
-  const links = LINKS.filter((l) => !l.adminOnly || user?.role === 'admin');
+  const links = LINKS.filter(
+    (l) =>
+      (!l.adminOnly || user?.role === 'admin') &&
+      (!l.financeOnly || user?.role === 'admin' || user?.role === 'finance')
+  );
   const isActive = (href: string) => (href === '/supervisor2' ? path === href : path.startsWith(href));
 
   return (
