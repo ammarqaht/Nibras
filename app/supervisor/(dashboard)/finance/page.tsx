@@ -103,6 +103,7 @@ export default function FinancePage() {
     act(inv, { status: 'on_hold', reviewNote: note }, 'تم تعليق الفاتورة');
   };
   const settle = (inv: Invoice) => act(inv, { settlement: 'handed_over' }, 'تم تأكيد تسليم المبلغ');
+  const markPending = (inv: Invoice) => act(inv, { status: 'pending', reviewNote: null }, 'تم إرجاع الفاتورة قيد المراجعة');
 
   if (user && !allowed) {
     return <div className="card p-10 text-center text-ink-500">هذه الصفحة متاحة للمالية والمدير العام فقط.</div>;
@@ -184,18 +185,17 @@ export default function FinancePage() {
                     </div>
                     {/* actions */}
                     <div className="flex flex-wrap gap-2 mt-3">
-                      {inv.status === 'pending' && (
-                        <>
-                          <button onClick={() => approve(inv)} className="btn text-white border-transparent py-1 px-3 text-xs" style={{ background: '#1B7A43' }}>✅ اعتماد</button>
-                          <button onClick={() => hold(inv)} className="btn btn-secondary py-1 px-3 text-xs">⏸️ تعليق</button>
-                          <button onClick={() => reject(inv)} className="btn btn-danger py-1 px-3 text-xs">رفض</button>
-                        </>
+                      {inv.status !== 'approved' && (
+                        <button onClick={() => approve(inv)} className="btn text-white border-transparent py-1 px-3 text-xs" style={{ background: '#1B7A43' }}>✅ اعتماد</button>
                       )}
-                      {inv.status === 'on_hold' && (
-                        <>
-                          <button onClick={() => approve(inv)} className="btn text-white border-transparent py-1 px-3 text-xs" style={{ background: '#1B7A43' }}>✅ اعتماد</button>
-                          <button onClick={() => reject(inv)} className="btn btn-danger py-1 px-3 text-xs">رفض</button>
-                        </>
+                      {inv.status !== 'on_hold' && (
+                        <button onClick={() => hold(inv)} className="btn btn-secondary py-1 px-3 text-xs">⏸️ تعليق</button>
+                      )}
+                      {inv.status !== 'rejected' && (
+                        <button onClick={() => reject(inv)} className="btn btn-danger py-1 px-3 text-xs">❌ رفض</button>
+                      )}
+                      {inv.status !== 'pending' && (
+                        <button onClick={() => markPending(inv)} className="btn btn-secondary py-1 px-3 text-xs">🔄 قيد المراجعة</button>
                       )}
                       {inv.status === 'approved' && inv.settlement !== 'handed_over' && (
                         <button onClick={() => settle(inv)} className="btn text-white border-transparent py-1 px-3 text-xs" style={{ background: 'var(--blue)' }}>💵 تأكيد تسليم المبلغ</button>
@@ -210,7 +210,17 @@ export default function FinancePage() {
         </>
       )}
 
-      {selected && <ReviewModal invoice={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <ReviewModal
+          invoice={selected}
+          onClose={() => setSelected(null)}
+          onApprove={approve}
+          onReject={reject}
+          onHold={hold}
+          onMarkPending={markPending}
+          onSettle={settle}
+        />
+      )}
     </div>
   );
 }
@@ -229,7 +239,23 @@ function Stat({ label, value, tone, hint }: { label: string; value: string; tone
   );
 }
 
-function ReviewModal({ invoice, onClose }: { invoice: Invoice; onClose: () => void }) {
+function ReviewModal({
+  invoice,
+  onClose,
+  onApprove,
+  onReject,
+  onHold,
+  onMarkPending,
+  onSettle
+}: {
+  invoice: Invoice;
+  onClose: () => void;
+  onApprove: (inv: Invoice) => void;
+  onReject: (inv: Invoice) => void;
+  onHold: (inv: Invoice) => void;
+  onMarkPending: (inv: Invoice) => void;
+  onSettle: (inv: Invoice) => void;
+}) {
   return (
     <div className="modal-backdrop flex items-start md:items-center justify-center p-3 md:p-6 overflow-y-auto" onClick={onClose}>
       <div className="modal-panel w-full max-w-xl my-4" onClick={(e) => e.stopPropagation()}>
@@ -244,7 +270,7 @@ function ReviewModal({ invoice, onClose }: { invoice: Invoice; onClose: () => vo
           </div>
           <button onClick={onClose} className="text-ink-400 hover:text-ink-900 text-2xl leading-none px-2">×</button>
         </div>
-        <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto scroll-soft">
+        <div className="p-5 space-y-4 max-h-[60vh] overflow-y-auto scroll-soft">
           <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
             <Info label="القسم" value={departmentLabel(invoice.department)} />
             <Info label="التصنيف" value={invoice.category ? categoryLabel(invoice.category) : '—'} />
@@ -257,7 +283,7 @@ function ReviewModal({ invoice, onClose }: { invoice: Invoice; onClose: () => vo
           {invoice.items.length > 0 && (
             <div className="rounded-lg border border-ink-200 overflow-hidden">
               <table className="tbl">
-                <thead><tr><th>البند</th><th>الكمية</th><th>السعر</th></tr></thead>
+                <thead><tr><th>المنتج</th><th>الكمية</th><th>السعر</th></tr></thead>
                 <tbody>{invoice.items.map((it, i) => <tr key={i}><td>{it.name}</td><td dir="ltr">{it.qty}</td><td dir="ltr">{money(it.price)}</td></tr>)}</tbody>
               </table>
             </div>
@@ -269,6 +295,23 @@ function ReviewModal({ invoice, onClose }: { invoice: Invoice; onClose: () => vo
           {invoice.imageData && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={invoice.imageData} alt="الفاتورة" className="max-h-80 rounded-lg border border-ink-200" />
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2 p-4 border-t border-ink-200 bg-cream-50">
+          {invoice.status !== 'approved' && (
+            <button onClick={() => onApprove(invoice)} className="btn text-white border-transparent py-1 px-3 text-xs" style={{ background: '#1B7A43' }}>✅ اعتماد</button>
+          )}
+          {invoice.status !== 'on_hold' && (
+            <button onClick={() => onHold(invoice)} className="btn btn-secondary py-1 px-3 text-xs">⏸️ تعليق</button>
+          )}
+          {invoice.status !== 'rejected' && (
+            <button onClick={() => onReject(invoice)} className="btn btn-danger py-1 px-3 text-xs">❌ رفض</button>
+          )}
+          {invoice.status !== 'pending' && (
+            <button onClick={() => onMarkPending(invoice)} className="btn btn-secondary py-1 px-3 text-xs">🔄 قيد المراجعة</button>
+          )}
+          {invoice.status === 'approved' && invoice.settlement !== 'handed_over' && (
+            <button onClick={() => onSettle(invoice)} className="btn text-white border-transparent py-1 px-3 text-xs" style={{ background: 'var(--blue)' }}>💵 تأكيد تسليم المبلغ</button>
           )}
         </div>
       </div>
