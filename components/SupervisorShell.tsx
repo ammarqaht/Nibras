@@ -18,6 +18,7 @@ const LINKS: NavLink[] = [
   { href: '/supervisor/students', label: 'الطلاب' },
   { href: '/supervisor/attendance', label: 'الحضور' },
   { href: '/supervisor/points', label: 'النقاط' },
+  { href: '/supervisor/tasks', label: 'المهام' },
   { href: '/supervisor/groups', label: 'المجموعات' },
   { href: '/supervisor/payments', label: 'المدفوعات', financeOnly: true },
   { href: '/supervisor/invoices', label: 'الفواتير' },

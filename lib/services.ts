@@ -126,6 +126,8 @@ const FILE_GROUPS = path.join(DATA_DIR, 'groups.json');
 const FILE_ANNOUNCEMENTS = path.join(DATA_DIR, 'announcements.json');
 const FILE_SETTINGS = path.join(DATA_DIR, 'settings.json');
 const FILE_INVOICES = path.join(DATA_DIR, 'invoices.json');
+const FILE_TASKS = path.join(DATA_DIR, 'tasks.json');
+const FILE_SUBMISSIONS = path.join(DATA_DIR, 'submissions.json');
 
 async function readJsonFile<T>(filePath: string, defaultVal: T): Promise<T> {
   try {
@@ -1091,6 +1093,436 @@ export async function deleteInvoice(id: number): Promise<boolean> {
     if (index === -1) return false;
     list.splice(index, 1);
     await writeJsonFile(FILE_INVOICES, list);
+    return true;
+  }
+}
+
+// ==================== TASKS & SUBMISSIONS SERVICES ====================
+
+export type TaskInfo = {
+  id: string;
+  title: string;
+  description: string;
+  maxPoints: number;
+  dueDate: string;
+  createdAt: string;
+  track: string | null;
+  isActive: boolean;
+  submissionMethod: string | null;
+  assignedAdmins: string[];
+  imageUrl: string | null;
+  resourceLink: string | null;
+  visibility: string;
+  visibleToIds: number[];
+};
+
+export type SubmissionInfo = {
+  id: string;
+  registrationId: number;
+  taskId: string;
+  fileUrl: string;
+  status: string;
+  grade: number | null;
+  feedback: string | null;
+  selectedAdminId: string | null;
+  submittedAt: string;
+  studentName?: string;
+  taskTitle?: string;
+  taskMaxPoints?: number;
+  taskTrack?: string | null;
+  taskAssignedAdmins?: string[];
+};
+
+export async function getTasks(): Promise<TaskInfo[]> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    const list = await prisma.task.findMany({ orderBy: { createdAt: 'desc' } });
+    return list.map(t => ({
+      id: t.id,
+      title: t.title,
+      description: t.description,
+      maxPoints: t.maxPoints,
+      dueDate: t.dueDate.toISOString(),
+      createdAt: t.createdAt.toISOString(),
+      track: t.track,
+      isActive: t.isActive,
+      submissionMethod: t.submissionMethod,
+      assignedAdmins: t.assignedAdmins,
+      imageUrl: t.imageUrl,
+      resourceLink: t.resourceLink,
+      visibility: t.visibility,
+      visibleToIds: t.visibleToIds,
+    }));
+  } else {
+    const list = await readJsonFile<any[]>(FILE_TASKS, []);
+    return list.map(t => ({
+      id: String(t.id),
+      title: String(t.title),
+      description: String(t.description),
+      maxPoints: Number(t.maxPoints),
+      dueDate: String(t.dueDate),
+      createdAt: String(t.createdAt || new Date().toISOString()),
+      track: t.track || 'عام',
+      isActive: t.isActive !== false,
+      submissionMethod: t.submissionMethod || 'رفع ملف',
+      assignedAdmins: Array.isArray(t.assignedAdmins) ? t.assignedAdmins : [],
+      imageUrl: t.imageUrl || null,
+      resourceLink: t.resourceLink || null,
+      visibility: t.visibility || 'all',
+      visibleToIds: Array.isArray(t.visibleToIds) ? t.visibleToIds.map(Number) : [],
+    })).sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+  }
+}
+
+export async function getTaskById(id: string): Promise<TaskInfo | null> {
+  const tasks = await getTasks();
+  return tasks.find(t => t.id === id) || null;
+}
+
+export async function createTask(data: Omit<TaskInfo, 'id' | 'createdAt'>): Promise<TaskInfo> {
+  const crypto = await import('crypto');
+  const id = crypto.randomUUID();
+  const createdAt = new Date().toISOString();
+  const task: TaskInfo = {
+    id,
+    createdAt,
+    ...data
+  };
+
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    await prisma.task.create({
+      data: {
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        maxPoints: task.maxPoints,
+        dueDate: new Date(task.dueDate),
+        track: task.track,
+        isActive: task.isActive,
+        submissionMethod: task.submissionMethod,
+        assignedAdmins: task.assignedAdmins,
+        imageUrl: task.imageUrl,
+        resourceLink: task.resourceLink,
+        visibility: task.visibility,
+        visibleToIds: task.visibleToIds,
+        createdAt: new Date(task.createdAt),
+      }
+    });
+  } else {
+    const list = await readJsonFile<any[]>(FILE_TASKS, []);
+    list.push(task);
+    await writeJsonFile(FILE_TASKS, list);
+  }
+  return task;
+}
+
+export async function updateTask(id: string, patch: Partial<Omit<TaskInfo, 'id' | 'createdAt'>>): Promise<TaskInfo | null> {
+  const dbData: any = {};
+  const allowedKeys = [
+    'title', 'description', 'maxPoints', 'dueDate', 'track', 'isActive',
+    'submissionMethod', 'assignedAdmins', 'imageUrl', 'resourceLink', 'visibility', 'visibleToIds'
+  ] as const;
+
+  for (const k of allowedKeys) {
+    if (patch[k] !== undefined) dbData[k] = patch[k];
+  }
+  if (patch.dueDate !== undefined) dbData.dueDate = new Date(patch.dueDate);
+
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    try {
+      const updated = await prisma.task.update({
+        where: { id },
+        data: dbData
+      });
+      return {
+        id: updated.id,
+        title: updated.title,
+        description: updated.description,
+        maxPoints: updated.maxPoints,
+        dueDate: updated.dueDate.toISOString(),
+        createdAt: updated.createdAt.toISOString(),
+        track: updated.track,
+        isActive: updated.isActive,
+        submissionMethod: updated.submissionMethod,
+        assignedAdmins: updated.assignedAdmins,
+        imageUrl: updated.imageUrl,
+        resourceLink: updated.resourceLink,
+        visibility: updated.visibility,
+        visibleToIds: updated.visibleToIds,
+      };
+    } catch {
+      return null;
+    }
+  } else {
+    const list = await readJsonFile<any[]>(FILE_TASKS, []);
+    const index = list.findIndex(t => String(t.id) === id);
+    if (index === -1) return null;
+    const task = { ...list[index] };
+    for (const k of allowedKeys) {
+      if (patch[k] !== undefined) task[k] = patch[k];
+    }
+    list[index] = task;
+    await writeJsonFile(FILE_TASKS, list);
+    return task;
+  }
+}
+
+export async function deleteTask(id: string): Promise<boolean> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    try {
+      await prisma.submission.deleteMany({ where: { taskId: id } });
+      await prisma.task.delete({ where: { id } });
+      return true;
+    } catch {
+      return false;
+    }
+  } else {
+    const tasks = await readJsonFile<any[]>(FILE_TASKS, []);
+    const taskIndex = tasks.findIndex(t => String(t.id) === id);
+    if (taskIndex === -1) return false;
+    tasks.splice(taskIndex, 1);
+    await writeJsonFile(FILE_TASKS, tasks);
+
+    const submissions = await readJsonFile<any[]>(FILE_SUBMISSIONS, []);
+    const remainingSubmissions = submissions.filter(s => String(s.taskId) !== id);
+    await writeJsonFile(FILE_SUBMISSIONS, remainingSubmissions);
+
+    return true;
+  }
+}
+
+export async function getSubmissions(): Promise<SubmissionInfo[]> {
+  const students = await getStudents();
+  const tasks = await getTasks();
+  const studentsMap = new Map(students.map(s => [s.id, s.studentName]));
+  const tasksMap = new Map(tasks.map(t => [t.id, t]));
+
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    const list = await prisma.submission.findMany({ orderBy: { submittedAt: 'desc' } });
+    return list.map(s => {
+      const task = tasksMap.get(s.taskId);
+      return {
+        id: s.id,
+        registrationId: s.registrationId,
+        taskId: s.taskId,
+        fileUrl: s.fileUrl,
+        status: s.status,
+        grade: s.grade,
+        feedback: s.feedback,
+        selectedAdminId: s.selectedAdminId,
+        submittedAt: s.submittedAt.toISOString(),
+        studentName: studentsMap.get(s.registrationId) || `طالب #${s.registrationId}`,
+        taskTitle: task?.title || 'مهمة محذوفة',
+        taskMaxPoints: task?.maxPoints || 0,
+        taskTrack: task?.track || null,
+        taskAssignedAdmins: task?.assignedAdmins || [],
+      };
+    });
+  } else {
+    const list = await readJsonFile<any[]>(FILE_SUBMISSIONS, []);
+    return list.map(s => {
+      const task = tasksMap.get(s.taskId);
+      return {
+        id: String(s.id),
+        registrationId: Number(s.registrationId),
+        taskId: String(s.taskId),
+        fileUrl: String(s.fileUrl),
+        status: String(s.status || 'pending'),
+        grade: s.grade !== null && s.grade !== undefined ? Number(s.grade) : null,
+        feedback: s.feedback || null,
+        selectedAdminId: s.selectedAdminId || null,
+        submittedAt: String(s.submittedAt || new Date().toISOString()),
+        studentName: studentsMap.get(Number(s.registrationId)) || `طالب #${s.registrationId}`,
+        taskTitle: task?.title || 'مهمة محذوفة',
+        taskMaxPoints: task?.maxPoints || 0,
+        taskTrack: task?.track || null,
+        taskAssignedAdmins: task?.assignedAdmins || [],
+      };
+    }).sort((a, b) => +new Date(b.submittedAt) - +new Date(a.submittedAt));
+  }
+}
+
+export async function getSubmissionById(id: string): Promise<SubmissionInfo | null> {
+  const list = await getSubmissions();
+  return list.find(s => s.id === id) || null;
+}
+
+export async function upsertSubmission(data: Omit<SubmissionInfo, 'id' | 'submittedAt'> & { id?: string }): Promise<SubmissionInfo> {
+  const crypto = await import('crypto');
+  const now = new Date().toISOString();
+  const tasks = await getTasks();
+  const task = tasks.find(t => t.id === data.taskId);
+  const students = await getStudents();
+  const student = students.find(s => s.id === data.registrationId);
+
+  const subId = data.id || crypto.randomUUID();
+
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    const row = await prisma.submission.upsert({
+      where: {
+        registrationId_taskId: {
+          registrationId: data.registrationId,
+          taskId: data.taskId,
+        }
+      },
+      update: {
+        fileUrl: data.fileUrl,
+        status: data.status,
+        grade: data.grade,
+        feedback: data.feedback,
+        selectedAdminId: data.selectedAdminId,
+        submittedAt: new Date(now),
+      },
+      create: {
+        id: subId,
+        registrationId: data.registrationId,
+        taskId: data.taskId,
+        fileUrl: data.fileUrl,
+        status: data.status,
+        grade: data.grade,
+        feedback: data.feedback,
+        selectedAdminId: data.selectedAdminId,
+        submittedAt: new Date(now),
+      }
+    });
+    return {
+      id: row.id,
+      registrationId: row.registrationId,
+      taskId: row.taskId,
+      fileUrl: row.fileUrl,
+      status: row.status,
+      grade: row.grade,
+      feedback: row.feedback,
+      selectedAdminId: row.selectedAdminId,
+      submittedAt: row.submittedAt.toISOString(),
+      studentName: student?.studentName || `طالب #${data.registrationId}`,
+      taskTitle: task?.title || 'مهمة محذوفة',
+      taskMaxPoints: task?.maxPoints || 0,
+      taskTrack: task?.track || null,
+      taskAssignedAdmins: task?.assignedAdmins || [],
+    };
+  } else {
+    const list = await readJsonFile<any[]>(FILE_SUBMISSIONS, []);
+    const index = list.findIndex(s => s.registrationId === data.registrationId && s.taskId === data.taskId);
+
+    const submission: SubmissionInfo = {
+      id: index !== -1 ? list[index].id : subId,
+      registrationId: data.registrationId,
+      taskId: data.taskId,
+      fileUrl: data.fileUrl,
+      status: data.status,
+      grade: data.grade,
+      feedback: data.feedback,
+      selectedAdminId: data.selectedAdminId,
+      submittedAt: now,
+      studentName: student?.studentName || `طالب #${data.registrationId}`,
+      taskTitle: task?.title || 'مهمة محذوفة',
+      taskMaxPoints: task?.maxPoints || 0,
+      taskTrack: task?.track || null,
+      taskAssignedAdmins: task?.assignedAdmins || [],
+    };
+
+    if (index !== -1) {
+      list[index] = { ...list[index], ...data, submittedAt: now };
+    } else {
+      list.push(submission);
+    }
+    await writeJsonFile(FILE_SUBMISSIONS, list);
+    return submission;
+  }
+}
+
+export async function updateSubmission(id: string, patch: Partial<Omit<SubmissionInfo, 'id' | 'submittedAt'>>): Promise<SubmissionInfo | null> {
+  const dbData: any = {};
+  const allowedKeys = ['fileUrl', 'status', 'grade', 'feedback', 'selectedAdminId'] as const;
+  for (const k of allowedKeys) {
+    if (patch[k] !== undefined) dbData[k] = patch[k];
+  }
+
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    try {
+      const updated = await prisma.submission.update({
+        where: { id },
+        data: dbData
+      });
+      const tasks = await getTasks();
+      const task = tasks.find(t => t.id === updated.taskId);
+      const students = await getStudents();
+      const student = students.find(s => s.id === updated.registrationId);
+
+      return {
+        id: updated.id,
+        registrationId: updated.registrationId,
+        taskId: updated.taskId,
+        fileUrl: updated.fileUrl,
+        status: updated.status,
+        grade: updated.grade,
+        feedback: updated.feedback,
+        selectedAdminId: updated.selectedAdminId,
+        submittedAt: updated.submittedAt.toISOString(),
+        studentName: student?.studentName || `طالب #${updated.registrationId}`,
+        taskTitle: task?.title || 'مهمة محذوفة',
+        taskMaxPoints: task?.maxPoints || 0,
+        taskTrack: task?.track || null,
+        taskAssignedAdmins: task?.assignedAdmins || [],
+      };
+    } catch {
+      return null;
+    }
+  } else {
+    const list = await readJsonFile<any[]>(FILE_SUBMISSIONS, []);
+    const index = list.findIndex(s => String(s.id) === id);
+    if (index === -1) return null;
+    const row = { ...list[index] };
+    for (const k of allowedKeys) {
+      if (patch[k] !== undefined) row[k] = patch[k];
+    }
+    list[index] = row;
+    await writeJsonFile(FILE_SUBMISSIONS, list);
+    const tasks = await getTasks();
+    const task = tasks.find(t => t.id === row.taskId);
+    const students = await getStudents();
+    const student = students.find(s => s.id === row.registrationId);
+    return {
+      id: String(row.id),
+      registrationId: Number(row.registrationId),
+      taskId: String(row.taskId),
+      fileUrl: String(row.fileUrl),
+      status: String(row.status),
+      grade: row.grade !== null && row.grade !== undefined ? Number(row.grade) : null,
+      feedback: row.feedback || null,
+      selectedAdminId: row.selectedAdminId || null,
+      submittedAt: String(row.submittedAt),
+      studentName: student?.studentName || `طالب #${row.registrationId}`,
+      taskTitle: task?.title || 'مهمة محذوفة',
+      taskMaxPoints: task?.maxPoints || 0,
+      taskTrack: task?.track || null,
+      taskAssignedAdmins: task?.assignedAdmins || [],
+    };
+  }
+}
+
+export async function deleteSubmission(id: string): Promise<boolean> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    try {
+      await prisma.submission.delete({ where: { id } });
+      return true;
+    } catch {
+      return false;
+    }
+  } else {
+    const list = await readJsonFile<any[]>(FILE_SUBMISSIONS, []);
+    const index = list.findIndex(s => String(s.id) === id);
+    if (index === -1) return false;
+    list.splice(index, 1);
+    await writeJsonFile(FILE_SUBMISSIONS, list);
     return true;
   }
 }

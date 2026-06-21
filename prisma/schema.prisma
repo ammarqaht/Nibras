@@ -31,6 +31,7 @@ model Registration {
   registrationStatus String   @default("pending")
   paymentType        String   @default("later") // 'now' | 'later'
   paymentReceipt     String?                    // Base64 string of receipt image
+  submissions        Submission[]
 
   @@index([nationalId])
 }
@@ -115,4 +116,38 @@ model Invoice {
   @@index([department])
   @@index([supervisorId])
   @@index([status])
+}
+
+model Task {
+  id               String       @id @default(cuid())
+  title            String
+  description      String
+  maxPoints        Int
+  dueDate          DateTime
+  createdAt        DateTime     @default(now())
+  track            String?      @default("عام")
+  isActive         Boolean      @default(true)
+  submissionMethod String?      @default("رفع ملف")
+  assignedAdmins   String[]     @default([])
+  imageUrl         String?
+  resourceLink     String?
+  visibility       String       @default("all")
+  visibleToIds     Int[]        @default([])
+  submissions      Submission[]
+}
+
+model Submission {
+  id              String       @id @default(cuid())
+  registrationId  Int
+  taskId          String
+  fileUrl         String
+  status          String       @default("pending")
+  grade           Int?
+  feedback        String?
+  selectedAdminId String?
+  submittedAt     DateTime     @default(now())
+  task            Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  registration    Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+
+  @@unique([registrationId, taskId])
 }
