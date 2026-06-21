@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { updateSubmission, deleteSubmission } from '@/lib/services';
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = getSession(req);
     if (!session) {
       return NextResponse.json({ error: 'غير مصرح بالدخول' }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
     const body = await req.json();
 
     const patch: any = {};
@@ -34,14 +34,14 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = getSession(req);
     if (!session) {
       return NextResponse.json({ error: 'غير مصرح بالدخول' }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
     const ok = await deleteSubmission(id);
     if (!ok) {
       return NextResponse.json({ error: 'التسليم غير موجود أو فشل الحذف' }, { status: 400 });
