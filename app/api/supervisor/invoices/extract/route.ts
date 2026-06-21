@@ -9,7 +9,7 @@ export const maxDuration = 60;
 //  - Else if ANTHROPIC_API_KEY is set -> use Claude.
 //  - Else -> 503 (UI falls back to manual entry).
 const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || '';
 const ANTHROPIC_MODEL = process.env.INVOICE_AI_MODEL || 'claude-opus-4-8';
 
