@@ -373,11 +373,19 @@ function AddInvoiceModal({
             </div>
             <div className="space-y-2">
               {items.map((it, i) => (
-                <div key={i} className="flex gap-2 items-center">
-                  <input className="field flex-1" placeholder="اسم المنتج" value={it.name} onChange={(e) => setItem(i, { name: e.target.value })} />
-                  <input className="field w-16 text-center" dir="ltr" inputMode="numeric" placeholder="كمية" value={it.qty} onChange={(e) => setItem(i, { qty: Number(e.target.value.replace(/\D/g, '')) || 0 })} />
-                  <input className="field w-24 text-center" dir="ltr" inputMode="decimal" placeholder="سعر" value={it.price} onChange={(e) => setItem(i, { price: Number(e.target.value) || 0 })} />
-                  <button type="button" onClick={() => setItems((p) => p.filter((_, idx) => idx !== i))} className="text-nred-600 px-1.5" title="حذف">×</button>
+                <div key={i} className="grid grid-cols-12 gap-2 items-center">
+                  <div className="col-span-6">
+                    <input className="field" placeholder="اسم المنتج" value={it.name} onChange={(e) => setItem(i, { name: e.target.value })} />
+                  </div>
+                  <div className="col-span-2">
+                    <input className="field text-center" dir="ltr" inputMode="numeric" placeholder="كمية" value={it.qty} onChange={(e) => setItem(i, { qty: Number(e.target.value.replace(/\D/g, '')) || 0 })} />
+                  </div>
+                  <div className="col-span-3">
+                    <input className="field text-center" dir="ltr" inputMode="decimal" placeholder="سعر" value={it.price} onChange={(e) => setItem(i, { price: Number(e.target.value) || 0 })} />
+                  </div>
+                  <div className="col-span-1 text-center">
+                    <button type="button" onClick={() => setItems((p) => p.filter((_, idx) => idx !== i))} className="text-nred-600 px-1.5 text-lg" title="حذف">×</button>
+                  </div>
                 </div>
               ))}
             </div>
