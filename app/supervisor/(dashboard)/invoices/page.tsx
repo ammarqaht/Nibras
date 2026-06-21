@@ -279,7 +279,7 @@ function AddInvoiceModal({
     if (!title.trim()) return pushToast('error', 'أدخل عنوان الفاتورة');
     if (!department) return pushToast('error', 'اختر القسم');
     const finalTotal = totalNum > 0 ? totalNum : itemsSum;
-    if (finalTotal <= 0) return pushToast('error', 'أدخل الإجمالي أو البنود');
+    if (finalTotal <= 0) return pushToast('error', 'أدخل الإجمالي أو المنتجات');
 
     setBusy(true);
     const r = await fetch('/api/supervisor/invoices', {
@@ -368,34 +368,29 @@ function AddInvoiceModal({
           {/* items editor */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="label !mb-0">البنود</label>
-              <button type="button" className="btn btn-ghost text-xs" onClick={() => setItems((p) => [...p, { name: '', qty: 1, price: 0 }])}>+ إضافة بند</button>
+              <label className="label !mb-0">المنتجات</label>
+              <button type="button" className="btn btn-ghost text-xs" onClick={() => setItems((p) => [...p, { name: '', qty: 1, price: 0 }])}>+ إضافة منتج</button>
             </div>
             <div className="space-y-2">
               {items.map((it, i) => (
                 <div key={i} className="flex gap-2 items-center">
-                  <input className="field flex-1" placeholder="اسم البند" value={it.name} onChange={(e) => setItem(i, { name: e.target.value })} />
+                  <input className="field flex-1" placeholder="اسم المنتج" value={it.name} onChange={(e) => setItem(i, { name: e.target.value })} />
                   <input className="field w-16 text-center" dir="ltr" inputMode="numeric" placeholder="كمية" value={it.qty} onChange={(e) => setItem(i, { qty: Number(e.target.value.replace(/\D/g, '')) || 0 })} />
                   <input className="field w-24 text-center" dir="ltr" inputMode="decimal" placeholder="سعر" value={it.price} onChange={(e) => setItem(i, { price: Number(e.target.value) || 0 })} />
                   <button type="button" onClick={() => setItems((p) => p.filter((_, idx) => idx !== i))} className="text-nred-600 px-1.5" title="حذف">×</button>
                 </div>
               ))}
             </div>
-            <div className="text-xs text-ink-400 mt-1.5">مجموع البنود: <span dir="ltr" className="font-mono">{money(itemsSum)}</span></div>
+            <div className="text-xs text-ink-400 mt-1.5">مجموع المنتجات: <span dir="ltr" className="font-mono">{money(itemsSum)}</span></div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="الضريبة (اختياري)">
-              <input className="field" dir="ltr" inputMode="decimal" value={tax} onChange={(e) => setTax(e.target.value)} />
-            </Field>
-            <Field label="الإجمالي" required>
-              <input className="field" dir="ltr" inputMode="decimal" value={total} onChange={(e) => setTotal(e.target.value)} placeholder={String(itemsSum || '')} />
-            </Field>
-          </div>
+          <Field label="الإجمالي" required>
+            <input className="field" dir="ltr" inputMode="decimal" value={total} onChange={(e) => setTotal(e.target.value)} placeholder={String(itemsSum || '')} />
+          </Field>
           {mismatch && (
             <div className="text-sm rounded-md p-2.5" style={{ background: '#FCF3DC', color: '#9A6B00' }}>
-              ⚠️ مجموع البنود ({money(itemsSum)}) لا يطابق الإجمالي ({money(totalNum)}).{' '}
-              <button type="button" className="underline font-semibold" onClick={() => setTotal(String(itemsSum))}>استخدم مجموع البنود</button>
+              ⚠️ مجموع المنتجات ({money(itemsSum)}) لا يطابق الإجمالي ({money(totalNum)}).{' '}
+              <button type="button" className="underline font-semibold" onClick={() => setTotal(String(itemsSum))}>استخدم مجموع المنتجات</button>
             </div>
           )}
         </div>
@@ -456,7 +451,7 @@ function ViewInvoiceModal({
           {invoice.items.length > 0 && (
             <div className="rounded-lg border border-ink-200 overflow-hidden">
               <table className="tbl">
-                <thead><tr><th>البند</th><th>الكمية</th><th>السعر</th></tr></thead>
+                <thead><tr><th>المنتج</th><th>الكمية</th><th>السعر</th></tr></thead>
                 <tbody>
                   {invoice.items.map((it, i) => (
                     <tr key={i}><td>{it.name}</td><td dir="ltr">{it.qty}</td><td dir="ltr">{money(it.price)}</td></tr>
