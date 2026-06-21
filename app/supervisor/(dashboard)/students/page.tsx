@@ -530,14 +530,16 @@ function StudentModal({
                 {student.paymentStatus !== 'paid' ? (
                   <div className="rounded-lg p-3" style={{ background: '#FCF3DC' }}>
                     <p className="text-sm mb-2" style={{ color: '#9A6B00' }}>لم يتم تأكيد السداد بعد.</p>
-                    <button
-                      onClick={confirmPayment}
-                      disabled={busy}
-                      className="btn text-white border-transparent"
-                      style={{ background: '#1B7A43' }}
-                    >
-                      ✅ تأكيد استلام الدفع
-                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={confirmPayment}
+                        disabled={busy}
+                        className="btn text-white border-transparent"
+                        style={{ background: '#1B7A43' }}
+                      >
+                        ✅ تأكيد استلام الدفع
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <p className="text-sm font-semibold" style={{ color: '#1B7A43' }}>✓ تم تأكيد استلام الدفع</p>
@@ -574,7 +576,9 @@ function StudentModal({
               </>
             ) : (
               <>
-                <button onClick={() => setEdit(true)} className="btn btn-secondary text-sm">✎ تعديل</button>
+                {isAdmin && (
+                  <button onClick={() => setEdit(true)} className="btn btn-secondary text-sm">✎ تعديل</button>
+                )}
               </>
             )}
           </div>
