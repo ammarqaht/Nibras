@@ -162,6 +162,15 @@ body::after {
 .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
 .btn-lg { padding: 1rem 2rem; font-size: 1.05rem; }
 
+@media (max-width: 640px) {
+  .btn {
+    padding: 0.5rem 0.9rem;
+    font-size: 0.8rem;
+    gap: 0.35rem;
+  }
+}
+
+
 /* Card */
 .card {
   background: var(--card);
@@ -247,6 +256,18 @@ body::after {
   background: var(--accent);
   color: #fff;
   box-shadow: 0 4px 14px rgba(245,166,35,0.25);
+}
+.choice.choice-add.is-active {
+  background: #1B7A43 !important;
+  border-color: #1B7A43 !important;
+  color: #fff !important;
+  box-shadow: 0 4px 14px rgba(27, 122, 67, 0.25) !important;
+}
+.choice.choice-deduct.is-active {
+  background: #C42910 !important;
+  border-color: #C42910 !important;
+  color: #fff !important;
+  box-shadow: 0 4px 14px rgba(196, 41, 16, 0.25) !important;
 }
 @media (max-width: 640px) {
   .choice {

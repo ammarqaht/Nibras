@@ -163,6 +163,8 @@ model Schedule {
   endTime      String // Format 'HH:MM'
   role         String // e.g. 'cultural_supervisor', 'social_supervisor', etc.
   supervisorId Int
+  stage        String   @default("الكل")
+  notes        String?
   createdAt    DateTime @default(now())
 
   @@index([date])

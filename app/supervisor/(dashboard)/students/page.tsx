@@ -33,7 +33,7 @@ type Group = { id: number; name: string; stage: string };
 function paymentPill(s: Student) {
   if (s.paymentStatus === 'paid') return { cls: 'pill-green', label: 'مدفوع' };
   if (s.paymentStatus === 'exempted') return { cls: 'pill-blue', label: 'معفي' };
-  if (s.paymentStatus !== 'paid' && s.paymentStatus !== 'exempted' && s.paymentType === 'now' && s.paymentReceipt) return { cls: 'pill-yellow', label: 'بانتظار المراجعة 📑' };
+  if (s.paymentStatus !== 'paid' && s.paymentStatus !== 'exempted' && s.paymentType === 'now' && s.paymentReceipt) return { cls: 'pill-yellow', label: 'بانتظار المراجعة' };
   return { cls: 'pill-red', label: 'لم يدفع' };
 }
 function regPill(status: string) {
@@ -357,7 +357,11 @@ export default function StudentsPage() {
             onClick={() => setShowColSettings(!showColSettings)}
             className="btn btn-secondary text-sm flex items-center gap-1.5"
           >
-            ⚙️ تخصيص الأعمدة
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+            <span>تخصيص الأعمدة</span>
           </button>
           
           {showColSettings && (
@@ -605,7 +609,15 @@ export default function StudentsPage() {
                         {visibleCols.studentName && (
                           <td className="font-medium">
                             {s.studentName}
-                            {s.hasCondition && <span title="حالة صحية" className="mr-1">🚨</span>}
+                            {s.hasCondition && (
+                              <span title="حالة صحية" className="mr-1 inline-flex items-center text-red-600">
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                                  <line x1="12" y1="9" x2="12" y2="13" />
+                                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                                </svg>
+                              </span>
+                            )}
                           </td>
                         )}
                         {visibleCols.membershipNo && (
@@ -632,11 +644,18 @@ export default function StudentsPage() {
                         {visibleCols.paymentStatus && (
                           <td><span className={`pill ${pp.cls}`}>{pp.label}</span></td>
                         )}
-                        {visibleCols.hasCondition && (
                           <td className="text-ink-500 text-sm">
-                            {s.hasCondition ? (s.conditionNote || 'نعم 🚨') : 'لا'}
+                            {s.hasCondition ? (
+                              <span className="inline-flex items-center gap-1 text-red-600 font-medium">
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                                  <line x1="12" y1="9" x2="12" y2="13" />
+                                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                                </svg>
+                                <span>نعم</span>
+                              </span>
+                            ) : 'لا'}
                           </td>
-                        )}
                         <td>
                           <button
                             className="btn btn-secondary py-1 px-3 text-xs"
@@ -670,12 +689,18 @@ export default function StudentsPage() {
                       </div>
                     )}
                     <div className="min-w-0 flex-1 space-y-1">
-                      {visibleCols.studentName && (
                         <div className="font-semibold text-ink-900 truncate">
                           {s.studentName}
-                          {s.hasCondition && <span title="حالة صحية" className="mr-1">🚨</span>}
+                          {s.hasCondition && (
+                            <span title="حالة صحية" className="mr-1 inline-flex items-center text-red-600">
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                                <line x1="12" y1="9" x2="12" y2="13" />
+                                <line x1="12" y1="17" x2="12.01" y2="17" />
+                              </svg>
+                            </span>
+                          )}
                         </div>
-                      )}
                       
                       <div className="text-xs text-ink-500 flex flex-wrap gap-x-2 gap-y-1">
                         {visibleCols.membershipNo && (
@@ -728,7 +753,14 @@ export default function StudentsPage() {
                             <span className={`pill ${pp.cls}`}>{pp.label}</span>
                           )}
                           {visibleCols.hasCondition && s.hasCondition && (
-                            <span className="pill pill-red">🚨 {s.conditionNote || 'حالة صحية'}</span>
+                            <span className="pill pill-red inline-flex items-center gap-1">
+                              <svg className="w-3 h-3 text-red-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                                <line x1="12" y1="9" x2="12" y2="13" />
+                                <line x1="12" y1="17" x2="12.01" y2="17" />
+                              </svg>
+                              <span>{s.conditionNote || 'حالة صحية'}</span>
+                            </span>
                           )}
                         </div>
                       )}
@@ -979,8 +1011,15 @@ function StudentModal({
 
               {/* health */}
               {student.hasCondition && (
-                <div className="rounded-lg p-3 text-sm" style={{ background: '#FDEAE6', color: '#C42910' }}>
-                  🚨 <span className="font-semibold">حالة صحية:</span> {student.conditionNote || 'غير موضّحة'}
+                <div className="rounded-lg p-3 text-sm flex items-start gap-1.5" style={{ background: '#FDEAE6', color: '#C42910' }}>
+                  <svg className="w-4 h-4 text-red-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                    <line x1="12" y1="9" x2="12" y2="13" />
+                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                  </svg>
+                  <div>
+                    <span className="font-semibold">حالة صحية:</span> {student.conditionNote || 'غير موضّحة'}
+                  </div>
                 </div>
               )}
 
@@ -988,8 +1027,15 @@ function StudentModal({
               <div>
                 <div className="label">الموقع</div>
                 {mapsHref ? (
-                  <a href={mapsHref} target="_blank" rel="noopener noreferrer" className="btn btn-secondary text-sm">
-                    📍 فتح الموقع في خرائط Google ↗
+                  <a href={mapsHref} target="_blank" rel="noopener noreferrer" className="btn btn-secondary text-sm flex items-center gap-1.5">
+                    <svg className="w-4 h-4 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0Z" />
+                      <circle cx="12" cy="10" r="3" />
+                    </svg>
+                    <span>فتح الموقع في خرائط Google</span>
+                    <svg className="w-3.5 h-3.5 text-ink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3" />
+                    </svg>
                   </a>
                 ) : (
                   <span className="text-sm text-ink-400">لم يحدّد الطالب موقعاً.</span>
@@ -1007,16 +1053,13 @@ function StudentModal({
                   <div className="mb-3">
                     <div className="label">إيصال التحويل</div>
                     {student.paymentReceipt ? (
-                      <div className="flex items-center gap-3">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={student.paymentReceipt}
-                          alt="إيصال"
-                          className="w-20 h-20 object-cover rounded-lg border border-ink-200 cursor-pointer"
-                          onClick={openReceipt}
-                        />
-                        <button onClick={openReceipt} className="btn btn-ghost text-sm">👁️ فتح الإيصال في صفحة جديدة</button>
-                      </div>
+                      <button onClick={openReceipt} className="btn btn-secondary text-sm w-full justify-center gap-2 flex items-center">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                          <circle cx="12" cy="12" r="3" />
+                        </svg>
+                        <span>عرض إيصال التحويل في صفحة جديدة</span>
+                      </button>
                     ) : (
                       <span className="text-sm text-ink-400">لم يُرفق إيصال.</span>
                     )}
@@ -1031,10 +1074,13 @@ function StudentModal({
                         <button
                           onClick={confirmPayment}
                           disabled={busy}
-                          className="btn text-white border-transparent text-xs py-1.5 px-3 flex-1 justify-center"
+                          className="btn text-white border-transparent text-xs py-1.5 px-3 flex-1 justify-center flex items-center gap-1"
                           style={{ background: '#1B7A43' }}
                         >
-                          ✅ تأكيد الدفع
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                          <span>تأكيد الدفع</span>
                         </button>
                         <button
                           onClick={setExempted}
@@ -1047,9 +1093,23 @@ function StudentModal({
                     )}
                   </div>
                 ) : (
-                  <p className="text-sm font-semibold" style={{ color: student.paymentStatus === 'exempted' ? '#1E40AF' : '#1B7A43' }}>
-                    {student.paymentStatus === 'exempted' ? '✓ تم إعفاء الطالب من الرسوم' : '✓ تم تأكيد استلام الدفع'}
-                  </p>
+                  <div className="text-sm font-semibold">
+                    {student.paymentStatus === 'exempted' ? (
+                      <span className="flex items-center gap-1.5 text-blue-600">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                        <span>تم إعفاء الطالب من الرسوم</span>
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1.5 text-green-700">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                        <span>تم تأكيد استلام الدفع</span>
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -1059,11 +1119,18 @@ function StudentModal({
                 <div className="flex items-center gap-2">
                   {student.paymentStatus === 'paid' || student.paymentStatus === 'exempted' ? (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium" style={{ background: '#DEF7E5', color: '#1B7A43' }}>
-                      ✓ مقبول
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                      <span>مقبول</span>
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium" style={{ background: '#FEF3CD', color: '#856404' }}>
-                      ⏳ قيد المراجعة
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.25" />
+                        <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" />
+                      </svg>
+                      <span>قيد المراجعة</span>
                     </span>
                   )}
                   <span className="text-xs text-ink-400">(يتحدد تلقائياً حسب حالة الدفع)</span>
@@ -1084,7 +1151,13 @@ function StudentModal({
             ) : (
               <>
                 {isAdmin && (
-                  <button onClick={() => setEdit(true)} className="btn btn-secondary text-sm">✎ تعديل</button>
+                  <button onClick={() => setEdit(true)} className="btn btn-secondary text-sm flex items-center gap-1">
+                    <svg className="w-3.5 h-3.5 text-ink-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                      <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z" />
+                    </svg>
+                    <span>تعديل</span>
+                  </button>
                 )}
               </>
             )}

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { getSchedules, createSchedule, deleteSchedule } from '@/lib/services';
+import { getSchedules, createSchedule, deleteSchedule, updateSchedule } from '@/lib/services';
 
 export async function GET(req: NextRequest) {
   try {
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { title, date, startTime, endTime, role } = body;
+    const { title, date, startTime, endTime, role, stage, notes } = body;
 
     if (!title || !date || !startTime || !endTime || !role) {
       return NextResponse.json({ error: 'البيانات غير كاملة' }, { status: 400 });
@@ -45,7 +45,9 @@ export async function POST(req: NextRequest) {
       startTime,
       endTime,
       role,
-      supervisorId: session.id
+      supervisorId: session.id,
+      stage: stage || 'الكل',
+      notes: notes || null
     });
     return NextResponse.json({ success: true, schedule });
   } catch (error) {
@@ -88,5 +90,55 @@ export async function DELETE(req: NextRequest) {
   } catch (error) {
     console.error('schedules DELETE error', error);
     return NextResponse.json({ error: 'حدث خطأ أثناء حذف البرنامج' }, { status: 500 });
+  }
+}
+
+export async function PUT(req: NextRequest) {
+  try {
+    const session = getSession(req);
+    if (!session) {
+      return NextResponse.json({ error: 'غير مصرح بالدخول' }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const { id, title, date, startTime, endTime, role, stage, notes } = body;
+
+    if (!id || !title || !date || !startTime || !endTime || !role) {
+      return NextResponse.json({ error: 'البيانات غير كاملة' }, { status: 400 });
+    }
+
+    // Verify supervisor has the role or is admin
+    if (session.role !== 'admin') {
+      const userRoles = session.role.split(',').map(r => r.trim());
+      if (!userRoles.includes(role)) {
+        return NextResponse.json({ error: 'لا تملك الصلاحية للتعديل بهذا الدور' }, { status: 403 });
+      }
+
+      // Check if they are the owner of the schedule
+      const all = await getSchedules();
+      const target = all.find(s => s.id === id);
+      if (target && target.supervisorId !== session.id) {
+        return NextResponse.json({ error: 'لا يمكنك تعديل برنامج لم تقم بإنشائه' }, { status: 403 });
+      }
+    }
+
+    const schedule = await updateSchedule(id, {
+      title,
+      date,
+      startTime,
+      endTime,
+      role,
+      stage: stage || 'الكل',
+      notes: notes || null
+    });
+
+    if (!schedule) {
+      return NextResponse.json({ error: 'البرنامج غير موجود أو فشل التعديل' }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, schedule });
+  } catch (error) {
+    console.error('schedules PUT error', error);
+    return NextResponse.json({ error: 'حدث خطأ أثناء تعديل البرنامج' }, { status: 500 });
   }
 }

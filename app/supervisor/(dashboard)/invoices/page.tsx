@@ -110,7 +110,16 @@ export default function InvoicesPage() {
                   {invoices.map((inv) => (
                     <tr key={inv.id} className="cursor-pointer" onClick={() => setViewing(inv)}>
                       <td dir="ltr" className="text-right font-mono text-ink-500">#{inv.invoiceNo}</td>
-                      <td className="font-medium">{inv.title}{inv.aiExtracted && <span title="قُرئت بالذكاء الاصطناعي" className="mr-1">✨</span>}</td>
+                      <td className="font-medium flex items-center gap-1">
+                        <span>{inv.title}</span>
+                        {inv.aiExtracted && (
+                          <span title="قُرئت بالذكاء الاصطناعي">
+                            <svg className="w-3.5 h-3.5 text-orange-500 inline-block" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275z" />
+                            </svg>
+                          </span>
+                        )}
+                      </td>
                       <td className="text-ink-500 text-sm">{departmentLabel(inv.department)}</td>
                       {isFinance && <td className="text-ink-500 text-sm">{inv.supervisorName}</td>}
                       <td className="font-semibold" dir="ltr">{money(inv.total)}</td>
@@ -131,7 +140,12 @@ export default function InvoicesPage() {
                 <li key={inv.id} onClick={() => setViewing(inv)} className="p-4 flex items-center gap-3 active:bg-cream-100 cursor-pointer">
                   <div className="min-w-0 flex-1">
                     <div className="font-semibold text-ink-900 truncate">
-                      {inv.title}{inv.aiExtracted && <span className="mr-1">✨</span>}
+                      <span>{inv.title}</span>
+                      {inv.aiExtracted && (
+                        <svg className="w-3.5 h-3.5 text-orange-500 inline-block mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275z" />
+                        </svg>
+                      )}
                     </div>
                     <div className="text-xs text-ink-400 mt-0.5">
                       <span dir="ltr" className="font-mono">#{inv.invoiceNo}</span> · {departmentLabel(inv.department)}
@@ -300,7 +314,13 @@ function AddInvoiceModal({
               // eslint-disable-next-line @next/next/no-img-element
               <img src={image} alt="الفاتورة" className="max-h-44 mx-auto rounded-lg border border-ink-200" />
             ) : (
-              <div className="text-ink-400 text-sm py-3">📷 صوّر الفاتورة ليقرأها الذكاء الاصطناعي تلقائياً</div>
+              <div className="flex flex-col items-center justify-center py-3 text-ink-400 text-sm gap-2">
+                <svg className="w-8 h-8 text-ink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                  <circle cx="12" cy="13" r="4" />
+                </svg>
+                <span>صوّر الفاتورة ليقرأها الذكاء الاصطناعي تلقائياً</span>
+              </div>
             )}
             <button
               type="button"
@@ -311,8 +331,11 @@ function AddInvoiceModal({
               {reading ? 'جارٍ القراءة…' : image ? 'تغيير الصورة' : 'تصوير / رفع صورة'}
             </button>
             {aiExtracted && (
-              <p className="hint mt-2" style={{ color: 'var(--blue)' }}>
-                ✨ عُبّئت الحقول تلقائياً{aiConfidence != null ? ` (ثقة ${Math.round(aiConfidence * 100)}%)` : ''} — راجعها قبل الحفظ.
+              <p className="hint mt-2 flex items-center justify-center gap-1.5" style={{ color: 'var(--blue)' }}>
+                 <svg className="w-3.5 h-3.5 text-blue-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                   <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275z" />
+                 </svg>
+                 <span>عُبّئت الحقول تلقائياً{aiConfidence != null ? ` (ثقة ${Math.round(aiConfidence * 100)}%)` : ''} — راجعها قبل الحفظ.</span>
               </p>
             )}
           </div>
@@ -372,9 +395,16 @@ function AddInvoiceModal({
             <input className="field" dir="ltr" inputMode="decimal" value={total} onChange={(e) => setTotal(e.target.value)} placeholder={String(itemsSum || '')} />
           </Field>
           {mismatch && (
-            <div className="text-sm rounded-md p-2.5" style={{ background: '#FCF3DC', color: '#9A6B00' }}>
-              ⚠️ مجموع المنتجات ({money(itemsSum)}) لا يطابق الإجمالي ({money(totalNum)}).{' '}
-              <button type="button" className="underline font-semibold" onClick={() => setTotal(String(itemsSum))}>استخدم مجموع المنتجات</button>
+            <div className="text-sm rounded-md p-2.5 flex items-start gap-2" style={{ background: '#FCF3DC', color: '#9A6B00' }}>
+               <svg className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                 <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                 <line x1="12" y1="9" x2="12" y2="13" />
+                 <line x1="12" y1="17" x2="12.01" y2="17" />
+               </svg>
+               <div>
+                 مجموع المنتجات ({money(itemsSum)}) لا يطابق الإجمالي ({money(totalNum)}).{' '}
+                 <button type="button" className="underline font-semibold" onClick={() => setTotal(String(itemsSum))}>استخدم مجموع المنتجات</button>
+               </div>
             </div>
           )}
         </div>

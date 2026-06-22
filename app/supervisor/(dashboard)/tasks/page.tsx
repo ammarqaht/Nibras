@@ -504,9 +504,12 @@ export default function TasksPage() {
       <div className="flex gap-2 mb-6 border-b border-ink-200 pb-2 overflow-x-auto scroll-soft">
         <button
           onClick={() => setActiveTab('submissions')}
-          className={`choice py-2 px-4 text-sm font-bold shrink-0 ${activeTab === 'submissions' ? 'is-active' : ''}`}
+          className={`choice py-2 px-4 text-sm font-bold shrink-0 flex items-center gap-1.5 ${activeTab === 'submissions' ? 'is-active' : ''}`}
         >
-          📥 المهام المسلمة
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M12 3v12M17 8l-5-5-5 5" />
+          </svg>
+          <span>المهام المسلمة</span>
           {pendingSubmissions.length > 0 && (
             <span className="mr-1.5 px-2 py-0.5 rounded-full bg-nred-600 text-white text-xs font-mono">
               {pendingSubmissions.length}
@@ -515,21 +518,35 @@ export default function TasksPage() {
         </button>
         <button
           onClick={() => setActiveTab('log')}
-          className={`choice py-2 px-4 text-sm font-bold shrink-0 ${activeTab === 'log' ? 'is-active' : ''}`}
+          className={`choice py-2 px-4 text-sm font-bold shrink-0 flex items-center gap-1.5 ${activeTab === 'log' ? 'is-active' : ''}`}
         >
-          📜 سجل التقييمات
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="16" y1="13" x2="8" y2="13" />
+            <line x1="16" y1="17" x2="8" y2="17" />
+          </svg>
+          <span>سجل التقييمات</span>
         </button>
         <button
           onClick={() => setActiveTab('add')}
-          className={`choice py-2 px-4 text-sm font-bold shrink-0 ${activeTab === 'add' ? 'is-active' : ''}`}
+          className={`choice py-2 px-4 text-sm font-bold shrink-0 flex items-center gap-1.5 ${activeTab === 'add' ? 'is-active' : ''}`}
         >
-          ✍️ إضافة مهمة
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+            <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z" />
+          </svg>
+          <span>إضافة مهمة</span>
         </button>
         <button
           onClick={() => setActiveTab('manage')}
-          className={`choice py-2 px-4 text-sm font-bold shrink-0 ${activeTab === 'manage' ? 'is-active' : ''}`}
+          className={`choice py-2 px-4 text-sm font-bold shrink-0 flex items-center gap-1.5 ${activeTab === 'manage' ? 'is-active' : ''}`}
         >
-          ⚙️ إدارة المهام
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+          <span>إدارة المهام</span>
         </button>
       </div>
 
@@ -774,7 +791,14 @@ export default function TasksPage() {
                         <button type="button" className="btn btn-secondary text-xs" onClick={(e) => { e.stopPropagation(); setAddImage(null); }}>إزالة الصورة</button>
                       </div>
                     ) : (
-                      <div className="py-2 text-ink-400 text-sm">🖼️ اضغط لاختيار صورة للمهمة</div>
+                      <div className="py-2 text-ink-400 text-sm flex items-center justify-center gap-1.5">
+                        <svg className="w-5 h-5 text-ink-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                          <circle cx="8.5" cy="8.5" r="1.5" />
+                          <polyline points="21 15 16 10 5 21" />
+                        </svg>
+                        <span>اضغط لاختيار صورة للمهمة</span>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -820,9 +844,17 @@ export default function TasksPage() {
                 <button
                   type="submit"
                   disabled={addBusy}
-                  className="btn btn-primary w-full py-2.5 font-bold"
+                  className="btn btn-primary w-full py-2.5 font-bold flex items-center justify-center gap-1.5"
                 >
-                  {addBusy ? 'جارٍ نشر المهمة…' : 'نشر المهمة والتحدي للطلاب 🚀'}
+                  {addBusy ? 'جارٍ نشر المهمة…' : (
+                    <>
+                      <span>نشر المهمة والتحدي للطلاب</span>
+                      <svg className="w-4 h-4 shrink-0 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" />
+                        <path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" />
+                      </svg>
+                    </>
+                  )}
                 </button>
               </form>
             </div>
@@ -832,13 +864,19 @@ export default function TasksPage() {
           {activeTab === 'manage' && (
             <div className="space-y-4 fade-in">
               <div className="card p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <input
-                  type="text"
-                  placeholder="🔍 ابحث في المهام المنشورة..."
-                  className="field py-1.5 px-3 text-sm sm:w-80"
-                  value={manageSearch}
-                  onChange={e => setManageSearch(e.target.value)}
-                />
+                <div className="relative flex-1 sm:w-80">
+                  <input
+                    type="text"
+                    placeholder="ابحث في المهام المنشورة..."
+                    className="field py-1.5 pr-9 pl-3 text-sm w-full"
+                    value={manageSearch}
+                    onChange={e => setManageSearch(e.target.value)}
+                  />
+                  <svg className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-ink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                </div>
                 <div className="text-xs text-ink-400">إجمالي المهام المنشورة: {tasks.length} مهمة</div>
               </div>
 
@@ -874,11 +912,22 @@ export default function TasksPage() {
                             </td>
                             <td>
                               {task.visibility === 'restricted' ? (
-                                <span className="pill pill-gray" title="طلاب محددون فقط">
-                                  👥 {task.visibleToIds.length} طالب
+                                <span className="pill pill-gray inline-flex items-center gap-1" title="طلاب محددون فقط">
+                                  <svg className="w-3 h-3 text-ink-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                                    <circle cx="9" cy="7" r="4" />
+                                  </svg>
+                                  <span>{task.visibleToIds.length} طالب</span>
                                 </span>
                               ) : (
-                                <span className="pill pill-green">🌐 الجميع</span>
+                                <span className="pill pill-green inline-flex items-center gap-1">
+                                  <svg className="w-3 h-3 text-green-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <line x1="2" y1="12" x2="22" y2="12" />
+                                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                                  </svg>
+                                  <span>الجميع</span>
+                                </span>
                               )}
                             </td>
                             <td>
@@ -961,8 +1010,12 @@ export default function TasksPage() {
                   ) : evalSub.fileUrl === 'admin://manual-mark' ? (
                     <div className="bg-ink-50 p-3 rounded text-sm text-ink-600">رصد يدوي مباشر من المشرف (بدون ملف مرفق)</div>
                   ) : (
-                    <a href={evalSub.fileUrl} target="_blank" rel="noopener noreferrer" className="btn btn-secondary inline-block text-xs font-semibold py-1.5 px-3">
-                      📄 فتح الملف المرفق في نافذة جديدة
+                    <a href={evalSub.fileUrl} target="_blank" rel="noopener noreferrer" className="btn btn-secondary inline-flex items-center gap-1.5 text-xs font-semibold py-1.5 px-3">
+                      <svg className="w-4 h-4 text-ink-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                      </svg>
+                      <span>فتح الملف المرفق في نافذة جديدة</span>
                     </a>
                   )}
                 </div>
@@ -1011,9 +1064,16 @@ export default function TasksPage() {
               <button
                 onClick={() => handleEvaluate('approved')}
                 disabled={evalBusy}
-                className="btn btn-primary text-sm font-bold"
+                className="btn btn-primary text-sm font-bold flex items-center justify-center gap-1.5"
               >
-                {evalBusy ? 'جارٍ الحفظ…' : 'اعتماد وقبول التسليم ✓'}
+                {evalBusy ? 'جارٍ الحفظ…' : (
+                  <>
+                    <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    <span>اعتماد وقبول التسليم</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -1107,7 +1167,14 @@ export default function TasksPage() {
                         <button type="button" className="btn btn-secondary text-xs" onClick={(e) => { e.stopPropagation(); setEditTask({ ...editTask, imageUrl: null }); }}>إزالة الصورة</button>
                       </div>
                     ) : (
-                      <div className="py-2 text-ink-400 text-xs">🖼️ اضغط لرفع صورة جديدة للمهة</div>
+                      <div className="py-2 text-ink-400 text-xs flex items-center justify-center gap-1.5">
+                        <svg className="w-4 h-4 text-ink-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                          <circle cx="8.5" cy="8.5" r="1.5" />
+                          <polyline points="21 15 16 10 5 21" />
+                        </svg>
+                        <span>اضغط لرفع صورة جديدة للمهمة</span>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -1175,16 +1242,25 @@ export default function TasksPage() {
                 <button
                   type="button"
                   onClick={() => setScopeTask({ ...scopeTask, visibility: 'all' })}
-                  className={`choice flex-1 text-center py-2 ${scopeTask.visibility === 'all' ? 'is-active' : ''}`}
+                  className={`choice flex-1 text-center py-2 flex items-center justify-center gap-1.5 ${scopeTask.visibility === 'all' ? 'is-active' : ''}`}
                 >
-                  🌐 متاحة للجميع
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="2" y1="12" x2="22" y2="12" />
+                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                  </svg>
+                  <span>متاحة للجميع</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setScopeTask({ ...scopeTask, visibility: 'restricted' })}
-                  className={`choice flex-1 text-center py-2 ${scopeTask.visibility === 'restricted' ? 'is-active' : ''}`}
+                  className={`choice flex-1 text-center py-2 flex items-center justify-center gap-1.5 ${scopeTask.visibility === 'restricted' ? 'is-active' : ''}`}
                 >
-                  👥 طلاب محددون فقط
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                  </svg>
+                  <span>طلاب محددون فقط</span>
                 </button>
               </div>
 
@@ -1300,13 +1376,19 @@ export default function TasksPage() {
 
               {/* List and search filters */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                <input
-                  type="text"
-                  placeholder="🔍 ابحث عن طالب..."
-                  className="field py-1 px-3 text-xs flex-1"
-                  value={statsSearch}
-                  onChange={e => setStatsSearch(e.target.value)}
-                />
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    placeholder="ابحث عن طالب..."
+                    className="field py-1 pr-9 pl-3 text-xs w-full"
+                    value={statsSearch}
+                    onChange={e => setStatsSearch(e.target.value)}
+                  />
+                  <svg className="w-3.5 h-3.5 absolute right-3 top-1/2 -translate-y-1/2 text-ink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                </div>
                 <select
                   className="field py-1 px-3 text-xs sm:w-44"
                   value={statsFilter}
@@ -1458,7 +1540,13 @@ function SubmissionCard({
               onClick={() => window.open(sub.fileUrl, '_blank')}
             />
           ) : sub.fileUrl === 'admin://manual-mark' ? (
-            <div className="text-xs text-ink-600">✍️ إقرار يدوي مباشر من المشرف</div>
+            <div className="text-xs text-ink-600 flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5 text-brand-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z" />
+              </svg>
+              <span>إقرار يدوي مباشر من المشرف</span>
+            </div>
           ) : (
             <a
               href={sub.fileUrl}
@@ -1466,7 +1554,11 @@ function SubmissionCard({
               rel="noopener noreferrer"
               className="btn btn-secondary inline-flex items-center gap-1.5 text-xs font-semibold py-1 px-2.5"
             >
-              📄 عرض المستند المرفق (PDF/ملف)
+              <svg className="w-3.5 h-3.5 text-ink-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+              </svg>
+              <span>عرض المستند المرفق (PDF/ملف)</span>
             </a>
           )}
         </div>
@@ -1518,9 +1610,13 @@ function SubmissionCard({
                         setInlineEditSub?.(sub.id);
                         setInlinePoints?.(String(sub.grade || 0));
                       }}
-                      className="text-brand-600 hover:underline font-bold text-[0.7rem]"
+                      className="text-brand-600 hover:underline font-bold text-[0.7rem] inline-flex items-center gap-1"
                     >
-                      ✏️ تعديل الدرجة
+                      <svg className="w-3 h-3 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                        <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z" />
+                      </svg>
+                      <span>تعديل الدرجة</span>
                     </button>
                   </>
                 )}

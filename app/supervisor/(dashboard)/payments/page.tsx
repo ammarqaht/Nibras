@@ -45,6 +45,11 @@ export default function PaymentsPage() {
   const [tab, setTab] = useState<Tab>('all');
   const [busyId, setBusyId] = useState<number | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Record<number, boolean>>({});
+
+  const toggleExpand = (id: number) => {
+    setExpandedIds((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
 
   async function load() {
     const r = await fetch('/api/supervisor/students', { cache: 'no-store' });
@@ -154,7 +159,13 @@ export default function PaymentsPage() {
           >
             {t.label}
             {t.key === 'unpaid' && reviewCount > 0 && (
-              <span className="font-bold text-amber-500 mr-1"> ({reviewCount} مراجعة 📑)</span>
+              <span className="font-bold text-amber-500 mr-1 inline-flex items-center gap-1">
+                <span>({reviewCount} مراجعة)</span>
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                </svg>
+              </span>
             )}
           </button>
         ))}
@@ -183,10 +194,16 @@ export default function PaymentsPage() {
                 <tbody>
                   {filtered.map((s) => (
                     <tr key={s.id}>
-                      <td className="font-medium">
                         {s.studentName}
-                        {s.hasCondition && <span title="حالة صحية" className="mr-1">🚨</span>}
-                      </td>
+                        {s.hasCondition && (
+                          <span title="حالة صحية" className="mr-1 inline-flex items-center text-red-600">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                              <line x1="12" y1="9" x2="12" y2="13" />
+                              <line x1="12" y1="17" x2="12.01" y2="17" />
+                            </svg>
+                          </span>
+                        )}
                       <td dir="ltr" className="text-right font-mono text-ink-500">#{s.membershipNo}</td>
                       <td><span className="pill pill-gray">{s.paymentType === 'now' ? 'فوري' : 'آجل'}</span></td>
                       <td>
@@ -213,7 +230,11 @@ export default function PaymentsPage() {
                             onClick={() => setSelectedStudent(s)}
                             className="btn btn-secondary py-1 px-3 text-xs flex items-center gap-1"
                           >
-                            👁️ بيانات الطالب
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                              <circle cx="12" cy="12" r="3" />
+                            </svg>
+                            <span>بيانات الطالب</span>
                           </button>
                           {s.paymentStatus === 'paid' || s.paymentStatus === 'exempted' ? (
                             <button
@@ -221,7 +242,10 @@ export default function PaymentsPage() {
                               disabled={busyId === s.id}
                               className="btn btn-danger py-1 px-3 text-xs flex items-center gap-1"
                             >
-                              ❌ إلغاء الدفع
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M18 6 6 18M6 6l12 12" />
+                              </svg>
+                              <span>إلغاء الدفع</span>
                             </button>
                           ) : (
                             <>
@@ -231,7 +255,10 @@ export default function PaymentsPage() {
                                 className="btn text-white border-transparent py-1 px-3 text-xs flex items-center gap-1"
                                 style={{ background: '#1B7A43' }}
                               >
-                                ✅ تأكيد الدفع
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="20 6 9 17 4 12" />
+                                </svg>
+                                <span>تأكيد الدفع</span>
                               </button>
                               <button
                                 onClick={() => setExempted(s.id)}
@@ -251,91 +278,155 @@ export default function PaymentsPage() {
             </div>
 
             {/* Mobile Cards View */}
-            <div className="lg:hidden space-y-4 p-4 bg-cream-50/50">
-              {filtered.map((s) => (
-                <div key={s.id} className="card p-4 flex flex-col gap-3 shadow-sm border border-line bg-white rounded-xl">
-                  {/* Header Row */}
-                  <div className="flex justify-between items-start">
-                    <div className="min-w-0">
-                      <h3 className="font-bold text-ink-900 text-base truncate">
-                        {s.studentName}
-                        {s.hasCondition && <span title="حالة صحية" className="mr-1">🚨</span>}
-                      </h3>
-                      <span dir="ltr" className="font-mono text-xs text-ink-400">#{s.membershipNo}</span>
+            <div className="lg:hidden space-y-4 p-4 bg-cream-50/50 font-sans">
+              {filtered.map((s) => {
+                const isExpanded = !!expandedIds[s.id];
+                return (
+                  <div key={s.id} className="card p-4 flex flex-col gap-3 shadow-sm border border-line bg-white rounded-xl transition-all">
+                    {/* Header Row (Always Visible) */}
+                    <div className="flex justify-between items-start">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h3 className="font-bold text-ink-900 text-base">
+                            {s.studentName}
+                            {s.hasCondition && (
+                              <span title="حالة صحية" className="mr-1 inline-flex items-center text-red-600">
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                                  <line x1="12" y1="9" x2="12" y2="13" />
+                                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                                </svg>
+                              </span>
+                            )}
+                          </h3>
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-cream-100 text-ink-600">
+                            {s.stage}
+                          </span>
+                        </div>
+                        <span dir="ltr" className="font-mono text-xs text-ink-400">#{s.membershipNo}</span>
+                      </div>
+                      <span className={`pill shrink-0 ${s.paymentStatus === 'paid' ? 'pill-green' : s.paymentStatus === 'exempted' ? 'pill-blue' : isReview(s) ? 'pill-yellow' : 'pill-red'}`}>
+                        {s.paymentStatus === 'paid' ? 'مدفوع' : s.paymentStatus === 'exempted' ? 'معفي' : isReview(s) ? 'بانتظار المراجعة' : 'لم يدفع'}
+                      </span>
                     </div>
-                    <span className={`pill ${s.paymentStatus === 'paid' ? 'pill-green' : s.paymentStatus === 'exempted' ? 'pill-blue' : isReview(s) ? 'pill-yellow' : 'pill-red'}`}>
-                      {s.paymentStatus === 'paid' ? 'مدفوع' : s.paymentStatus === 'exempted' ? 'معفي' : isReview(s) ? 'بانتظار المراجعة' : 'لم يدفع'}
-                    </span>
-                  </div>
 
-                  {/* Info Row / Grid */}
-                  <div className="grid grid-cols-2 gap-2 text-xs border-y border-line py-3 my-1">
-                    <div>
-                      <span className="text-ink-400 block mb-1">نوع الدفع</span>
-                      <span className="pill pill-gray font-medium">{s.paymentType === 'now' ? 'فوري' : 'آجل'}</span>
-                    </div>
-                    <div>
-                      <span className="text-ink-400 block mb-1">إيصال السداد</span>
-                      {s.paymentReceipt ? (
-                        <div className="flex items-center gap-1.5">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={s.paymentReceipt}
-                            alt="إيصال"
-                            onClick={() => openReceipt(s.paymentReceipt!)}
-                            className="w-8 h-8 object-cover rounded border border-ink-200 cursor-pointer"
-                          />
-                          <button 
-                            onClick={() => openReceipt(s.paymentReceipt!)}
-                            className="text-blue hover:underline text-[10px]"
+                    {/* Expandable Section */}
+                    {isExpanded && (
+                      <div className="space-y-3 pt-3 border-t border-line fade-in">
+                        {/* Student Details Grid */}
+                        <div className="grid grid-cols-2 gap-3 text-[11px] text-ink-600 bg-cream-50/30 p-2.5 rounded-lg border border-ink-100">
+                          <div>
+                            <span className="text-ink-400 block mb-0.5">الهوية الوطنية</span>
+                            <span className="font-semibold">{s.nationalId || '—'}</span>
+                          </div>
+                          <div>
+                            <span className="text-ink-400 block mb-0.5">ولي الأمر</span>
+                            <span className="font-semibold" dir="ltr">{s.guardianPhone || '—'}</span>
+                          </div>
+                          <div>
+                            <span className="text-ink-400 block mb-0.5">الحي السكني</span>
+                            <span className="font-semibold">{s.neighborhood || '—'}</span>
+                          </div>
+                          <div>
+                            <span className="text-ink-400 block mb-0.5">نوع الدفع</span>
+                            <span className="pill pill-gray font-medium text-[9px] py-0.5 px-1.5">{s.paymentType === 'now' ? 'فوري' : 'آجل'}</span>
+                          </div>
+                        </div>
+
+                        {/* Receipt Block (if paymentType is now) */}
+                        {s.paymentType === 'now' && (
+                          <div className="text-[11px] flex justify-between items-center bg-cream-50/50 p-2 rounded-lg border border-line">
+                            <span className="text-ink-500 font-semibold">إيصال التحويل:</span>
+                            {s.paymentReceipt ? (
+                              <button
+                                onClick={() => openReceipt(s.paymentReceipt!)}
+                                className="btn btn-secondary py-1 px-2.5 text-[10px] inline-flex items-center gap-1 rounded-md"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                                  <circle cx="12" cy="12" r="3" />
+                                </svg>
+                                <span>عرض الإيصال</span>
+                              </button>
+                            ) : (
+                              <span className="text-ink-300">—</span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Actions Row - Smaller buttons */}
+                        <div className="flex gap-2 pt-1">
+                          {s.paymentStatus === 'paid' || s.paymentStatus === 'exempted' ? (
+                            <button
+                              onClick={() => cancelConfirm(s.id)}
+                              disabled={busyId === s.id}
+                              className="btn btn-danger py-1.5 px-2.5 text-[11px] flex-1 flex items-center justify-center gap-1 rounded-lg"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M18 6 6 18M6 6l12 12" />
+                              </svg>
+                              <span>إلغاء التأكيد</span>
+                            </button>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => confirm(s.id)}
+                                disabled={busyId === s.id}
+                                className="btn text-white border-transparent py-1.5 px-2.5 text-[11px] flex-1 flex items-center justify-center gap-1 rounded-lg"
+                                style={{ background: '#1B7A43' }}
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="20 6 9 17 4 12" />
+                                </svg>
+                                <span>تأكيد الدفع</span>
+                              </button>
+                              <button
+                                onClick={() => setExempted(s.id)}
+                                disabled={busyId === s.id}
+                                className="btn btn-secondary py-1.5 px-2.5 text-[11px] flex-1 flex items-center justify-center gap-1 text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100 rounded-lg"
+                              >
+                                إعفاء
+                              </button>
+                            </>
+                          )}
+                          <button
+                            onClick={() => setSelectedStudent(s)}
+                            className="btn btn-secondary py-1.5 px-2.5 text-[11px] flex items-center justify-center rounded-lg"
+                            title="بيانات الطالب الكاملة"
                           >
-                            عرض الإيصال
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                              <circle cx="12" cy="12" r="3" />
+                            </svg>
                           </button>
                         </div>
-                      ) : (
-                        <span className="text-ink-300">—</span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Actions Row */}
-                  <div className="flex gap-2">
-                    {s.paymentStatus === 'paid' || s.paymentStatus === 'exempted' ? (
-                      <button
-                        onClick={() => cancelConfirm(s.id)}
-                        disabled={busyId === s.id}
-                        className="btn btn-danger py-1 px-3 text-xs flex-1 flex items-center justify-center gap-1"
-                      >
-                        ❌ إلغاء
-                      </button>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => confirm(s.id)}
-                          disabled={busyId === s.id}
-                          className="btn text-white border-transparent py-1 px-3 text-xs flex-1 flex items-center justify-center gap-1"
-                          style={{ background: '#1B7A43' }}
-                        >
-                          ✅ تأكيد
-                        </button>
-                        <button
-                          onClick={() => setExempted(s.id)}
-                          disabled={busyId === s.id}
-                          className="btn btn-secondary py-1 px-3 text-xs flex-1 flex items-center justify-center gap-1 text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100"
-                        >
-                          إعفاء
-                        </button>
-                      </>
+                      </div>
                     )}
+
+                    {/* Toggle Button */}
                     <button
-                      onClick={() => setSelectedStudent(s)}
-                      className="btn btn-secondary py-1 px-3 text-xs flex items-center justify-center"
+                      onClick={() => toggleExpand(s.id)}
+                      className="btn btn-secondary py-1.5 px-3 text-xs w-full justify-center gap-1 mt-1 border-dashed"
                     >
-                      👁️
+                      {isExpanded ? (
+                        <>
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="18 15 12 9 6 15" />
+                          </svg>
+                          <span>إخفاء التفاصيل</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="6 9 12 15 18 9" />
+                          </svg>
+                          <span>عرض باقي التفاصيل</span>
+                        </>
+                      )}
                     </button>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </>
         )}
@@ -478,7 +569,11 @@ function StudentDetailsModal({
           {/* Condition Alert */}
           {student.hasCondition && (
             <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs flex gap-2 items-start">
-              <span className="text-base">🚨</span>
+              <svg className="w-4 h-4 text-red-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
               <div>
                 <span className="font-bold block mb-0.5">حالة صحية خاصة:</span>
                 <span>{student.conditionNote || 'لا توجد تفاصيل'}</span>
@@ -501,7 +596,10 @@ function StudentDetailsModal({
                   href={`tel:${student.guardianPhone}`}
                   className="btn btn-secondary py-1 px-2.5 text-xs flex items-center gap-1 rounded-md"
                 >
-                  📞 اتصال
+                  <svg className="w-3.5 h-3.5 text-ink-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                  </svg>
+                  <span>اتصال</span>
                 </a>
                 <a
                   href={guardianWhatsappUrl}
@@ -510,7 +608,10 @@ function StudentDetailsModal({
                   className="btn text-white py-1.5 px-2.5 text-xs flex items-center gap-1 rounded-md"
                   style={{ background: '#128C7E' }}
                 >
-                  💬 واتساب
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+                  </svg>
+                  <span>واتساب</span>
                 </a>
               </div>
             </div>
@@ -527,7 +628,10 @@ function StudentDetailsModal({
                     href={`tel:${student.studentPhone}`}
                     className="btn btn-secondary py-1 px-2.5 text-xs flex items-center gap-1 rounded-md"
                   >
-                    📞 اتصال
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                    </svg>
+                    <span>اتصال</span>
                   </a>
                   {studentWhatsappUrl && (
                     <a
@@ -537,7 +641,10 @@ function StudentDetailsModal({
                       className="btn text-white py-1.5 px-2.5 text-xs flex items-center gap-1 rounded-md"
                       style={{ background: '#128C7E' }}
                     >
-                      💬 واتساب
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+                      </svg>
+                      <span>واتساب</span>
                     </a>
                   )}
                 </div>
@@ -563,32 +670,55 @@ function StudentDetailsModal({
                 disabled={uploadingReceipt}
                 className="btn btn-secondary py-1 px-2.5 text-xs flex items-center gap-1 rounded-md"
               >
-                {uploadingReceipt ? '⏳ جارٍ الرفع...' : student.paymentReceipt ? '📝 تغيير الإيصال' : '📤 إرفاق صورة الإيصال'}
+                {uploadingReceipt ? (
+                  <>
+                    <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.25" />
+                      <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" />
+                    </svg>
+                    <span>جارٍ الرفع...</span>
+                  </>
+                ) : student.paymentReceipt ? (
+                  <>
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                      <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z" />
+                    </svg>
+                    <span>تغيير الإيصال</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
+                    </svg>
+                    <span>إرفاق صورة الإيصال</span>
+                  </>
+                )}
               </button>
             </div>
 
             {student.paymentReceipt ? (
-              <div className="flex items-start gap-3 bg-cream-50 p-3 rounded-lg border border-line">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={student.paymentReceipt}
-                  alt="إيصال التحويل"
+              <div className="bg-cream-50 p-3 rounded-lg border border-line flex flex-col gap-2">
+                <span className="text-xs text-ink-500 font-semibold">تم رفع الإيصال بنجاح</span>
+                <button
                   onClick={() => openReceipt(student.paymentReceipt!)}
-                  className="w-16 h-16 object-cover rounded border border-ink-200 cursor-pointer"
-                />
-                <div className="flex flex-col gap-1.5 justify-center h-full">
-                  <span className="text-xs text-ink-500">تم رفع الإيصال بنجاح</span>
-                  <button
-                    onClick={() => openReceipt(student.paymentReceipt!)}
-                    className="btn btn-secondary py-1 px-3 text-xs self-start"
-                  >
-                    👁️ فتح الإيصال بكامل الحجم
-                  </button>
-                </div>
+                  className="btn btn-secondary py-1.5 px-3 text-xs w-full justify-center gap-1.5"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                  <span>عرض الإيصال المرفق بكامل الحجم</span>
+                </button>
               </div>
             ) : (
-              <div className="p-3 bg-red-50 border border-red-100 text-red-700 rounded-lg text-xs">
-                ⚠️ لم يقم الطالب بإرفاق إيصال التحويل بعد. يمكنك إرفاق صورة الإيصال يدوياً بالضغط على زر الرفع أعلاه.
+              <div className="p-3 bg-red-50 border border-red-100 text-red-700 rounded-lg text-xs flex items-start gap-1.5">
+                <svg className="w-4 h-4 text-red-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+                <span>لم يقم الطالب بإرفاق إيصال التحويل بعد. يمكنك إرفاق صورة الإيصال يدوياً بالضغط على زر الرفع أعلاه.</span>
               </div>
             )}
           </div>
@@ -602,7 +732,10 @@ function StudentDetailsModal({
               disabled={busyId === student.id}
               className="btn btn-danger py-2 px-4 text-xs flex-1 flex justify-center items-center gap-1"
             >
-              ❌ إلغاء تأكيد الدفع
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 6 6 18M6 6l12 12" />
+              </svg>
+              <span>إلغاء تأكيد الدفع</span>
             </button>
           ) : (
             <button
@@ -611,7 +744,10 @@ function StudentDetailsModal({
               className="btn text-white border-transparent py-2 px-4 text-xs flex-1 flex justify-center items-center gap-1"
               style={{ background: '#1B7A43' }}
             >
-              ✅ تأكيد استلام الدفع
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              <span>تأكيد استلام الدفع</span>
             </button>
           )}
           <button

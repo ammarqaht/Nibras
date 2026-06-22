@@ -30,6 +30,7 @@ export default function AnnouncementsPage() {
   const [busy, setBusy] = useState(false);
 
   // Form states
+  const [showFormModal, setShowFormModal] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
@@ -142,6 +143,7 @@ export default function AnnouncementsPage() {
       .map((x) => x.trim())
       .filter((x) => x.startsWith('stage:') || x.startsWith('group:'));
     setSelectedAudience(filteredAudience);
+    setShowFormModal(true);
   };
 
   const cancelEdit = () => {
@@ -151,6 +153,7 @@ export default function AnnouncementsPage() {
     setCoverImage(null);
     setContentImages([]);
     setSelectedAudience([]);
+    setShowFormModal(false);
   };
 
   async function del(id: number) {
@@ -190,166 +193,207 @@ export default function AnnouncementsPage() {
 
   return (
     <div className="font-sans text-right" dir="rtl">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-ink-900 mb-1">الإشهار والإعلانات</h1>
-        <p className="text-sm text-ink-500">نشر وتعديل الإعلانات الموجهة لطلاب وأسر النادي.</p>
+      <div className="mb-6 flex justify-between items-center flex-wrap gap-4 border-b border-ink-100 pb-4">
+        <div>
+          <h1 className="text-2xl font-bold text-ink-900 mb-1">الإشهار والإعلانات</h1>
+          <p className="text-sm text-ink-500">نشر وتعديل الإعلانات الموجهة لطلاب وأسر النادي.</p>
+        </div>
+        <button
+          onClick={() => {
+            cancelEdit();
+            setShowFormModal(true);
+          }}
+          className="btn btn-primary px-5 py-2.5 font-bold flex items-center gap-2 shadow-sm hover:shadow"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" />
+            <line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" />
+          </svg>
+          <span>إنشاء إعلان جديد</span>
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Form panel */}
-        <form onSubmit={handleSubmit} className="card p-5 space-y-4 self-start bg-white shadow-sm border border-ink-150">
-          <h2 className="text-lg font-bold text-ink-900 border-b border-ink-100 pb-2">
-            {editId ? 'تعديل الإعلان الحالي' : 'إنشاء إعلان جديد'}
-          </h2>
-
-          {/* 1. Cover Image Upload (ABOVE title) */}
-          <div>
-            <label className="label">صورة الغلاف / مصغرة الإعلان (اختياري)</label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleCoverChange}
-              className="field w-full cursor-pointer file:ml-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-cream-100 file:text-brand hover:file:bg-cream-200"
-            />
-            {coverImage && (
-              <div className="mt-2.5 relative">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={coverImage}
-                  alt="معاينة الغلاف"
-                  className="w-full h-36 object-cover rounded-xl border border-ink-200 shadow-inner"
+      {showFormModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fade-in" dir="rtl">
+          <div className="bg-white rounded-2xl max-w-xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-ink-150 flex flex-col font-sans">
+            {/* Modal Header */}
+            <div className="flex justify-between items-center p-4 border-b border-line bg-cream-50/50">
+              <h2 className="text-lg font-bold text-ink-900">
+                {editId ? 'تعديل الإعلان الحالي' : 'إنشاء إعلان جديد'}
+              </h2>
+              <button 
+                type="button"
+                onClick={() => {
+                  cancelEdit();
+                  setShowFormModal(false);
+                }}
+                className="text-ink-400 hover:text-ink-900 font-bold p-1 flex items-center justify-center"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            {/* Modal Form */}
+            <form onSubmit={handleSubmit} className="p-5 space-y-4">
+              {/* Cover Image Upload */}
+              <div>
+                <label className="label">صورة الغلاف / مصغرة الإعلان (اختياري)</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleCoverChange}
+                  className="field w-full cursor-pointer file:ml-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-cream-100 file:text-brand hover:file:bg-cream-200"
                 />
-                <button
-                  type="button"
-                  onClick={() => setCoverImage(null)}
-                  className="absolute top-1.5 right-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full p-1.5 shadow-md flex items-center justify-center"
-                  title="إزالة الصورة"
-                >
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M18 6 6 18M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* 2. Title Input */}
-          <div>
-            <label className="label">عنوان الإعلان</label>
-            <input
-              className="field"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="اكتب عنوان الإعلان هنا…"
-            />
-          </div>
-
-          {/* 3. Content Textarea */}
-          <div>
-            <label className="label">محتوى الإعلان</label>
-            <textarea
-              className="field"
-              rows={5}
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              placeholder="اكتب تفاصيل الإعلان هنا…"
-            />
-          </div>
-
-          {/* 4. Multiple Content Images Upload (BELOW content) */}
-          <div>
-            <label className="label">صور إضافية للمنشور (اختياري - متعدد)</label>
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handleContentImagesChange}
-              className="field w-full cursor-pointer file:ml-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-cream-100 file:text-brand hover:file:bg-cream-200"
-            />
-            {contentImages.length > 0 && (
-              <div className="grid grid-cols-3 gap-2 mt-2.5">
-                {contentImages.map((src, idx) => (
-                  <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border border-ink-150 shadow-sm">
+                {coverImage && (
+                  <div className="mt-2.5 relative">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={src}
-                      alt={`مرفق ${idx + 1}`}
-                      className="w-full h-full object-cover"
+                      src={coverImage}
+                      alt="معاينة الغلاف"
+                      className="w-full h-36 object-cover rounded-xl border border-ink-200 shadow-inner"
                     />
                     <button
                       type="button"
-                      onClick={() => setContentImages((prev) => prev.filter((_, i) => i !== idx))}
-                      className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 shadow-md flex items-center justify-center"
-                      title="حذف"
+                      onClick={() => setCoverImage(null)}
+                      className="absolute top-1.5 right-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full p-1.5 shadow-md flex items-center justify-center"
+                      title="إزالة الصورة"
                     >
                       <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M18 6 6 18M6 6l12 12" />
                       </svg>
                     </button>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Audience selection */}
-          <div className="space-y-2 border-t border-ink-100 pt-3">
-            <label className="label font-bold">تحديد فئة الجمهور المستهدف</label>
-            
-            <div className="space-y-3 max-h-56 overflow-y-auto scroll-soft border border-ink-150 rounded-xl p-3 bg-cream-50/30">
-              {/* Stages List */}
-              <div className="space-y-1">
-                <span className="text-xs font-bold text-brand-600 block mb-1">تصفية حسب المراحل:</span>
-                {STAGES.map((s) => (
-                  <label key={s.key} className="flex items-center gap-2 cursor-pointer select-none text-sm text-ink-800">
-                    <input
-                      type="checkbox"
-                      checked={selectedAudience.includes(s.key)}
-                      onChange={() => toggleAudience(s.key)}
-                      className="rounded border-ink-300 text-brand w-4 h-4 focus:ring-brand"
-                    />
-                    <span>{s.label}</span>
-                  </label>
-                ))}
+                )}
               </div>
 
-              {/* Groups List */}
-              {groups.length > 0 && (
-                <div className="space-y-1 border-t border-ink-100 pt-2.5">
-                  <span className="text-xs font-bold text-brand-600 block mb-1">تصفية حسب المجموعات/الأسرة:</span>
-                  {groups.map((g) => {
-                    const key = `group:${g.id}`;
-                    return (
-                      <label key={g.id} className="flex items-center gap-2 cursor-pointer select-none text-sm text-ink-800">
+              {/* Title Input */}
+              <div>
+                <label className="label">عنوان الإعلان</label>
+                <input
+                  className="field"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="اكتب عنوان الإعلان هنا…"
+                />
+              </div>
+
+              {/* Content Textarea */}
+              <div>
+                <label className="label">محتوى الإعلان</label>
+                <textarea
+                  className="field"
+                  rows={5}
+                  value={body}
+                  onChange={(e) => setBody(e.target.value)}
+                  placeholder="اكتب تفاصيل الإعلان هنا…"
+                />
+              </div>
+
+              {/* Multiple Content Images Upload */}
+              <div>
+                <label className="label">صور إضافية للمنشور (اختياري - متعدد)</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleContentImagesChange}
+                  className="field w-full cursor-pointer file:ml-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-cream-100 file:text-brand hover:file:bg-cream-200"
+                />
+                {contentImages.length > 0 && (
+                  <div className="grid grid-cols-3 gap-2 mt-2.5">
+                    {contentImages.map((src, idx) => (
+                      <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border border-ink-150 shadow-sm">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={src}
+                          alt={`مرفق ${idx + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setContentImages((prev) => prev.filter((_, i) => i !== idx))}
+                          className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 shadow-md flex items-center justify-center"
+                          title="حذف"
+                        >
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M18 6 6 18M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Audience selection */}
+              <div className="space-y-2 border-t border-ink-100 pt-3">
+                <label className="label font-bold">تحديد فئة الجمهور المستهدف</label>
+                
+                <div className="space-y-3 max-h-56 overflow-y-auto scroll-soft border border-ink-150 rounded-xl p-3 bg-cream-50/30">
+                  {/* Stages List */}
+                  <div className="space-y-1">
+                    <span className="text-xs font-bold text-brand-600 block mb-1">تصفية حسب المراحل:</span>
+                    {STAGES.map((s) => (
+                      <label key={s.key} className="flex items-center gap-2 cursor-pointer select-none text-sm text-ink-800">
                         <input
                           type="checkbox"
-                          checked={selectedAudience.includes(key)}
-                          onChange={() => toggleAudience(key)}
+                          checked={selectedAudience.includes(s.key)}
+                          onChange={() => toggleAudience(s.key)}
                           className="rounded border-ink-300 text-brand w-4 h-4 focus:ring-brand"
                         />
-                        <span>{g.name} ({g.stage})</span>
+                        <span>{s.label}</span>
                       </label>
-                    );
-                  })}
+                    ))}
+                  </div>
+
+                  {/* Groups List */}
+                  {groups.length > 0 && (
+                    <div className="space-y-1 border-t border-ink-100 pt-2.5">
+                      <span className="text-xs font-bold text-brand-600 block mb-1">تصفية حسب المجموعات/الأسرة:</span>
+                      {groups.map((g) => {
+                        const key = `group:${g.id}`;
+                        return (
+                          <label key={g.id} className="flex items-center gap-2 cursor-pointer select-none text-sm text-ink-800">
+                            <input
+                              type="checkbox"
+                              checked={selectedAudience.includes(key)}
+                              onChange={() => toggleAudience(key)}
+                              className="rounded border-ink-300 text-brand w-4 h-4 focus:ring-brand"
+                            />
+                            <span>{g.name} ({g.stage})</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          </div>
+              </div>
 
-          <div className="flex gap-2 pt-2">
-            <button type="submit" disabled={busy} className="btn btn-primary flex-1">
-              {busy ? 'جاري الحفظ…' : editId ? 'حفظ التعديلات' : 'نشر الإعلان'}
-            </button>
-            {editId && (
-              <button type="button" onClick={cancelEdit} className="btn btn-secondary">
-                إلغاء
-              </button>
-            )}
+              <div className="flex gap-2 pt-2">
+                <button type="submit" disabled={busy} className="btn btn-primary flex-1 font-bold">
+                  {busy ? 'جاري الحفظ…' : editId ? 'حفظ التعديلات' : 'نشر الإعلان'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    cancelEdit();
+                    setShowFormModal(false);
+                  }}
+                  className="btn btn-secondary"
+                >
+                  إلغاء
+                </button>
+              </div>
+            </form>
           </div>
-        </form>
+        </div>
+      )}
 
+      <div className="space-y-4">
         {/* Compact Announcements List */}
-        <div className="lg:col-span-2 space-y-3">
+        <div className="w-full space-y-3">
           {loading ? (
             <div className="card p-12 text-center text-ink-400 text-sm">جارٍ تحميل الإعلانات…</div>
           ) : items.length === 0 ? (
@@ -371,8 +415,12 @@ export default function AnnouncementsPage() {
                     />
                   </div>
                 ) : (
-                  <div className="w-16 h-16 rounded-xl bg-cream-50 flex items-center justify-center flex-shrink-0 text-brand-600 border border-ink-100 text-xl">
-                    📢
+                  <div className="w-16 h-16 rounded-xl bg-cream-50 flex items-center justify-center flex-shrink-0 text-brand-600 border border-ink-100">
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h2" />
+                      <path d="m6 9 12-6v16L6 15" />
+                      <path d="M18 9h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2" />
+                    </svg>
                   </div>
                 )}
 

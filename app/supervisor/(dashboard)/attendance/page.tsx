@@ -107,8 +107,11 @@ export default function AttendancePage() {
       {/* Blur Overlay with "Coming Soon" */}
       <div className="absolute inset-x-0 bottom-0 top-[72px] bg-cream-50/40 backdrop-blur-[6px] z-10 flex items-center justify-center rounded-3xl min-h-[400px]">
         <div className="card p-8 sm:p-10 max-w-md text-center bg-white border border-ink-200 shadow-xl pop-in m-6">
-          <div className="w-16 h-16 rounded-full bg-orange-50 text-orange-600 flex items-center justify-center text-3xl mx-auto mb-4">
-            🔒
+          <div className="w-16 h-16 rounded-full bg-orange-50 text-orange-600 flex items-center justify-center mx-auto mb-4 border border-orange-200">
+            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
           </div>
           <h2 className="font-display text-2xl text-ink-900 mb-2">قريباً</h2>
           <p className="text-sm text-ink-500 leading-relaxed">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { pushToast } from '@/components/Toast';
 
 type Student = { id: number; membershipNo: number; studentName: string; groupId: number | null; registrationStatus: string; paymentStatus: string };
@@ -26,6 +26,9 @@ export default function PointsPage() {
 
   const [mode, setMode] = useState<'individual' | 'group'>('individual');
   const [studentId, setStudentId] = useState('');
+  const [studentQuery, setStudentQuery] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
   const [groupId, setGroupId] = useState('');
   const [sign, setSign] = useState<1 | -1>(1);
   const [amount, setAmount] = useState('5');
@@ -52,6 +55,24 @@ export default function PointsPage() {
     setLoading(false);
   }
   useEffect(() => { loadAll(); }, []);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+        if (studentId) {
+          const selected = students.find((s) => String(s.id) === studentId);
+          if (selected) {
+            setStudentQuery(`${selected.studentName} (#${selected.membershipNo})`);
+          }
+        } else {
+          setStudentQuery('');
+        }
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [studentId, students]);
 
   const nameOf = useMemo(() => {
     const m = new Map(students.map((s) => [s.id, s.studentName]));
@@ -84,6 +105,16 @@ export default function PointsPage() {
     );
   }, [leaderboard, leaderboardSearch]);
 
+  const filteredStudents = useMemo(() => {
+    if (!studentQuery.trim()) return students;
+    const q = studentQuery.toLowerCase().trim();
+    return students.filter(
+      (s) =>
+        s.studentName.toLowerCase().includes(q) ||
+        String(s.membershipNo).includes(q)
+    );
+  }, [students, studentQuery]);
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const delta = sign * Math.abs(parseInt(amount, 10) || 0);
@@ -106,6 +137,8 @@ export default function PointsPage() {
     if (!r.ok) return pushToast('error', j.error ?? 'فشل تسجيل النقاط');
     pushToast('success', j.bulk ? `تم رصد النقاط لـ ${j.pointRecords.length} طالب` : 'تم رصد النقاط');
     setReason('');
+    setStudentId('');
+    setStudentQuery('');
     loadAll();
   }
 
@@ -124,12 +157,63 @@ export default function PointsPage() {
           </div>
 
           {mode === 'individual' ? (
-            <div>
+            <div className="relative font-sans" ref={searchContainerRef}>
               <label className="label">الطالب</label>
-              <select className="field" value={studentId} onChange={(e) => setStudentId(e.target.value)}>
-                <option value="">اختر الطالب</option>
-                {students.map((s) => <option key={s.id} value={String(s.id)}>{s.studentName} (#{s.membershipNo})</option>)}
-              </select>
+              <div className="relative">
+                <input
+                  type="text"
+                  className="field w-full pl-8 pr-3"
+                  placeholder="ابحث عن طالب بالاسم أو العضوية..."
+                  value={studentQuery}
+                  onChange={(e) => {
+                    setStudentQuery(e.target.value);
+                    setIsDropdownOpen(true);
+                    if (!e.target.value) {
+                      setStudentId('');
+                    }
+                  }}
+                  onFocus={() => setIsDropdownOpen(true)}
+                />
+                {studentId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStudentId('');
+                      setStudentQuery('');
+                    }}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400 hover:text-ink-900 font-bold p-0.5 flex items-center justify-center"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18 6 6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+              {isDropdownOpen && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-ink-200 rounded-lg shadow-lg max-h-60 overflow-y-auto scroll-soft">
+                  {filteredStudents.length === 0 ? (
+                    <div className="p-3 text-sm text-ink-400 text-center">لا يوجد طلاب يطابقون البحث</div>
+                  ) : (
+                    filteredStudents.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => {
+                          setStudentId(String(s.id));
+                          setStudentQuery(`${s.studentName} (#${s.membershipNo})`);
+                          setIsDropdownOpen(false);
+                        }}
+                        className={`w-full text-right px-3 py-2 text-sm hover:bg-cream-50 transition-colors flex items-center justify-between border-b border-ink-50 last:border-0 ${
+                          studentId === String(s.id) ? 'bg-brand/5 text-brand-600 font-semibold' : 'text-ink-900'
+                        }`}
+                      >
+                        <span className="font-semibold">{s.studentName}</span>
+                        <span className="text-xs text-ink-400 font-mono">#{s.membershipNo}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             <div>
@@ -144,8 +228,28 @@ export default function PointsPage() {
           <div>
             <label className="label">النوع</label>
             <div className="flex gap-2">
-              <button type="button" className={`choice flex-1 ${sign === 1 ? 'is-active' : ''}`} onClick={() => setSign(1)}>+ إضافة</button>
-              <button type="button" className={`choice flex-1 ${sign === -1 ? 'is-active' : ''}`} onClick={() => setSign(-1)}>− خصم</button>
+              <button
+                type="button"
+                className={`choice choice-add flex-1 transition-all ${
+                  sign === 1
+                    ? 'is-active font-bold'
+                    : 'text-green-600 border-green-200 bg-white hover:bg-green-50'
+                }`}
+                onClick={() => setSign(1)}
+              >
+                + إضافة
+              </button>
+              <button
+                type="button"
+                className={`choice choice-deduct flex-1 transition-all ${
+                  sign === -1
+                    ? 'is-active font-bold'
+                    : 'text-red-600 border-red-200 bg-white hover:bg-red-50'
+                }`}
+                onClick={() => setSign(-1)}
+              >
+                − خصم
+              </button>
             </div>
           </div>
 
@@ -175,17 +279,30 @@ export default function PointsPage() {
             <div className="flex gap-2">
               <button
                 type="button"
-                className={`choice py-1.5 px-4 text-sm ${activeTab === 'leaderboard' ? 'is-active' : ''}`}
+                className={`choice py-1.5 px-4 text-sm flex items-center gap-1.5 ${activeTab === 'leaderboard' ? 'is-active' : ''}`}
                 onClick={() => setActiveTab('leaderboard')}
               >
-                🏆 ترتيب الصدارة
+                <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+                  <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+                  <path d="M4 22h16" />
+                  <path d="M10 14.66V17c0 .55-.45 1-1 1H4v2h16v-2h-5c-.55 0-1-.45-1-1v-2.34" />
+                  <path d="M12 2a6 6 0 0 1 6 6v7a6 6 0 0 1-12 0V8a6 6 0 0 1 6-6Z" />
+                </svg>
+                <span>ترتيب الصدارة</span>
               </button>
               <button
                 type="button"
-                className={`choice py-1.5 px-4 text-sm ${activeTab === 'history' ? 'is-active' : ''}`}
+                className={`choice py-1.5 px-4 text-sm flex items-center gap-1.5 ${activeTab === 'history' ? 'is-active' : ''}`}
                 onClick={() => setActiveTab('history')}
               >
-                📜 سجل رصد النقاط
+                <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="16" y1="13" x2="8" y2="13" />
+                  <line x1="16" y1="17" x2="8" y2="17" />
+                </svg>
+                <span>سجل رصد النقاط</span>
               </button>
             </div>
             
@@ -222,9 +339,9 @@ export default function PointsPage() {
                       {filteredLeaderboard.map((item) => {
                         const rank = leaderboard.findIndex((x) => x.id === item.id) + 1;
                         let rankBadge;
-                        if (rank === 1) rankBadge = <span className="text-xl">🥇</span>;
-                        else if (rank === 2) rankBadge = <span className="text-xl">🥈</span>;
-                        else if (rank === 3) rankBadge = <span className="text-xl">🥉</span>;
+                        if (rank === 1) rankBadge = <span className="w-6 h-6 rounded-full bg-amber-400 text-ink-900 border border-amber-500 font-bold text-xs flex items-center justify-center shadow-sm" title="المركز الأول">١</span>;
+                        else if (rank === 2) rankBadge = <span className="w-6 h-6 rounded-full bg-slate-300 text-ink-900 border border-slate-400 font-bold text-xs flex items-center justify-center shadow-sm" title="المركز الثاني">٢</span>;
+                        else if (rank === 3) rankBadge = <span className="w-6 h-6 rounded-full bg-amber-600 text-white border border-amber-700 font-bold text-xs flex items-center justify-center shadow-sm" title="المركز الثالث">٣</span>;
                         else rankBadge = <span className="text-ink-400 font-mono">#{rank}</span>;
 
                         return (
@@ -249,9 +366,9 @@ export default function PointsPage() {
                   {filteredLeaderboard.map((item) => {
                     const rank = leaderboard.findIndex((x) => x.id === item.id) + 1;
                     let rankBadge;
-                    if (rank === 1) rankBadge = <span className="text-lg">🥇</span>;
-                    else if (rank === 2) rankBadge = <span className="text-lg">🥈</span>;
-                    else if (rank === 3) rankBadge = <span className="text-lg">🥉</span>;
+                    if (rank === 1) rankBadge = <span className="w-6 h-6 rounded-full bg-amber-400 text-ink-900 border border-amber-500 font-bold text-xs flex items-center justify-center shadow-sm mx-auto" title="المركز الأول">١</span>;
+                    else if (rank === 2) rankBadge = <span className="w-6 h-6 rounded-full bg-slate-300 text-ink-900 border border-slate-400 font-bold text-xs flex items-center justify-center shadow-sm mx-auto" title="المركز الثاني">٢</span>;
+                    else if (rank === 3) rankBadge = <span className="w-6 h-6 rounded-full bg-amber-600 text-white border border-amber-700 font-bold text-xs flex items-center justify-center shadow-sm mx-auto" title="المركز الثالث">٣</span>;
                     else rankBadge = <span className="text-ink-400 font-mono text-xs">#{rank}</span>;
 
                     return (

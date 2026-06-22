@@ -130,6 +130,8 @@ export type ScheduleInfo = {
   endTime: string;
   role: string;
   supervisorId: number;
+  stage: string;
+  notes?: string | null;
   createdAt: string;
 };
 
@@ -1737,10 +1739,24 @@ export async function getSchedules(): Promise<ScheduleInfo[]> {
       endTime: s.endTime,
       role: s.role,
       supervisorId: s.supervisorId,
+      stage: s.stage || 'الكل',
+      notes: s.notes,
       createdAt: s.createdAt.toISOString()
     }));
   } else {
-    return readJsonFile<ScheduleInfo[]>(FILE_SCHEDULES, []);
+    const list = await readJsonFile<any[]>(FILE_SCHEDULES, []);
+    return list.map(s => ({
+      id: s.id,
+      title: s.title,
+      date: s.date,
+      startTime: s.startTime,
+      endTime: s.endTime,
+      role: s.role,
+      supervisorId: s.supervisorId,
+      stage: s.stage || 'الكل',
+      notes: s.notes || null,
+      createdAt: s.createdAt
+    }));
   }
 }
 
@@ -1754,7 +1770,9 @@ export async function createSchedule(data: Omit<ScheduleInfo, 'id' | 'createdAt'
         startTime: data.startTime,
         endTime: data.endTime,
         role: data.role,
-        supervisorId: data.supervisorId
+        supervisorId: data.supervisorId,
+        stage: data.stage,
+        notes: data.notes
       }
     });
     return {
@@ -1765,6 +1783,8 @@ export async function createSchedule(data: Omit<ScheduleInfo, 'id' | 'createdAt'
       endTime: s.endTime,
       role: s.role,
       supervisorId: s.supervisorId,
+      stage: s.stage,
+      notes: s.notes,
       createdAt: s.createdAt.toISOString()
     };
   } else {
@@ -1772,6 +1792,7 @@ export async function createSchedule(data: Omit<ScheduleInfo, 'id' | 'createdAt'
     const newSchedule: ScheduleInfo = {
       id: crypto.randomUUID(),
       ...data,
+      stage: data.stage || 'الكل',
       createdAt: new Date().toISOString()
     };
     list.push(newSchedule);
@@ -1796,5 +1817,51 @@ export async function deleteSchedule(id: string): Promise<boolean> {
     list.splice(idx, 1);
     await writeJsonFile(FILE_SCHEDULES, list);
     return true;
+  }
+}
+
+export async function updateSchedule(
+  id: string,
+  data: Partial<Omit<ScheduleInfo, 'id' | 'createdAt'>>
+): Promise<ScheduleInfo | null> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    try {
+      const updated = await prisma.schedule.update({
+        where: { id },
+        data: {
+          title: data.title,
+          date: data.date,
+          startTime: data.startTime,
+          endTime: data.endTime,
+          role: data.role,
+          supervisorId: data.supervisorId,
+          stage: data.stage,
+          notes: data.notes
+        }
+      });
+      return {
+        id: updated.id,
+        title: updated.title,
+        date: updated.date,
+        startTime: updated.startTime,
+        endTime: updated.endTime,
+        role: updated.role,
+        supervisorId: updated.supervisorId,
+        stage: updated.stage,
+        notes: updated.notes,
+        createdAt: updated.createdAt.toISOString()
+      };
+    } catch {
+      return null;
+    }
+  } else {
+    const list = await readJsonFile<ScheduleInfo[]>(FILE_SCHEDULES, []);
+    const idx = list.findIndex(s => s.id === id);
+    if (idx === -1) return null;
+    const updated = { ...list[idx], ...data };
+    list[idx] = updated;
+    await writeJsonFile(FILE_SCHEDULES, list);
+    return updated;
   }
 }
