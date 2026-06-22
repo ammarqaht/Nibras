@@ -6,12 +6,12 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import Brand from './Brand';
 import ToastHost from './Toast';
 
-export type SupervisorUser = { id: number; email: string; name: string; role: string };
+export type SupervisorUser = { id: number; email: string; name: string; role: string; permissions?: string[] };
 
 const SupervisorContext = createContext<{ user: SupervisorUser | null }>({ user: null });
 export const useSupervisor = () => useContext(SupervisorContext);
 
-type NavLink = { href: string; label: string; roles?: string[] };
+type NavLink = { id: string; href: string; label: string; roles?: string[] };
 
 const ROLE_MAP: Record<string, string> = {
   admin: 'مدير عام',
@@ -36,19 +36,19 @@ const getRoleLabel = (roleStr: string) => {
 };
 
 const LINKS: NavLink[] = [
-  { href: '/supervisor', label: 'الرئيسية' },
-  { href: '/supervisor/students', label: 'الطلاب' },
-  { href: '/supervisor/attendance', label: 'الحضور', roles: ['attendance_supervisor', 'general_supervisor'] },
-  { href: '/supervisor/points', label: 'النقاط', roles: ['social_supervisor', 'cultural_supervisor', 'general_supervisor'] },
-  { href: '/supervisor/tasks', label: 'المهام', roles: ['general_supervisor'] },
-  { href: '/supervisor/schedule', label: 'الجدول' },
-  { href: '/supervisor/groups', label: 'المجموعات', roles: ['groups_supervisor', 'general_supervisor'] },
-  { href: '/supervisor/payments', label: 'المدفوعات', roles: ['finance', 'finance_supervisor'] },
-  { href: '/supervisor/invoices', label: 'الفواتير' },
-  { href: '/supervisor/finance', label: 'المالية', roles: ['finance', 'finance_supervisor'] },
-  { href: '/supervisor/announcements', label: 'الإشعارات', roles: ['media_supervisor', 'general_supervisor'] },
-  { href: '/supervisor/supervisors', label: 'المشرفون', roles: ['admin'] },
-  { href: '/supervisor/settings', label: 'الإعدادات', roles: ['admin'] }
+  { id: 'home', href: '/supervisor', label: 'الرئيسية' },
+  { id: 'students', href: '/supervisor/students', label: 'الطلاب' },
+  { id: 'attendance', href: '/supervisor/attendance', label: 'الحضور', roles: ['attendance_supervisor', 'general_supervisor'] },
+  { id: 'points', href: '/supervisor/points', label: 'النقاط', roles: ['social_supervisor', 'cultural_supervisor', 'general_supervisor'] },
+  { id: 'tasks', href: '/supervisor/tasks', label: 'المهام', roles: ['general_supervisor'] },
+  { id: 'schedule', href: '/supervisor/schedule', label: 'الجدول' },
+  { id: 'groups', href: '/supervisor/groups', label: 'المجموعات', roles: ['groups_supervisor', 'general_supervisor'] },
+  { id: 'payments', href: '/supervisor/payments', label: 'المدفوعات', roles: ['finance', 'finance_supervisor'] },
+  { id: 'invoices', href: '/supervisor/invoices', label: 'الفواتير' },
+  { id: 'finance', href: '/supervisor/finance', label: 'المالية', roles: ['finance', 'finance_supervisor'] },
+  { id: 'announcements', href: '/supervisor/announcements', label: 'الإشعارات', roles: ['media_supervisor', 'general_supervisor'] },
+  { id: 'supervisors', href: '/supervisor/supervisors', label: 'المشرفون', roles: ['admin'] },
+  { id: 'settings', href: '/supervisor/settings', label: 'الإعدادات', roles: ['admin'] }
 ];
 
 export default function SupervisorShell({ children }: { children: React.ReactNode }) {
@@ -139,16 +139,22 @@ export default function SupervisorShell({ children }: { children: React.ReactNod
   }
 
   const userRoles = user?.role ? user.role.split(',').map((r) => r.trim()) : [];
-  const isAdmin = userRoles.includes('admin');
+  const isAdmin = userRoles.includes('admin') || user?.permissions?.includes('*');
 
   const links = LINKS.filter((l) => {
     if (isAdmin) return true;
+    if (user?.permissions) {
+      if (user.permissions.includes(l.id)) return true;
+      if (['home', 'students', 'schedule', 'invoices'].includes(l.id)) return true; // Defaults everyone can see unless explicitly revoked (handled later if needed)
+      return false;
+    }
+    // Fallback if permissions aren't loaded yet
     if (!l.roles) return true;
     return l.roles.some((r) => userRoles.includes(r));
   });
 
   const currentLink = LINKS.find((l) => path === l.href || (l.href !== '/supervisor' && path.startsWith(l.href)));
-  const hasAccess = !currentLink || isAdmin || !currentLink.roles || currentLink.roles.some((r) => userRoles.includes(r));
+  const hasAccess = !currentLink || links.some(l => l.id === currentLink.id);
 
   const isActive = (href: string) => (href === '/supervisor' ? path === href : path.startsWith(href));
 

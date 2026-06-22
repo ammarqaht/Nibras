@@ -4,8 +4,23 @@ import { useEffect, useState } from 'react';
 import { pushToast } from '@/components/Toast';
 import { useSupervisor } from '@/components/SupervisorShell';
 
-type Sup = { id: number; name: string; email: string; role: string; groupIds: string; createdAt: string };
+import RoleCustomizer from './RoleCustomizer';
+
+type Sup = { id: number; name: string; email: string; role: string; groupIds: string; customPermissions?: string; createdAt: string };
 type Group = { id: number; name: string };
+
+const MODULES = [
+  { id: 'students', label: 'الطلاب' },
+  { id: 'attendance', label: 'الحضور' },
+  { id: 'points', label: 'النقاط' },
+  { id: 'tasks', label: 'المهام' },
+  { id: 'schedule', label: 'الجدول' },
+  { id: 'groups', label: 'المجموعات' },
+  { id: 'payments', label: 'المدفوعات' },
+  { id: 'invoices', label: 'الفواتير' },
+  { id: 'finance', label: 'المالية' },
+  { id: 'announcements', label: 'الإشعارات' }
+];
 
 const ROLE_MAP: Record<string, string> = {
   admin: 'مدير عام',
@@ -42,8 +57,10 @@ export default function SupervisorsPage() {
   const [accountType, setAccountType] = useState<'admin' | 'supervisor' | 'finance'>('supervisor');
   const [selectedRoles, setSelectedRoles] = useState<string[]>(['general_supervisor']);
   const [groupIds, setGroupIds] = useState<number[]>([]);
+  const [customPermissions, setCustomPermissions] = useState<string[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [isEditingPrimary, setIsEditingPrimary] = useState(false);
+  const [activeTab, setActiveTab] = useState<'supervisors' | 'roles'>('supervisors');
 
   async function load() {
     const [r, gr] = await Promise.all([
@@ -72,6 +89,7 @@ export default function SupervisorsPage() {
     setAccountType('supervisor');
     setSelectedRoles(['general_supervisor']);
     setGroupIds([]);
+    setCustomPermissions([]);
     setEditingId(null);
     setIsEditingPrimary(false);
   }
@@ -96,6 +114,7 @@ export default function SupervisorsPage() {
       setSelectedRoles(s.role.split(',').map((r) => r.trim()).filter(Boolean));
       setGroupIds(s.groupIds.split(',').map((id) => parseInt(id.trim(), 10)).filter((id) => !isNaN(id)));
     }
+    setCustomPermissions(s.customPermissions ? s.customPermissions.split(',').map(p => p.trim()).filter(Boolean) : []);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -123,7 +142,8 @@ export default function SupervisorsPage() {
       name: name.trim(),
       email: email.trim(),
       role: finalRole,
-      groupIds: finalGroupIds
+      groupIds: finalGroupIds,
+      customPermissions: customPermissions.join(',')
     };
 
     if (editingId) {
@@ -162,10 +182,30 @@ export default function SupervisorsPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-ink-900 mb-1">المشرفون</h1>
-        <p className="text-sm text-ink-500">إدارة حسابات المشرفين وصلاحياتهم.</p>
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-ink-900 mb-1">المشرفون</h1>
+          <p className="text-sm text-ink-500">إدارة حسابات المشرفين وصلاحياتهم.</p>
+        </div>
+        <div className="flex bg-ink-100 p-1 rounded-lg">
+          <button
+            onClick={() => setActiveTab('supervisors')}
+            className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors ${activeTab === 'supervisors' ? 'bg-white shadow-sm text-ink-900' : 'text-ink-600 hover:text-ink-900'}`}
+          >
+            إضافة وإدارة المشرفين
+          </button>
+          <button
+            onClick={() => setActiveTab('roles')}
+            className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors ${activeTab === 'roles' ? 'bg-white shadow-sm text-ink-900' : 'text-ink-600 hover:text-ink-900'}`}
+          >
+            ⚙️ تخصيص الأدوار
+          </button>
+        </div>
       </div>
+
+      {activeTab === 'roles' ? (
+        <RoleCustomizer />
+      ) : (
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <form onSubmit={handleSubmit} className="card p-6 space-y-4 self-start">
@@ -268,6 +308,26 @@ export default function SupervisorsPage() {
               )}
             </div>
           )}
+
+          {accountType === 'supervisor' && (
+            <div className="pt-3 border-t border-ink-100">
+              <label className="label font-semibold text-ink-900">صلاحيات مخصصة واستثنائية</label>
+              <p className="text-xs text-ink-500 mb-3">حدد الصفحات الإضافية التي ترغب بمنحها لهذا المشرف بشكل استثنائي، والتي قد لا تكون متاحة في دوره الافتراضي.</p>
+              <div className="flex flex-wrap gap-2">
+                {MODULES.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setCustomPermissions(prev => prev.includes(m.id) ? prev.filter(x => x !== m.id) : [...prev, m.id])}
+                    className={`choice py-1.5 px-3 text-xs ${customPermissions.includes(m.id) ? 'is-active bg-brand hover:bg-brand-600 text-white border-brand' : ''}`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="flex gap-2">
             <button type="submit" disabled={busy} className="btn btn-primary flex-1">{busy ? '...' : editingId ? 'حفظ التعديلات' : 'إضافة المشرف'}</button>
             {editingId && (
@@ -346,6 +406,7 @@ export default function SupervisorsPage() {
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }

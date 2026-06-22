@@ -43,8 +43,9 @@ model Supervisor {
   passwordHash String
   role         String   @default("supervisor") // 'admin' | 'supervisor' | 'finance'
   groupIds     String   @default("") // comma-separated group IDs (e.g. "1,2")
-  departments  String   @default("") // comma-separated department keys (e.g. "cultural,families")
-  createdAt    DateTime @default(now())
+  departments       String   @default("") // comma-separated department keys (e.g. "cultural,families")
+  customPermissions String?
+  createdAt         DateTime @default(now())
 }
 
 model Group {

@@ -15,6 +15,7 @@ export type SupervisorInfo = {
   role: string;
   groupIds: string;
   departments?: string;
+  customPermissions?: string | null;
   createdAt: string;
 };
 
@@ -287,6 +288,7 @@ export async function getAllSupervisors(): Promise<SupervisorInfo[]> {
       role: sup.role,
       groupIds: sup.groupIds,
       departments: sup.departments,
+      customPermissions: sup.customPermissions,
       createdAt: sup.createdAt.toISOString()
     }));
   } else {
@@ -304,7 +306,8 @@ export async function createSupervisor(data: Omit<SupervisorInfo, 'id' | 'create
         passwordHash: data.passwordHash,
         role: data.role,
         groupIds: data.groupIds,
-        departments: data.departments
+        departments: data.departments,
+        customPermissions: data.customPermissions
       }
     });
     return {
@@ -315,6 +318,7 @@ export async function createSupervisor(data: Omit<SupervisorInfo, 'id' | 'create
       role: sup.role,
       groupIds: sup.groupIds,
       departments: sup.departments,
+      customPermissions: sup.customPermissions,
       createdAt: sup.createdAt.toISOString()
     };
   } else {
@@ -359,6 +363,7 @@ export async function updateSupervisor(
   if (data.role !== undefined) updateData.role = data.role;
   if (data.groupIds !== undefined) updateData.groupIds = data.groupIds;
   if (data.departments !== undefined) updateData.departments = data.departments;
+  if (data.customPermissions !== undefined) updateData.customPermissions = data.customPermissions;
   if (data.password) updateData.passwordHash = hashPassword(data.password);
 
   if (hasDatabase) {
@@ -376,6 +381,7 @@ export async function updateSupervisor(
         role: updated.role,
         groupIds: updated.groupIds,
         departments: updated.departments,
+        customPermissions: updated.customPermissions,
         createdAt: updated.createdAt.toISOString()
       };
     } catch {
