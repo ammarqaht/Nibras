@@ -63,11 +63,11 @@ export const clubDetails = {
   },
   location: {
     label: 'الموقع',
-    value: 'مقر نادي نبراس',
-    note: 'اضغط لفتح الخريطة',
+    value: 'مجمع السيوطي التعليمي',
+    note: 'الدمام - حي الفيصلية',
     // TODO: replace with the real club coordinates.
-    lat: 24.7136,
-    lng: 46.6753,
+    lat: 26.3905625,
+    lng: 50.0719375,
     get mapsLink() {
       return `https://www.google.com/maps?q=${this.lat},${this.lng}`;
     },
@@ -149,7 +149,7 @@ export const confirmation = {
   notices: [
     'يرجى حفظ رقم العضوية للاستفادة منه في عرض نقاط الطالب والتحضير.',
     'في حال عدم دفع الرسوم سيتم الاعتذار من الطالب.',
-    'يجب الالتزام بالزي الرسمي في النادي.'
+    'يجب الالتزام بالزي الساتر في النادي.'
   ],
   registerAnother: 'تسجيل طالب آخر',
   backHome: 'العودة للصفحة الرئيسية'
