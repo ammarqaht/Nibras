@@ -280,7 +280,7 @@ export default function StudentsPage() {
   }, []);
 
   const approvedStudents = useMemo(() => {
-    return students.filter((s) => s.registrationStatus === 'approved');
+    return students.filter((s) => s.registrationStatus === 'approved' && s.paymentStatus === 'paid');
   }, [students]);
 
   const neighborhoods = useMemo(() => {
