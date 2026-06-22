@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { pushToast } from '@/components/Toast';
 import { useSupervisor } from '@/components/SupervisorShell';
-import { site, landing, clubDetails, footer, defaultBankDetails } from '@/content';
+import { site, landing, clubDetails, footer, defaultBankDetails, confirmation } from '@/content';
 
 type Field = { key: string; label: string; def: string; type?: 'text' | 'textarea'; ltr?: boolean };
 type Section = { title: string; fields: Field[] };
@@ -45,6 +45,12 @@ const SECTIONS: Section[] = [
   {
     title: 'روابط التواصل الاجتماعي',
     fields: footer.social.map((s) => ({ key: `social_${s.key}`, label: s.label, def: s.href, ltr: true }))
+  },
+  {
+    title: 'الإشعارات',
+    fields: [
+      { key: 'confirmationNotices', label: 'الإشعارات', def: confirmation.notices.join('\n'), type: 'textarea' }
+    ]
   }
 ];
 

@@ -21,6 +21,38 @@ const STAGES = [
   { key: 'stage:ثانوي', label: 'مرحلة الثانوي' }
 ];
 
+// SVG Icon components matching the website style
+const SpeakerIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+  </svg>
+);
+
+const EditIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+  </svg>
+);
+
+const TrashIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+  </svg>
+);
+
+const EyeIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+  </svg>
+);
+
+const CloseIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+  </svg>
+);
+
 // Helper function to compress base64 images client-side before sending
 const compressImage = (base64Str: string, maxWidth = 800, maxHeight = 800, quality = 0.75): Promise<string> => {
   return new Promise((resolve) => {
@@ -261,10 +293,10 @@ export default function AnnouncementsPage() {
                 <button
                   type="button"
                   onClick={() => setCoverImage(null)}
-                  className="absolute top-1.5 right-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full p-1.5 leading-none shadow-md"
+                  className="absolute top-1.5 right-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full p-1.5 leading-none shadow-md flex items-center justify-center"
                   title="إزالة الصورة"
                 >
-                  ×
+                  <CloseIcon className="w-3.5 h-3.5" />
                 </button>
               </div>
             )}
@@ -316,10 +348,10 @@ export default function AnnouncementsPage() {
                     <button
                       type="button"
                       onClick={() => setContentImages((prev) => prev.filter((_, i) => i !== idx))}
-                      className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 leading-none shadow-md text-xs"
+                      className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 leading-none shadow-md flex items-center justify-center"
                       title="حذف"
                     >
-                      ×
+                      <CloseIcon className="w-3 h-3" />
                     </button>
                   </div>
                 ))}
@@ -406,8 +438,8 @@ export default function AnnouncementsPage() {
                     />
                   </div>
                 ) : (
-                  <div className="w-16 h-16 rounded-xl bg-cream-50 flex items-center justify-center flex-shrink-0 text-brand-600 border border-ink-100 text-xl">
-                    📢
+                  <div className="w-16 h-16 rounded-xl bg-cream-50 flex items-center justify-center flex-shrink-0 text-brand-600 border border-ink-100">
+                    <SpeakerIcon className="w-6 h-6 text-brand" />
                   </div>
                 )}
 
@@ -415,7 +447,8 @@ export default function AnnouncementsPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                     <h3 className="font-bold text-ink-900 text-sm truncate max-w-[200px] sm:max-w-xs">{a.title}</h3>
-                    <span className="pill pill-blue text-[10px] py-0.5 px-2 truncate" title={audLabel(a.audience)}>
+                    <span className="pill pill-blue text-[10px] py-0.5 px-2 truncate flex items-center gap-1" title={audLabel(a.audience)}>
+                      <SpeakerIcon className="w-3 h-3 text-brand-600" />
                       {audLabel(a.audience)}
                     </span>
                   </div>
@@ -434,25 +467,27 @@ export default function AnnouncementsPage() {
                 <div className="flex flex-row gap-1 flex-shrink-0 items-center">
                   <button
                     onClick={() => setActiveDetails(a)}
-                    className="btn btn-secondary py-1 px-2 text-[11px] font-semibold"
+                    className="btn btn-secondary py-1 px-2 text-[11px] font-semibold flex items-center gap-1"
                     type="button"
                     title="عرض كامل التفاصيل"
                   >
-                    🔍 عرض
+                    <EyeIcon className="w-3 h-3 text-ink-600" />
+                    عرض
                   </button>
                   <button
                     onClick={() => startEdit(a)}
-                    className="btn btn-secondary py-1 px-2 text-[11px] font-semibold"
+                    className="btn btn-secondary py-1 px-2 text-[11px] font-semibold flex items-center gap-1"
                     type="button"
                   >
-                    ✎ تعديل
+                    <EditIcon className="w-3 h-3 text-ink-600" />
+                    تعديل
                   </button>
                   <button
                     onClick={() => del(a.id)}
-                    className="btn btn-danger py-1 px-2 text-[11px] font-semibold"
+                    className="btn btn-danger py-1 px-2 text-[11px] font-semibold flex items-center justify-center"
                     type="button"
                   >
-                    🗑️
+                    <TrashIcon className="w-3 h-3" />
                   </button>
                 </div>
               </div>
@@ -477,10 +512,10 @@ export default function AnnouncementsPage() {
                 />
                 <button
                   onClick={() => setActiveDetails(null)}
-                  className="absolute top-3 right-3 bg-black/65 hover:bg-black/85 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold text-lg transition-colors shadow-md leading-none"
+                  className="absolute top-3 right-3 bg-black/65 hover:bg-black/85 text-white rounded-full w-8 h-8 flex items-center justify-center transition-colors shadow-md leading-none"
                   type="button"
                 >
-                  ×
+                  <CloseIcon className="w-4 h-4" />
                 </button>
               </div>
             )}
@@ -492,10 +527,10 @@ export default function AnnouncementsPage() {
                   <h2 className="text-xl font-bold text-ink-900">{activeDetails.title}</h2>
                   <button
                     onClick={() => setActiveDetails(null)}
-                    className="text-ink-400 hover:text-ink-600 font-bold text-2xl"
+                    className="text-ink-400 hover:text-ink-600 flex items-center justify-center"
                     type="button"
                   >
-                    ×
+                    <CloseIcon className="w-5 h-5" />
                   </button>
                 </div>
               )}
@@ -509,8 +544,9 @@ export default function AnnouncementsPage() {
               {/* Metadata */}
               <div className="flex items-center gap-3 text-xs text-ink-500 flex-wrap">
                 <span>📅 {new Date(activeDetails.createdAt).toLocaleString('ar')}</span>
-                <span className="pill pill-blue text-[11px]">
-                  📢 الجمهور: {audLabel(activeDetails.audience)}
+                <span className="pill pill-blue text-[11px] flex items-center gap-1">
+                  <SpeakerIcon className="w-3 h-3 text-brand-600" />
+                  الجمهور: {audLabel(activeDetails.audience)}
                 </span>
               </div>
 
