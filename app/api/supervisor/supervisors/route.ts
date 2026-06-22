@@ -5,7 +5,7 @@ import { getAllSupervisors, createSupervisor, deleteSupervisor, hashPassword, up
 export async function GET(req: NextRequest) {
   try {
     const session = getSession(req);
-    if (!session || session.role !== 'admin') {
+    if (!session) {
       return NextResponse.json({ error: 'غير مصرح بالدخول' }, { status: 401 });
     }
 

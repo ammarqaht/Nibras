@@ -224,7 +224,6 @@ export default function SupervisorsPage() {
                   { key: 'cultural_supervisor', label: 'مشرف ثقافية' },
                   { key: 'groups_supervisor', label: 'مشرف أسر' },
                   { key: 'general_supervisor', label: 'مشرف عام' },
-                  { key: 'finance_supervisor', label: 'مسؤول المالية' },
                   { key: 'media_supervisor', label: 'مسؤول الإعلامية' }
                 ].map((r) => {
                   const active = selectedRoles.includes(r.key);

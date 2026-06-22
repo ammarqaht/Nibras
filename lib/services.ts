@@ -680,6 +680,71 @@ export async function createGroup(name: string, stage: string): Promise<GroupInf
   }
 }
 
+export async function deleteGroup(id: number): Promise<boolean> {
+  if (hasDatabase) {
+    try {
+      const prisma = getPrisma()!;
+      // Set groupId to null for students in this group
+      await prisma.registration.updateMany({
+        where: { groupId: id },
+        data: { groupId: null }
+      });
+
+      // Remove group from supervisors
+      const supervisorsWithGroup = await prisma.supervisor.findMany();
+      for (const sup of supervisorsWithGroup) {
+        if (sup.groupIds) {
+          const ids = sup.groupIds.split(',').map(s => parseInt(s, 10)).filter(num => !isNaN(num));
+          if (ids.includes(id)) {
+            const newIds = ids.filter(gId => gId !== id).join(',');
+            await prisma.supervisor.update({
+              where: { id: sup.id },
+              data: { groupIds: newIds }
+            });
+          }
+        }
+      }
+
+      await prisma.group.delete({ where: { id } });
+      return true;
+    } catch (e) {
+      console.error(e);
+      return false;
+    }
+  } else {
+    const list = await readJsonFile<GroupInfo[]>(FILE_GROUPS, []);
+    const index = list.findIndex(g => g.id === id);
+    if (index === -1) return false;
+    list.splice(index, 1);
+    await writeJsonFile(FILE_GROUPS, list);
+
+    const students = await readJsonFile<any[]>(FILE_REGISTRATIONS, []);
+    let studentsUpdated = false;
+    for (const s of students) {
+      if (s.groupId === id) {
+        s.groupId = null;
+        studentsUpdated = true;
+      }
+    }
+    if (studentsUpdated) await writeJsonFile(FILE_REGISTRATIONS, students);
+
+    const supervisors = await readJsonFile<SupervisorInfo[]>(FILE_SUPERVISORS, []);
+    let supervisorsUpdated = false;
+    for (const s of supervisors) {
+      if (s.groupIds) {
+        const ids = s.groupIds.split(',').map((n: string) => parseInt(n, 10)).filter((num: number) => !isNaN(num));
+        if (ids.includes(id)) {
+          s.groupIds = ids.filter((gId: number) => gId !== id).join(',');
+          supervisorsUpdated = true;
+        }
+      }
+    }
+    if (supervisorsUpdated) await writeJsonFile(FILE_SUPERVISORS, supervisors);
+
+    return true;
+  }
+}
+
 // ==================== ANNOUNCEMENTS SERVICES ====================
 export async function getAnnouncements(): Promise<AnnouncementInfo[]> {
   if (hasDatabase) {

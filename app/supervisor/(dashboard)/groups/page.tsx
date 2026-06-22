@@ -7,6 +7,7 @@ import { useSupervisor } from '@/components/SupervisorShell';
 
 type Group = { id: number; name: string; stage: string };
 type Student = { id: number; studentName: string; stage: string; grade: string; groupId: number | null; registrationStatus: string };
+type Supervisor = { id: number; name: string; groupIds: string };
 
 export default function GroupsPage() {
   const { user } = useSupervisor();
@@ -14,6 +15,7 @@ export default function GroupsPage() {
 
   const [groups, setGroups] = useState<Group[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [supervisors, setSupervisors] = useState<Supervisor[]>([]);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
   const [stage, setStage] = useState<string>(stages[0].key);
@@ -22,15 +24,20 @@ export default function GroupsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [stageFilter, setStageFilter] = useState('');
   const [selectedGroups, setSelectedGroups] = useState<Record<number, number>>({});
+  const [selectedGroupModal, setSelectedGroupModal] = useState<Group | null>(null);
 
   async function load() {
-    const [gr, sr] = await Promise.all([
+    const [gr, sr, su] = await Promise.all([
       fetch('/api/supervisor/groups', { cache: 'no-store' }),
-      fetch('/api/supervisor/students', { cache: 'no-store' })
+      fetch('/api/supervisor/students', { cache: 'no-store' }),
+      fetch('/api/supervisor/supervisors', { cache: 'no-store' })
     ]);
     const grj = await gr.json().catch(() => ({ groups: [] }));
     const srj = await sr.json().catch(() => ({ students: [] }));
+    const suj = await su.json().catch(() => ({ supervisors: [] }));
+    
     setGroups(grj.groups ?? []);
+    setSupervisors(suj.supervisors ?? []);
     const allSt: Student[] = srj.students ?? [];
     setStudents(allSt.filter((s) => s.registrationStatus === 'approved'));
     setLoading(false);
@@ -57,6 +64,20 @@ export default function GroupsPage() {
     pushToast('success', 'تم إنشاء المجموعة');
     setName('');
     load();
+  }
+
+  async function deleteGroup(id: number) {
+    if (!window.confirm('هل أنت متأكد من حذف هذه المجموعة؟ سيتم إزالة جميع الطلاب منها.')) return;
+    setBusy(true);
+    const r = await fetch(`/api/supervisor/groups?id=${id}`, { method: 'DELETE' });
+    setBusy(false);
+    if (!r.ok) {
+      pushToast('error', 'فشل حذف المجموعة');
+    } else {
+      pushToast('success', 'تم حذف المجموعة بنجاح');
+      if (selectedGroupModal?.id === id) setSelectedGroupModal(null);
+      load();
+    }
   }
 
   const unassignedStudents = useMemo(() => {
@@ -347,12 +368,25 @@ export default function GroupsPage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {groups.map((g) => (
-                <div key={g.id} className="rounded-xl border border-ink-200 p-4 flex items-center justify-between">
+                <div key={g.id} 
+                     onClick={() => setSelectedGroupModal(g)}
+                     className="cursor-pointer hover:border-brand-500 transition-colors rounded-xl border border-ink-200 p-4 flex items-center justify-between">
                   <div>
                     <div className="font-semibold text-ink-900">{g.name}</div>
                     <div className="text-xs text-ink-400 mt-0.5">{g.stage}</div>
                   </div>
-                  <span className="pill pill-blue">{countOf(g.id)} طالب</span>
+                  <div className="flex items-center gap-3">
+                    <span className="pill pill-blue">{countOf(g.id)} طالب</span>
+                    {isAdmin && (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); deleteGroup(g.id); }}
+                        className="text-red-500 hover:text-red-700 p-1"
+                        title="حذف المجموعة"
+                      >
+                        🗑️
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -495,6 +529,54 @@ export default function GroupsPage() {
           </>
         )}
       </div>
+
+      {/* نافذة تفاصيل المجموعة */}
+      {selectedGroupModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="p-5 border-b border-ink-200 flex justify-between items-center bg-ink-50">
+              <div>
+                <h3 className="text-lg font-bold text-ink-900">{selectedGroupModal.name}</h3>
+                <p className="text-sm text-ink-500">المرحلة: {selectedGroupModal.stage}</p>
+              </div>
+              <button onClick={() => setSelectedGroupModal(null)} className="text-ink-400 hover:text-ink-900 text-xl font-bold">&times;</button>
+            </div>
+            <div className="p-5 overflow-y-auto flex-1 space-y-6">
+              
+              <div>
+                <h4 className="font-bold text-ink-900 mb-3 flex items-center gap-2">👨‍🏫 المشرفون</h4>
+                {supervisors.filter(sup => sup.groupIds && sup.groupIds.split(',').map(s => parseInt(s, 10)).includes(selectedGroupModal.id)).length > 0 ? (
+                  <ul className="space-y-2">
+                    {supervisors.filter(sup => sup.groupIds && sup.groupIds.split(',').map(s => parseInt(s, 10)).includes(selectedGroupModal.id)).map(sup => (
+                      <li key={sup.id} className="text-sm bg-ink-50 px-3 py-2 rounded-lg text-ink-800 font-medium">{sup.name}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-ink-400">لا يوجد مشرفون معينون لهذه المجموعة.</p>
+                )}
+              </div>
+
+              <div>
+                <h4 className="font-bold text-ink-900 mb-3 flex items-center gap-2">👨‍🎓 الطلاب ({countOf(selectedGroupModal.id)})</h4>
+                {students.filter(s => s.groupId === selectedGroupModal.id).length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {students.filter(s => s.groupId === selectedGroupModal.id).map(st => (
+                      <div key={st.id} className="text-sm border border-ink-200 px-3 py-2 rounded-lg text-ink-800 flex justify-between items-center">
+                        <span className="font-medium">{st.studentName}</span>
+                        <span className="text-xs text-ink-400 bg-ink-100 px-2 py-0.5 rounded">{st.grade}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-ink-400">لا يوجد طلاب في هذه المجموعة.</p>
+                )}
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
