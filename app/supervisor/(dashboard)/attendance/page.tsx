@@ -18,13 +18,7 @@ function today() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-import { useSupervisor } from '@/components/SupervisorShell';
-
 export default function AttendancePage() {
-  const { user } = useSupervisor();
-  const roles = user?.role ? user.role.split(',').map((r) => r.trim()) : [];
-  const canEdit = roles.includes('admin') || roles.includes('secretary') || roles.includes('attendance_supervisor');
-
   const [date, setDate] = useState(today());
   const [students, setStudents] = useState<Student[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -35,7 +29,7 @@ export default function AttendancePage() {
 
   async function loadStatic() {
     const [sr, gr] = await Promise.all([
-      fetch('/api/supervisor/students', { cache: 'no-store' }),
+      fetch('/api/supervisor/students?registrationStatus=approved', { cache: 'no-store' }),
       fetch('/api/supervisor/groups', { cache: 'no-store' })
     ]);
     const sj = await sr.json().catch(() => ({ students: [] }));
@@ -57,7 +51,6 @@ export default function AttendancePage() {
   useEffect(() => { setLoading(true); loadDay(date); }, [date]);
 
   async function mark(registrationId: number, status: string) {
-    if (!canEdit) return;
     setRecords((prev) => ({ ...prev, [registrationId]: status })); // optimistic
     const r = await fetch('/api/supervisor/attendance', {
       method: 'POST',
@@ -73,7 +66,6 @@ export default function AttendancePage() {
 
   async function quickPresent(e: React.FormEvent) {
     e.preventDefault();
-    if (!canEdit) return;
     const mNo = quick.trim();
     if (!mNo) return;
     const r = await fetch('/api/supervisor/attendance', {
@@ -111,116 +103,116 @@ export default function AttendancePage() {
         <p className="text-sm text-ink-500">اختر اليوم وسجّل حضور الطلاب.</p>
       </div>
 
-      <div className="space-y-6">
+      {/* Blur Overlay with "Coming Soon" */}
+      <div className="absolute inset-x-0 bottom-0 top-[72px] bg-cream-50/40 backdrop-blur-[6px] z-10 flex items-center justify-center rounded-3xl min-h-[400px]">
+        <div className="card p-8 sm:p-10 max-w-md text-center bg-white border border-ink-200 shadow-xl pop-in m-6">
+          <div className="w-16 h-16 rounded-full bg-orange-50 text-orange-600 flex items-center justify-center text-3xl mx-auto mb-4">
+            🔒
+          </div>
+          <h2 className="font-display text-2xl text-ink-900 mb-2">قريباً</h2>
+          <p className="text-sm text-ink-500 leading-relaxed">
+            ميزة التحضير اليومي ومسح الـ QR والتحضير السريع قيد التطوير وستكون متاحة للمشرفين قريباً.
+          </p>
+        </div>
+      </div>
+
+      <div className="select-none pointer-events-none opacity-40 space-y-6">
         <div className="card p-4 mb-5 grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div>
-            <label className="label">التاريخ</label>
-            <input type="date" className="field" dir="ltr" value={date} onChange={(e) => setDate(e.target.value)} />
-          </div>
-          <div>
-            <label className="label">المجموعة</label>
-            <select className="field" value={fGroup} onChange={(e) => setFGroup(e.target.value)}>
-              <option value="">كل المجموعات</option>
-              {groups.map((g) => <option key={g.id} value={String(g.id)}>{g.name}</option>)}
-            </select>
-          </div>
-          <div>
-            {canEdit ? (
-              <form onSubmit={quickPresent}>
-                <label className="label">تحضير سريع برقم العضوية</label>
-                <div className="flex gap-2">
-                  <input className="field" dir="ltr" placeholder="1001" value={quick} onChange={(e) => setQuick(e.target.value)} />
-                  <button className="btn btn-primary px-4">حضور</button>
-                </div>
-              </form>
-            ) : (
-              <div className="flex flex-col h-full justify-center">
-                <span className="text-xs text-ink-400 font-semibold block mb-1">وضع العرض فقط</span>
-                <span className="text-xs text-ink-500 bg-cream-100 p-2 rounded-lg border border-ink-200">
-                  ⚠️ التعديل متاح للإدارة ومشرف التحضير فقط
-                </span>
-              </div>
-            )}
-          </div>
+        <div>
+          <label className="label">التاريخ</label>
+          <input type="date" className="field" dir="ltr" value={date} onChange={(e) => setDate(e.target.value)} />
         </div>
-
-        <div className="flex gap-2 mb-4 text-sm">
-          <span className="pill pill-green">حاضر {counts.present}</span>
-          <span className="pill pill-yellow">متأخر {counts.late}</span>
-          <span className="pill pill-red">غائب {counts.absent}</span>
-          <span className="pill pill-gray">بدون {list.length - counts.present - counts.late - counts.absent}</span>
+        <div>
+          <label className="label">المجموعة</label>
+          <select className="field" value={fGroup} onChange={(e) => setFGroup(e.target.value)}>
+            <option value="">كل المجموعات</option>
+            {groups.map((g) => <option key={g.id} value={String(g.id)}>{g.name}</option>)}
+          </select>
         </div>
+        <form onSubmit={quickPresent}>
+          <label className="label">تحضير سريع برقم العضوية</label>
+          <div className="flex gap-2">
+            <input className="field" dir="ltr" placeholder="1001" value={quick} onChange={(e) => setQuick(e.target.value)} />
+            <button className="btn btn-primary px-4">حضور</button>
+          </div>
+        </form>
+      </div>
 
-        <div className="card p-0 overflow-hidden">
-          {loading ? (
-            <p className="text-center py-16 text-ink-400 text-sm">جارٍ التحميل…</p>
-          ) : list.length === 0 ? (
-            <p className="text-center py-16 text-ink-400 text-sm">لا يوجد طلاب.</p>
-          ) : (
-            <>
-              <div className="hidden lg:block overflow-x-auto scroll-soft">
-                <table className="tbl">
-                  <thead>
-                    <tr><th>الطالب</th><th>العضوية</th><th>المرحلة</th><th>الحالة</th></tr>
-                  </thead>
-                  <tbody>
-                    {list.map((s) => (
-                      <tr key={s.id}>
-                        <td className="font-medium">{s.studentName}</td>
-                        <td dir="ltr" className="text-right font-mono text-ink-500">#{s.membershipNo}</td>
-                        <td className="text-ink-500 text-sm">{s.stage} — {s.grade}</td>
-                        <td>
-                          <div className="flex gap-1.5">
-                            {STATUSES.map((st) => {
-                              const active = records[s.id] === st.key;
-                              return (
-                                <button
-                                  key={st.key}
-                                  disabled={!canEdit}
-                                  onClick={() => mark(s.id, st.key)}
-                                  className={`choice py-1 px-3 text-xs ${active ? 'is-active' : ''} ${!canEdit ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                >
-                                  {st.label}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+      <div className="flex gap-2 mb-4 text-sm">
+        <span className="pill pill-green">حاضر {counts.present}</span>
+        <span className="pill pill-yellow">متأخر {counts.late}</span>
+        <span className="pill pill-red">غائب {counts.absent}</span>
+        <span className="pill pill-gray">بدون {list.length - counts.present - counts.late - counts.absent}</span>
+      </div>
 
-              <ul className="lg:hidden divide-y divide-ink-200">
-                {list.map((s) => (
-                  <li key={s.id} className="p-4">
-                    <div className="flex items-baseline justify-between gap-2 mb-2.5">
-                      <span className="font-semibold text-ink-900 truncate">{s.studentName}</span>
-                      <span dir="ltr" className="font-mono text-xs text-ink-400 shrink-0">#{s.membershipNo}</span>
-                    </div>
-                    <div className="text-xs text-ink-400 mb-2.5">{s.stage} — {s.grade}</div>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {STATUSES.map((st) => {
-                        const active = records[s.id] === st.key;
-                        return (
-                          <button
-                            key={st.key}
-                            disabled={!canEdit}
-                            onClick={() => mark(s.id, st.key)}
-                            className={`choice py-2 text-xs ${active ? 'is-active' : ''} ${!canEdit ? 'opacity-60 cursor-not-allowed' : ''}`}
-                          >
-                            {st.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </div>
+      <div className="card p-0 overflow-hidden">
+        {loading ? (
+          <p className="text-center py-16 text-ink-400 text-sm">جارٍ التحميل…</p>
+        ) : list.length === 0 ? (
+          <p className="text-center py-16 text-ink-400 text-sm">لا يوجد طلاب.</p>
+        ) : (
+          <>
+            <div className="hidden lg:block overflow-x-auto scroll-soft">
+              <table className="tbl">
+                <thead>
+                  <tr><th>الطالب</th><th>العضوية</th><th>المرحلة</th><th>الحالة</th></tr>
+                </thead>
+                <tbody>
+                  {list.map((s) => (
+                    <tr key={s.id}>
+                      <td className="font-medium">{s.studentName}</td>
+                      <td dir="ltr" className="text-right font-mono text-ink-500">#{s.membershipNo}</td>
+                      <td className="text-ink-500 text-sm">{s.stage} — {s.grade}</td>
+                      <td>
+                        <div className="flex gap-1.5">
+                          {STATUSES.map((st) => {
+                            const active = records[s.id] === st.key;
+                            return (
+                              <button
+                                key={st.key}
+                                onClick={() => mark(s.id, st.key)}
+                                className={`choice py-1 px-3 text-xs ${active ? 'is-active' : ''}`}
+                              >
+                                {st.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <ul className="lg:hidden divide-y divide-ink-200">
+              {list.map((s) => (
+                <li key={s.id} className="p-4">
+                  <div className="flex items-baseline justify-between gap-2 mb-2.5">
+                    <span className="font-semibold text-ink-900 truncate">{s.studentName}</span>
+                    <span dir="ltr" className="font-mono text-xs text-ink-400 shrink-0">#{s.membershipNo}</span>
+                  </div>
+                  <div className="text-xs text-ink-400 mb-2.5">{s.stage} — {s.grade}</div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {STATUSES.map((st) => {
+                      const active = records[s.id] === st.key;
+                      return (
+                        <button
+                          key={st.key}
+                          onClick={() => mark(s.id, st.key)}
+                          className={`choice py-2 text-xs ${active ? 'is-active' : ''}`}
+                        >
+                          {st.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
       </div>
     </div>
   );

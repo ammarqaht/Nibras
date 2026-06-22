@@ -38,7 +38,7 @@ export default function PointsPage() {
 
   async function loadAll() {
     const [sr, gr, pr] = await Promise.all([
-      fetch('/api/supervisor/students', { cache: 'no-store' }),
+      fetch('/api/supervisor/students?registrationStatus=approved', { cache: 'no-store' }),
       fetch('/api/supervisor/groups', { cache: 'no-store' }),
       fetch('/api/supervisor/points', { cache: 'no-store' })
     ]);

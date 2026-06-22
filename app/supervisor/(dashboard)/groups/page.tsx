@@ -26,7 +26,7 @@ export default function GroupsPage() {
   async function load() {
     const [gr, sr] = await Promise.all([
       fetch('/api/supervisor/groups', { cache: 'no-store' }),
-      fetch('/api/supervisor/students', { cache: 'no-store' })
+      fetch('/api/supervisor/students?registrationStatus=approved', { cache: 'no-store' })
     ]);
     setGroups((await gr.json().catch(() => ({ groups: [] }))).groups ?? []);
     setStudents((await sr.json().catch(() => ({ students: [] }))).students ?? []);

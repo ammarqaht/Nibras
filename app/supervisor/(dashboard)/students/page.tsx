@@ -112,6 +112,7 @@ export default function StudentsPage() {
   // filters
   const [search, setSearch] = useState('');
   const [fStages, setFStages] = useState<string[]>([]);
+  const [fGrades, setFGrades] = useState<string[]>([]);
   const [fGroups, setFGroups] = useState<string[]>([]);
   const [fNeighborhoods, setFNeighborhoods] = useState<string[]>([]);
 
@@ -151,7 +152,7 @@ export default function StudentsPage() {
 
   async function load() {
     const [sr, gr] = await Promise.all([
-      fetch('/api/supervisor/students', { cache: 'no-store' }),
+      fetch('/api/supervisor/students?registrationStatus=approved', { cache: 'no-store' }),
       fetch('/api/supervisor/groups', { cache: 'no-store' })
     ]);
     const sj = await sr.json().catch(() => ({ students: [] }));
@@ -165,18 +166,19 @@ export default function StudentsPage() {
     load();
   }, []);
 
-  const approvedStudents = useMemo(() => {
-    return students.filter((s) => s.registrationStatus === 'approved');
+  const neighborhoods = useMemo(() => {
+    const list = students.map((s) => s.neighborhood?.trim()).filter(Boolean);
+    return Array.from(new Set(list));
   }, [students]);
 
-  const neighborhoods = useMemo(() => {
-    const list = approvedStudents.map((s) => s.neighborhood?.trim()).filter(Boolean);
+  const grades = useMemo(() => {
+    const list = students.map((s) => s.grade?.trim()).filter(Boolean);
     return Array.from(new Set(list));
-  }, [approvedStudents]);
+  }, [students]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return approvedStudents.filter((s) => {
+    return students.filter((s) => {
       if (q) {
         const hit =
           s.studentName.toLowerCase().includes(q) ||
@@ -187,11 +189,12 @@ export default function StudentsPage() {
         if (!hit) return false;
       }
       if (fStages.length > 0 && !fStages.includes(s.stage)) return false;
+      if (fGrades.length > 0 && !fGrades.includes(s.grade)) return false;
       if (fGroups.length > 0 && !fGroups.includes(String(s.groupId))) return false;
       if (fNeighborhoods.length > 0 && !fNeighborhoods.includes(s.neighborhood)) return false;
       return true;
     });
-  }, [approvedStudents, search, fStages, fGroups, fNeighborhoods]);
+  }, [students, search, fStages, fGrades, fGroups, fNeighborhoods]);
 
   // optimistic local update after a PUT
   function applyUpdate(updated: Student) {
@@ -231,7 +234,7 @@ export default function StudentsPage() {
       <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-ink-900 mb-1">سجل الطلاب</h1>
-          <p className="text-sm text-ink-500">{filtered.length} طالب من أصل {approvedStudents.length}</p>
+          <p className="text-sm text-ink-500">{filtered.length} طالب من أصل {students.length}</p>
         </div>
         <div className="flex gap-2 items-center relative">
           <button
@@ -364,7 +367,7 @@ export default function StudentsPage() {
 
       {/* Filters */}
       <div className="card p-4 mb-5">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           <input
             className="field lg:col-span-1"
             placeholder="بحث بالاسم / الهوية / الجوال / العضوية…"
@@ -376,6 +379,12 @@ export default function StudentsPage() {
             options={stages.map((s) => ({ value: s.key, label: s.label }))}
             selected={fStages}
             onChange={setFStages}
+          />
+          <MultiSelectDropdown
+            label="تصفية الصفوف"
+            options={grades.map((g) => ({ value: g, label: g }))}
+            selected={fGrades}
+            onChange={setFGrades}
           />
           <MultiSelectDropdown
             label="تصفية المجموعات"
@@ -390,6 +399,23 @@ export default function StudentsPage() {
             onChange={setFNeighborhoods}
           />
         </div>
+
+        {(search || fStages.length > 0 || fGrades.length > 0 || fGroups.length > 0 || fNeighborhoods.length > 0) && (
+          <div className="mt-3 pt-3 border-t border-ink-100 flex justify-end">
+            <button
+              onClick={() => {
+                setSearch('');
+                setFStages([]);
+                setFGrades([]);
+                setFGroups([]);
+                setFNeighborhoods([]);
+              }}
+              className="btn btn-ghost text-xs text-ink-500 hover:text-ink-900 flex items-center gap-1.5"
+            >
+              ✕ إلغاء التصفية
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Table */}
