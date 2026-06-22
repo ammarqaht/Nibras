@@ -41,6 +41,65 @@ function regPill(status: string) {
   return { cls: 'pill-yellow', label: 'قيد المراجعة' };
 }
 
+function MultiSelectDropdown({
+  label,
+  options,
+  selected,
+  onChange,
+}: {
+  label: string;
+  options: { value: string; label: string }[];
+  selected: string[];
+  onChange: (val: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const toggle = (val: string) => {
+    if (selected.includes(val)) {
+      onChange(selected.filter((s) => s !== val));
+    } else {
+      onChange([...selected, val]);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="field flex items-center justify-between gap-2 text-right w-full bg-white select-none"
+      >
+        <span>{selected.length > 0 ? `${label} (${selected.length})` : label}</span>
+        <span className="text-ink-400 text-xs">▼</span>
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 mt-1 w-full min-w-[200px] max-h-60 overflow-y-auto bg-white border border-ink-200 rounded-xl shadow-xl z-50 p-2 space-y-0.5 scroll-soft">
+            {options.length === 0 ? (
+              <p className="text-center py-4 text-ink-400 text-xs">لا توجد خيارات</p>
+            ) : (
+              options.map((opt) => (
+                <label
+                  key={opt.value}
+                  className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-cream-50 cursor-pointer text-sm select-none"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(opt.value)}
+                    onChange={() => toggle(opt.value)}
+                    className="rounded border-ink-300 text-primary-600 focus:ring-primary-500 w-4 h-4"
+                  />
+                  <span className="text-ink-800">{opt.label}</span>
+                </label>
+              ))
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function StudentsPage() {
   const { user } = useSupervisor();
   const isAdmin = user?.role === 'admin';
@@ -52,11 +111,12 @@ export default function StudentsPage() {
 
   // filters
   const [search, setSearch] = useState('');
-  const [fStage, setFStage] = useState('');
-  const [fPay, setFPay] = useState('');
-  const [fGroup, setFGroup] = useState('');
+  const [fStages, setFStages] = useState<string[]>([]);
+  const [fGroups, setFGroups] = useState<string[]>([]);
+  const [fNeighborhoods, setFNeighborhoods] = useState<string[]>([]);
 
   const [visibleCols, setVisibleCols] = useState({
+    index: true,
     studentName: true,
     guardianPhone: true,
     membershipNo: true,
@@ -109,6 +169,11 @@ export default function StudentsPage() {
     return students.filter((s) => s.registrationStatus === 'approved');
   }, [students]);
 
+  const neighborhoods = useMemo(() => {
+    const list = approvedStudents.map((s) => s.neighborhood?.trim()).filter(Boolean);
+    return Array.from(new Set(list));
+  }, [approvedStudents]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return approvedStudents.filter((s) => {
@@ -121,12 +186,12 @@ export default function StudentsPage() {
           String(s.membershipNo).includes(q);
         if (!hit) return false;
       }
-      if (fStage && s.stage !== fStage) return false;
-      if (fPay && s.paymentStatus !== fPay) return false;
-      if (fGroup && String(s.groupId) !== fGroup) return false;
+      if (fStages.length > 0 && !fStages.includes(s.stage)) return false;
+      if (fGroups.length > 0 && !fGroups.includes(String(s.groupId))) return false;
+      if (fNeighborhoods.length > 0 && !fNeighborhoods.includes(s.neighborhood)) return false;
       return true;
     });
-  }, [approvedStudents, search, fStage, fPay, fGroup]);
+  }, [approvedStudents, search, fStages, fGroups, fNeighborhoods]);
 
   // optimistic local update after a PUT
   function applyUpdate(updated: Student) {
@@ -180,6 +245,15 @@ export default function StudentsPage() {
             <div className="absolute left-0 top-full mt-2 w-64 bg-white border border-ink-200 rounded-xl shadow-xl z-50 p-4 font-sans text-right" dir="rtl">
               <h3 className="font-bold text-ink-900 mb-3 text-sm border-b border-ink-100 pb-2">تخصيص الأعمدة المعروضة</h3>
               <div className="space-y-2 max-h-60 overflow-y-auto scroll-soft">
+                <label className="flex items-center gap-2.5 text-sm text-ink-700 cursor-pointer hover:bg-cream-50 p-1.5 rounded-lg select-none">
+                  <input
+                    type="checkbox"
+                    checked={visibleCols.index}
+                    onChange={(e) => setVisibleCol('index', e.target.checked)}
+                    className="rounded border-ink-300 text-primary-600 focus:ring-primary-500 w-4 h-4"
+                  />
+                  <span>الرقم التسلسلي</span>
+                </label>
                 <label className="flex items-center gap-2.5 text-sm text-ink-700 cursor-pointer hover:bg-cream-50 p-1.5 rounded-lg select-none">
                   <input
                     type="checkbox"
@@ -297,19 +371,24 @@ export default function StudentsPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          <select className="field" value={fStage} onChange={(e) => setFStage(e.target.value)}>
-            <option value="">كل المراحل</option>
-            {stages.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
-          </select>
-          <select className="field" value={fPay} onChange={(e) => setFPay(e.target.value)}>
-            <option value="">كل حالات الدفع</option>
-            <option value="paid">مدفوع</option>
-            <option value="unpaid">غير مدفوع</option>
-          </select>
-          <select className="field" value={fGroup} onChange={(e) => setFGroup(e.target.value)}>
-            <option value="">كل المجموعات</option>
-            {groups.map((g) => <option key={g.id} value={String(g.id)}>{g.name}</option>)}
-          </select>
+          <MultiSelectDropdown
+            label="تصفية المراحل"
+            options={stages.map((s) => ({ value: s.key, label: s.label }))}
+            selected={fStages}
+            onChange={setFStages}
+          />
+          <MultiSelectDropdown
+            label="تصفية المجموعات"
+            options={groups.map((g) => ({ value: String(g.id), label: g.name }))}
+            selected={fGroups}
+            onChange={setFGroups}
+          />
+          <MultiSelectDropdown
+            label="تصفية الأحياء"
+            options={neighborhoods.map((n) => ({ value: n, label: n }))}
+            selected={fNeighborhoods}
+            onChange={setFNeighborhoods}
+          />
         </div>
       </div>
 
@@ -326,6 +405,7 @@ export default function StudentsPage() {
               <table className="tbl">
                 <thead>
                   <tr>
+                    {visibleCols.index && <th>الرقم</th>}
                     {visibleCols.studentName && <th>الطالب</th>}
                     {visibleCols.membershipNo && <th>العضوية</th>}
                     {visibleCols.guardianPhone && <th>رقم ولي الأمر</th>}
@@ -340,11 +420,14 @@ export default function StudentsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((s) => {
+                  {filtered.map((s, idx) => {
                     const pp = paymentPill(s);
                     const groupName = groups.find((g) => g.id === s.groupId)?.name || 'بدون مجموعة';
                     return (
                       <tr key={s.id} className="cursor-pointer" onClick={() => setSelected(s)}>
+                        {visibleCols.index && (
+                          <td className="text-ink-500 text-sm font-mono">{idx + 1}</td>
+                        )}
                         {visibleCols.studentName && (
                           <td className="font-medium">
                             {s.studentName}
@@ -397,7 +480,7 @@ export default function StudentsPage() {
 
             {/* mobile: tappable cards (no horizontal scroll) */}
             <ul className="lg:hidden divide-y divide-ink-200">
-              {filtered.map((s) => {
+              {filtered.map((s, idx) => {
                 const pp = paymentPill(s);
                 const groupName = groups.find((g) => g.id === s.groupId)?.name || 'بدون مجموعة';
                 return (
@@ -407,6 +490,11 @@ export default function StudentsPage() {
                     className="py-3 px-4 flex items-center gap-3 active:bg-cream-100 cursor-pointer text-right"
                     dir="rtl"
                   >
+                    {visibleCols.index && (
+                      <div className="text-ink-400 font-mono text-sm shrink-0 min-w-[1.5rem] text-center">
+                        {idx + 1}
+                      </div>
+                    )}
                     <div className="min-w-0 flex-1 space-y-1">
                       {visibleCols.studentName && (
                         <div className="font-semibold text-ink-900 truncate">
