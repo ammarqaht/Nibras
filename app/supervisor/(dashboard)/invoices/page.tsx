@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { pushToast } from '@/components/Toast';
 import { useSupervisor } from '@/components/SupervisorShell';
+import { compressImage } from '@/lib/imageUtils';
 import { DEPARTMENTS, CATEGORIES, departmentLabel, categoryLabel, statusLabel } from '@/lib/finance';
 
 type Item = { name: string; qty: number; price: number };
@@ -38,31 +39,6 @@ function statusPill(s: string) {
   return 'pill-yellow';
 }
 
-/* client-side image compression (same approach as the public registration page) */
-function compressImage(file: File, maxDim = 1400, quality = 0.7): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        let { width, height } = img;
-        if (width > height) {
-          if (width > maxDim) { height = Math.round((height * maxDim) / width); width = maxDim; }
-        } else if (height > maxDim) { width = Math.round((width * maxDim) / height); height = maxDim; }
-        const canvas = document.createElement('canvas');
-        canvas.width = width; canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return resolve(e.target?.result as string);
-        ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', quality));
-      };
-      img.onerror = reject;
-      img.src = e.target?.result as string;
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
 
 export default function InvoicesPage() {
   const { user } = useSupervisor();

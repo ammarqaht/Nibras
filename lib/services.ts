@@ -113,6 +113,15 @@ export type SettingInfo = {
   value: string; // JSON string
 };
 
+export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
+  attendance_supervisor: ['attendance', 'students'],
+  social_supervisor: ['points', 'students', 'groups'],
+  cultural_supervisor: ['tasks', 'students', 'groups', 'schedule'],
+  groups_supervisor: ['groups', 'students', 'points', 'attendance', 'tasks'],
+  general_supervisor: ['students', 'attendance', 'points', 'tasks', 'schedule', 'groups', 'announcements'],
+  media_supervisor: ['announcements', 'schedule']
+};
+
 export type ScheduleInfo = {
   id: string;
   title: string;

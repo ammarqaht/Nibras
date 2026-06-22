@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { pushToast } from '@/components/Toast';
 import { useSupervisor } from '@/components/SupervisorShell';
+import { compressImage } from '@/lib/imageUtils';
 
 type Student = { id: number; membershipNo: number; studentName: string; stage: string; grade: string; registrationStatus: string; paymentStatus: string };
 type SupervisorUser = { id: number; name: string; email: string };
@@ -39,31 +40,6 @@ type Submission = {
   taskAssignedAdmins: string[];
 };
 
-/* Client-side image compression */
-function compressImage(file: File, maxDim = 1200, quality = 0.7): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        let { width, height } = img;
-        if (width > height) {
-          if (width > maxDim) { height = Math.round((height * maxDim) / width); width = maxDim; }
-        } else if (height > maxDim) { width = Math.round((width * maxDim) / height); height = maxDim; }
-        const canvas = document.createElement('canvas');
-        canvas.width = width; canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return resolve(e.target?.result as string);
-        ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', quality));
-      };
-      img.onerror = reject;
-      img.src = e.target?.result as string;
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
 
 function statusLabel(status: string) {
   if (status === 'approved') return 'مقبولة ✓';
@@ -456,7 +432,7 @@ export default function TasksPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      const base64 = await compressImage(file);
+      const base64 = await compressImage(file, 200);
       if (isEdit && editTask) {
         setEditTask({ ...editTask, imageUrl: base64 });
       } else {

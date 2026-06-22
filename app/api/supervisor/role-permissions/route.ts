@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { getSettings, saveSetting, getAllSupervisors } from '@/lib/services';
+import { getSettings, saveSetting, getAllSupervisors, DEFAULT_ROLE_PERMISSIONS } from '@/lib/services';
 
 export async function GET(req: NextRequest) {
   try {
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     }
 
     const settings = await getSettings();
-    let map = {};
+    let map = DEFAULT_ROLE_PERMISSIONS;
     if (settings.role_permissions) {
       try {
         map = JSON.parse(settings.role_permissions);

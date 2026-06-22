@@ -58,18 +58,23 @@ export default function SupervisorsPage() {
   const [selectedRoles, setSelectedRoles] = useState<string[]>(['general_supervisor']);
   const [groupIds, setGroupIds] = useState<number[]>([]);
   const [customPermissions, setCustomPermissions] = useState<string[]>([]);
+  const [rolePermissionsMap, setRolePermissionsMap] = useState<Record<string, string[]>>({});
   const [editingId, setEditingId] = useState<number | null>(null);
   const [isEditingPrimary, setIsEditingPrimary] = useState(false);
   const [activeTab, setActiveTab] = useState<'supervisors' | 'roles'>('supervisors');
 
   async function load() {
-    const [r, gr] = await Promise.all([
+    const [r, gr, pr] = await Promise.all([
       fetch('/api/supervisor/supervisors', { cache: 'no-store' }),
-      fetch('/api/supervisor/groups', { cache: 'no-store' })
+      fetch('/api/supervisor/groups', { cache: 'no-store' }),
+      fetch('/api/supervisor/role-permissions', { cache: 'no-store' })
     ]);
     if (r.status === 401) { setLoading(false); return; }
     setList((await r.json().catch(() => ({ supervisors: [] }))).supervisors ?? []);
     setGroups((await gr.json().catch(() => ({ groups: [] }))).groups ?? []);
+    
+    const prJson = await pr.json().catch(() => ({ permissions: {} }));
+    setRolePermissionsMap(prJson.permissions || {});
     setLoading(false);
   }
   useEffect(() => { load(); }, []);
@@ -314,16 +319,31 @@ export default function SupervisorsPage() {
               <label className="label font-semibold text-ink-900">صلاحيات مخصصة واستثنائية</label>
               <p className="text-xs text-ink-500 mb-3">حدد الصفحات الإضافية التي ترغب بمنحها لهذا المشرف بشكل استثنائي، والتي قد لا تكون متاحة في دوره الافتراضي.</p>
               <div className="flex flex-wrap gap-2">
-                {MODULES.map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => setCustomPermissions(prev => prev.includes(m.id) ? prev.filter(x => x !== m.id) : [...prev, m.id])}
-                    className={`choice py-1.5 px-3 text-xs ${customPermissions.includes(m.id) ? 'is-active bg-brand hover:bg-brand-600 text-white border-brand' : ''}`}
-                  >
-                    {m.label}
-                  </button>
-                ))}
+                {MODULES.map((m) => {
+                  let isRoleGranted = false;
+                  selectedRoles.forEach(r => {
+                    if (rolePermissionsMap[r]?.includes(m.id)) {
+                      isRoleGranted = true;
+                    }
+                  });
+                  const isCustomGranted = customPermissions.includes(m.id);
+                  const isActive = isRoleGranted || isCustomGranted;
+
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => {
+                        if (isRoleGranted) return; // Already granted by role
+                        setCustomPermissions(prev => prev.includes(m.id) ? prev.filter(x => x !== m.id) : [...prev, m.id])
+                      }}
+                      className={`choice py-1.5 px-3 text-xs ${isActive ? 'is-active bg-brand hover:bg-brand-600 text-white border-brand' : ''} ${isRoleGranted ? 'opacity-80 cursor-default' : ''}`}
+                      title={isRoleGranted ? 'ممنوحة مسبقاً من خلال الدور الوظيفي' : 'تخصيص بشكل استثنائي'}
+                    >
+                      {m.label} {isRoleGranted && <span className="mr-1 text-[10px] opacity-75">✓</span>}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}

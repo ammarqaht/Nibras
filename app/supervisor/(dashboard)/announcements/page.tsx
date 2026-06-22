@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { pushToast } from '@/components/Toast';
+import { compressImage } from '@/lib/imageUtils';
 
 type Announcement = {
   id: number;
@@ -21,46 +22,6 @@ const STAGES = [
   { key: 'stage:ثانوي', label: 'مرحلة الثانوي' }
 ];
 
-// Helper function to compress base64 images client-side before sending
-const compressImage = (base64Str: string, maxWidth = 800, maxHeight = 800, quality = 0.75): Promise<string> => {
-  return new Promise((resolve) => {
-    if (!base64Str || !base64Str.startsWith('data:image/')) {
-      resolve(base64Str);
-      return;
-    }
-    const img = new Image();
-    img.src = base64Str;
-    img.onload = () => {
-      let width = img.width;
-      let height = img.height;
-
-      if (width > maxWidth || height > maxHeight) {
-        if (width > height) {
-          height = Math.round((height * maxWidth) / width);
-          width = maxWidth;
-        } else {
-          width = Math.round((width * maxHeight) / height);
-          height = maxHeight;
-        }
-      }
-
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', quality));
-      } else {
-        resolve(base64Str);
-      }
-    };
-    img.onerror = () => {
-      resolve(base64Str);
-    };
-  });
-};
 
 export default function AnnouncementsPage() {
   const [items, setItems] = useState<Announcement[]>([]);
@@ -96,27 +57,27 @@ export default function AnnouncementsPage() {
     })();
   }, []);
 
-  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCoverChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const compressed = await compressImage(reader.result as string, 900, 900, 0.8);
+    try {
+      const compressed = await compressImage(file, 200);
       setCoverImage(compressed);
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const handleContentImagesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const compressed = await compressImage(reader.result as string, 800, 800, 0.7);
+    Array.from(files).forEach(async (file) => {
+      try {
+        const compressed = await compressImage(file, 200);
         setContentImages((prev) => [...prev, compressed]);
-      };
-      reader.readAsDataURL(file);
+      } catch (err) {
+        console.error(err);
+      }
     });
   };
 

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { pushToast } from '@/components/Toast';
 import { useSupervisor } from '@/components/SupervisorShell';
+import { compressImage } from '@/lib/imageUtils';
 
 type Student = {
   id: number;
@@ -33,31 +34,6 @@ function isReview(s: Student) {
   return s.paymentStatus !== 'paid' && s.paymentType === 'now' && !!s.paymentReceipt;
 }
 
-/* client-side image compression */
-function compressImage(file: File, maxDim = 1200, quality = 0.7): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        let { width, height } = img;
-        if (width > height) {
-          if (width > maxDim) { height = Math.round((height * maxDim) / width); width = maxDim; }
-        } else if (height > maxDim) { width = Math.round((width * maxDim) / height); height = maxDim; }
-        const canvas = document.createElement('canvas');
-        canvas.width = width; canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return resolve(e.target?.result as string);
-        ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', quality));
-      };
-      img.onerror = reject;
-      img.src = e.target?.result as string;
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
 
 export default function PaymentsPage() {
   const { user } = useSupervisor();
@@ -395,7 +371,7 @@ function StudentDetailsModal({
 
     try {
       setUploadingReceipt(true);
-      const base64 = await compressImage(file, 1200, 0.7);
+      const base64 = await compressImage(file, 200);
       
       const r = await fetch('/api/supervisor/students', {
         method: 'PUT',
