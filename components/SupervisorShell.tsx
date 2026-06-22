@@ -157,9 +157,9 @@ export default function SupervisorShell({ children }: { children: React.ReactNod
       <ToastHost />
       <div className="min-h-screen flex flex-col" style={{ background: 'var(--bg-soft)' }}>
         <header className="bg-white border-b border-ink-200 sticky top-0 z-40">
-          <div className="px-4 md:px-8 py-3.5 flex items-center justify-between gap-4 max-w-7xl mx-auto w-full">
+          <div className="px-4 md:px-8 py-3.5 flex items-center justify-between gap-4 max-w-[90rem] mx-auto w-full">
             {/* right (RTL): hamburger on mobile, logo */}
-            <div className="flex items-center gap-3 lg:gap-8 min-w-0">
+            <div className="flex items-center gap-3 lg:gap-6 min-w-0 flex-1">
               <button
                 onClick={() => setMenuOpen((v) => !v)}
                 aria-label="القائمة"
@@ -168,13 +168,15 @@ export default function SupervisorShell({ children }: { children: React.ReactNod
               >
                 {menuOpen ? <CloseIcon /> : <MenuIcon />}
               </button>
-              <Brand href="/supervisor" variant="lockup" imgClassName="h-9 w-auto" />
-              <nav className="hidden lg:flex items-center gap-1">
+              <div className="shrink-0">
+                <Brand href="/supervisor" variant="lockup" imgClassName="h-9 w-auto" />
+              </div>
+              <nav className="hidden lg:flex items-center gap-1 overflow-x-auto scroll-soft no-scrollbar flex-1 ms-2">
                 {links.map((l) => (
                   <Link
                     key={l.href}
                     href={l.href}
-                    className={`px-3.5 py-2 rounded-lg text-sm transition-all ${
+                    className={`whitespace-nowrap shrink-0 px-3 py-2 rounded-lg text-sm transition-all ${
                       isActive(l.href)
                         ? 'bg-brand/10 text-brand-600 font-semibold'
                         : 'text-ink-500 hover:text-ink-900 hover:bg-cream-100'
@@ -203,7 +205,7 @@ export default function SupervisorShell({ children }: { children: React.ReactNod
           {/* mobile dropdown menu */}
           {menuOpen && (
             <div className="lg:hidden border-t border-ink-200 bg-white fade-in">
-              <div className="px-3 py-3 flex flex-col gap-1 max-w-7xl mx-auto">
+              <div className="px-3 py-3 flex flex-col gap-1 max-w-[90rem] mx-auto">
                 <div className="px-3 pb-2 mb-1 border-b border-ink-100">
                   <div className="text-sm font-semibold text-ink-900">{user?.name}</div>
                   <div className="text-xs text-ink-400">{getRoleLabel(user?.role ?? '')}</div>
@@ -231,7 +233,7 @@ export default function SupervisorShell({ children }: { children: React.ReactNod
           )}
         </header>
 
-        <main className="flex-1 px-4 md:px-8 py-6 md:py-7 max-w-7xl mx-auto w-full">
+        <main className="flex-1 px-4 md:px-8 py-6 md:py-7 max-w-[90rem] mx-auto w-full">
           {hasAccess ? (
             children
           ) : (
