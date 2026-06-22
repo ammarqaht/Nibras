@@ -6,11 +6,11 @@
 // Department keys mirror the supervisor "role" keys used on the supervisors page,
 // so a supervisor files an invoice under one of the roles they already hold.
 export const DEPARTMENTS = [
-  { key: 'cultural_head', label: 'الثقافية' },
-  { key: 'sports_head', label: 'الرياضية' },
-  { key: 'media_head', label: 'الإعلامية' },
+  { key: 'cultural_supervisor', label: 'الثقافية' },
+  { key: 'social_supervisor', label: 'الاجتماعية' },
   { key: 'attendance_supervisor', label: 'التحضير' },
-  { key: 'group_supervisor', label: 'الأسر' }
+  { key: 'groups_supervisor', label: 'الأسر' },
+  { key: 'general_supervisor', label: 'العام' }
 ] as const;
 
 export const departmentLabel = (key: string) =>
@@ -19,9 +19,7 @@ export const departmentLabel = (key: string) =>
 // The departments a supervisor can file invoices under = the department-roles
 // in their (comma-separated) role string. admin/finance file under any.
 export function supervisorDepartments(role: string): string[] {
-  const roles = (role || '').split(',').map((r) => r.trim());
-  const isGlobal = roles.some((r) => ['admin', 'secretary', 'finance_head', 'finance'].includes(r));
-  if (isGlobal) return [];
+  if (!role || role === 'admin' || role === 'finance') return [];
   const keys = DEPARTMENTS.map((d) => d.key as string);
   return parseDepartments(role).filter((r) => keys.includes(r));
 }

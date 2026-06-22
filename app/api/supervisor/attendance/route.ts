@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { getAttendance, logAttendance, getStudents, getSupervisorByEmail } from '@/lib/services';
+import { getAttendance, logAttendance, getStudents } from '@/lib/services';
 
 export async function GET(req: NextRequest) {
   try {
@@ -38,17 +38,6 @@ export async function POST(req: NextRequest) {
     const session = getSession(req);
     if (!session) {
       return NextResponse.json({ error: 'غير مصرح بالدخول' }, { status: 401 });
-    }
-
-    const supervisor = await getSupervisorByEmail(session.email);
-    if (!supervisor) {
-      return NextResponse.json({ error: 'حساب غير موجود' }, { status: 401 });
-    }
-
-    const roles = supervisor.role.split(',').map(r => r.trim());
-    const canRecord = roles.some(r => ['admin', 'secretary', 'attendance_supervisor'].includes(r));
-    if (!canRecord) {
-      return NextResponse.json({ error: 'غير مصرح لك بتسجيل التحضير. هذه الصلاحية لمشرف التحضير والإدارة فقط.' }, { status: 403 });
     }
 
     const body = await req.json();

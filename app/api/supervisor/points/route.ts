@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { getPoints, addPointsRecord, getSupervisorByEmail } from '@/lib/services';
+import { getPoints, addPointsRecord } from '@/lib/services';
 
 export async function GET(req: NextRequest) {
   try {
@@ -33,13 +33,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'غير مصرح بالدخول' }, { status: 401 });
     }
 
-    const supervisor = await getSupervisorByEmail(session.email);
-    if (!supervisor) {
-      return NextResponse.json({ error: 'حساب غير موجود' }, { status: 401 });
-    }
-
-    const roles = supervisor.role.split(',').map(r => r.trim());
-
     const body = await req.json();
     const { registrationId, groupId, delta, reason, category } = body;
 
@@ -52,31 +45,6 @@ export async function POST(req: NextRequest) {
       const gId = parseInt(groupId, 10);
       if (isNaN(gId)) {
         return NextResponse.json({ error: 'رقم المجموعة غير صحيح' }, { status: 400 });
-      }
-
-      // Check permission: only admin, secretary, cultural_head, sports_head, or stage_head matching the group stage can award group points
-      const isGlobalGroupPointManager = roles.some(r =>
-        ['admin', 'secretary', 'cultural_head', 'sports_head'].includes(r)
-      );
-
-      const { getGroups } = await import('@/lib/services');
-      const allGroups = await getGroups();
-      const group = allGroups.find(g => g.id === gId);
-      if (!group) {
-        return NextResponse.json({ error: 'المجموعة غير موجودة' }, { status: 400 });
-      }
-
-      let isAllowed = isGlobalGroupPointManager;
-      if (!isAllowed) {
-        if (group.stage === 'ابتدائي' && roles.includes('stage_head_elementary')) isAllowed = true;
-        if (group.stage === 'متوسط' && roles.includes('stage_head_middle')) isAllowed = true;
-        if (group.stage === 'ثانوي' && roles.includes('stage_head_high')) isAllowed = true;
-      }
-
-      if (!isAllowed) {
-        return NextResponse.json({
-          error: 'غير مصرح لك برصد نقاط للمجموعة. المتاح للمدير، أمين النادي، مسؤول الثقافية/الرياضية، ومسؤول المرحلة المطابقة فقط.'
-        }, { status: 403 });
       }
 
       const { getStudents } = await import('@/lib/services');

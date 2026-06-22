@@ -135,7 +135,7 @@ export default function TasksPage() {
   async function loadData() {
     try {
       const [studentsRes, supervisorsRes, tasksRes, submissionsRes] = await Promise.all([
-        fetch('/api/supervisor/students?registrationStatus=approved', { cache: 'no-store' }),
+        fetch('/api/supervisor/students', { cache: 'no-store' }),
         fetch('/api/supervisor/tasks/supervisors', { cache: 'no-store' }),
         fetch('/api/supervisor/tasks', { cache: 'no-store' }),
         fetch('/api/supervisor/submissions', { cache: 'no-store' })

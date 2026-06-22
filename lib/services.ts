@@ -102,6 +102,7 @@ export type AnnouncementInfo = {
   title: string;
   body: string;
   audience: string;
+  imageUrl?: string | null;
   createdAt: string;
 };
 
@@ -685,11 +686,12 @@ export async function getAnnouncements(): Promise<AnnouncementInfo[]> {
     const list = await prisma.announcement.findMany({
       orderBy: { createdAt: 'desc' }
     });
-    return list.map(a => ({
+    return list.map((a) => ({
       id: a.id,
       title: a.title,
       body: a.body,
       audience: a.audience,
+      imageUrl: a.imageUrl,
       createdAt: a.createdAt.toISOString()
     }));
   } else {
@@ -697,17 +699,18 @@ export async function getAnnouncements(): Promise<AnnouncementInfo[]> {
   }
 }
 
-export async function createAnnouncement(title: string, body: string, audience: string): Promise<AnnouncementInfo> {
+export async function createAnnouncement(title: string, body: string, audience: string, imageUrl?: string | null): Promise<AnnouncementInfo> {
   if (hasDatabase) {
     const prisma = getPrisma()!;
     const a = await prisma.announcement.create({
-      data: { title, body, audience }
+      data: { title, body, audience, imageUrl }
     });
     return {
       id: a.id,
       title: a.title,
       body: a.body,
       audience: a.audience,
+      imageUrl: a.imageUrl,
       createdAt: a.createdAt.toISOString()
     };
   } else {
@@ -717,11 +720,63 @@ export async function createAnnouncement(title: string, body: string, audience: 
       title,
       body,
       audience,
+      imageUrl: imageUrl || null,
       createdAt: new Date().toISOString()
     };
     list.push(newAnnounce);
     await writeJsonFile(FILE_ANNOUNCEMENTS, list);
     return newAnnounce;
+  }
+}
+
+export async function updateAnnouncement(id: number, patch: { title?: string; body?: string; audience?: string; imageUrl?: string | null }): Promise<AnnouncementInfo | null> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    const a = await prisma.announcement.update({
+      where: { id },
+      data: {
+        title: patch.title,
+        body: patch.body,
+        audience: patch.audience,
+        imageUrl: patch.imageUrl
+      }
+    });
+    return {
+      id: a.id,
+      title: a.title,
+      body: a.body,
+      audience: a.audience,
+      imageUrl: a.imageUrl,
+      createdAt: a.createdAt.toISOString()
+    };
+  } else {
+    const list = await readJsonFile<AnnouncementInfo[]>(FILE_ANNOUNCEMENTS, []);
+    const idx = list.findIndex((a) => a.id === id);
+    if (idx === -1) return null;
+    
+    const updated = {
+      ...list[idx],
+      ...patch,
+    };
+    list[idx] = updated;
+    await writeJsonFile(FILE_ANNOUNCEMENTS, list);
+    return updated;
+  }
+}
+
+export async function deleteAnnouncement(id: number): Promise<boolean> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    await prisma.announcement.delete({
+      where: { id }
+    });
+    return true;
+  } else {
+    const list = await readJsonFile<AnnouncementInfo[]>(FILE_ANNOUNCEMENTS, []);
+    const filtered = list.filter((a) => a.id !== id);
+    if (filtered.length === list.length) return false;
+    await writeJsonFile(FILE_ANNOUNCEMENTS, filtered);
+    return true;
   }
 }
 

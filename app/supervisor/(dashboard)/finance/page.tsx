@@ -44,7 +44,7 @@ export default function FinancePage() {
   async function load() {
     const [ir, sr, setr] = await Promise.all([
       fetch('/api/supervisor/invoices', { cache: 'no-store' }),
-      fetch('/api/supervisor/students?registrationStatus=approved', { cache: 'no-store' }),
+      fetch('/api/supervisor/students', { cache: 'no-store' }),
       fetch('/api/supervisor/settings', { cache: 'no-store' })
     ]);
     const ij = await ir.json().catch(() => ({ invoices: [] }));

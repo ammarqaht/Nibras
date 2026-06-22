@@ -77,7 +77,8 @@ model Announcement {
   id        Int      @id @default(autoincrement())
   title     String
   body      String
-  audience  String   // 'students' | 'guardians' | 'all'
+  audience  String   // 'students' | 'guardians' | 'all' or comma-separated stages/groups
+  imageUrl  String?  // Optional base64 or url for image
   createdAt DateTime @default(now())
 }
 
