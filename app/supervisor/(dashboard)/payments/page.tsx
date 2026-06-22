@@ -1,203 +1,199 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { pushToast } from '@/components/Toast';
+import { useSupervisor } from '@/components/SupervisorShell';
 
 type Student = {
-  id: number;
-  membershipNo: number;
-  studentName: string;
-  stage: string;
-  grade: string;
-  paymentStatus: string;
+  id: number; membershipNo: number; studentName: string;
+  paymentStatus: string; paymentType: string; paymentReceipt: string | null;
 };
 
+type Tab = 'unpaid' | 'paid' | 'all';
+const TABS: { key: Tab; label: string }[] = [
+  { key: 'all', label: 'الكل' },
+  { key: 'paid', label: 'مدفوع' },
+  { key: 'unpaid', label: 'غير مدفوع' }
+];
+
+function isReview(s: Student) {
+  return s.paymentStatus !== 'paid' && s.paymentType === 'now' && !!s.paymentReceipt;
+}
+
 export default function PaymentsPage() {
+  const { user } = useSupervisor();
+  const allowed = user?.role === 'admin' || user?.role === 'finance';
+
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
-  
-  // Filters
-  const [search, setSearch] = useState('');
-  const [filterPayment, setFilterPayment] = useState('');
+  const [tab, setTab] = useState<Tab>('all');
+  const [busyId, setBusyId] = useState<number | null>(null);
 
-  // Toggling status state
-  const [updatingId, setUpdatingId] = useState<number | null>(null);
+  async function load() {
+    const r = await fetch('/api/supervisor/students', { cache: 'no-store' });
+    setStudents((await r.json().catch(() => ({ students: [] }))).students ?? []);
+    setLoading(false);
+  }
+  useEffect(() => { if (allowed) load(); else setLoading(false); }, [allowed]);
 
-  const fetchStudents = useCallback(async () => {
-    setLoading(true);
+  const filtered = useMemo(() => {
+    return students.filter((s) => {
+      if (tab === 'all') return true;
+      if (tab === 'paid') return s.paymentStatus === 'paid';
+      if (tab === 'unpaid') return s.paymentStatus !== 'paid';
+      if (tab === 'review') return isReview(s);
+      return true;
+    });
+  }, [students, tab]);
+
+  async function confirm(id: number) {
+    setBusyId(id);
+    const r = await fetch('/api/supervisor/students', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, paymentStatus: 'paid' })
+    });
+    setBusyId(null);
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return pushToast('error', j.error ?? 'فشل التأكيد');
+    pushToast('success', 'تم تأكيد استلام الدفع');
+    setStudents((prev) => prev.map((s) => (s.id === id ? { ...s, paymentStatus: 'paid' } : s)));
+  }
+
+  async function openReceipt(receipt: string) {
     try {
-      const q = new URLSearchParams({
-        search,
-        paymentStatus: filterPayment
-      });
-      const res = await fetch(`/api/supervisor/students?${q.toString()}`);
-      const data = await res.json();
-      if (res.ok) {
-        setStudents(data.students || []);
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
+      const res = await fetch(receipt);
+      window.open(URL.createObjectURL(await res.blob()), '_blank');
+    } catch {
+      window.open(receipt, '_blank');
     }
-  }, [search, filterPayment]);
+  }
 
-  useEffect(() => {
-    fetchStudents();
-  }, [fetchStudents]);
+  const reviewCount = students.filter(isReview).length;
 
-  const togglePayment = async (studentId: number, currentStatus: string) => {
-    setUpdatingId(studentId);
-    try {
-      const nextStatus = currentStatus === 'paid' ? 'unpaid' : 'paid';
-      const res = await fetch('/api/supervisor/students', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: studentId,
-          paymentStatus: nextStatus
-        })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setStudents(prev => prev.map(s => s.id === studentId ? data.student : s));
-      } else {
-        alert(data.error || 'فشل تعديل حالة الدفع');
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setUpdatingId(null);
-    }
-  };
-
-  // Totals calculations
-  const totalCount = students.length;
-  const paidCount = students.filter(s => s.paymentStatus === 'paid').length;
-  const unpaidCount = totalCount - paidCount;
-  const totalCollected = paidCount * 300;
-  const totalOutstanding = unpaidCount * 300;
+  if (user && !allowed) {
+    return <div className="card p-10 text-center text-ink-500">هذه الصفحة متاحة للمالية والمدير العام فقط.</div>;
+  }
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="font-display text-4xl text-ink-900">المدفوعات والرسوم</h1>
-        <p className="text-ink-500 mt-2">متابعة رسوم تسجيل الطلاب وتأكيد الدفع لرسوم الاشتراك (300 ريال لكل طالب).</p>
+    <div>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-ink-900 mb-1">المدفوعات</h1>
+        <p className="text-sm text-ink-500">مراجعة إيصالات التحويل وتأكيد استلام الرسوم.</p>
       </div>
 
-      {/* Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-        {/* Total Collected */}
-        <div className="card p-6 bg-white flex items-center justify-between">
-          <div>
-            <span className="text-xs font-bold text-ink-400 block mb-1">الرسوم المحصلة</span>
-            <span className="font-display text-3xl text-green-600 block">{totalCollected.toLocaleString()} ريال</span>
-            <span className="text-xs text-ink-500 block mt-2">من {paidCount} طالب</span>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-green-50 text-green-600 flex items-center justify-center text-xl">
-            ✓
-          </div>
-        </div>
-
-        {/* Total Outstanding */}
-        <div className="card p-6 bg-white flex items-center justify-between">
-          <div>
-            <span className="text-xs font-bold text-ink-400 block mb-1">الرسوم غير المحصلة</span>
-            <span className="font-display text-3xl text-red-500 block">{totalOutstanding.toLocaleString()} ريال</span>
-            <span className="text-xs text-ink-500 block mt-2">من {unpaidCount} طالب</span>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-red-50 text-red-600 flex items-center justify-center text-xl">
-            🚨
-          </div>
-        </div>
-
-        {/* Paid ratio */}
-        <div className="card p-6 bg-white flex items-center justify-between">
-          <div>
-            <span className="text-xs font-bold text-ink-400 block mb-1">نسبة التحصيل</span>
-            <span className="font-display text-3xl text-ink-900 block">
-              {totalCount ? Math.round((paidCount / totalCount) * 100) : 0}%
-            </span>
-            <span className="text-xs text-ink-500 block mt-2">من إجمالي الطلاب المسجلين</span>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl">
-            📊
-          </div>
-        </div>
-      </div>
-
-      {/* Filter Options */}
-      <div className="card p-6 bg-white flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="w-full sm:w-2/3">
-          <label className="label mb-1.5 block">بحث بالاسم أو رقم العضوية</label>
-          <input
-            type="text"
-            placeholder="ابحث هنا..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="input w-full"
-          />
-        </div>
-        <div className="w-full sm:w-1/3">
-          <label className="label mb-1.5 block">تصنيف حالة الدفع</label>
-          <select
-            value={filterPayment}
-            onChange={e => setFilterPayment(e.target.value)}
-            className="input w-full"
+      <div className="flex gap-2 mb-5 flex-wrap">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            className={`choice text-sm ${tab === t.key ? 'is-active' : ''}`}
+            onClick={() => setTab(t.key)}
           >
-            <option value="">عرض الكل</option>
-            <option value="paid">تم الدفع</option>
-            <option value="unpaid">لم يدفع</option>
-          </select>
-        </div>
+            {t.label}
+            {t.key === 'unpaid' && reviewCount > 0 && (
+              <span className="font-bold text-amber-500 mr-1"> ({reviewCount} مراجعة 📑)</span>
+            )}
+          </button>
+        ))}
       </div>
 
-      {/* Roster list */}
-      <div className="card bg-white overflow-hidden">
+      <div className="card p-0 overflow-hidden">
         {loading ? (
-          <div className="py-20 text-center text-ink-500 font-body">جاري تحميل البيانات…</div>
-        ) : students.length === 0 ? (
-          <div className="py-20 text-center text-ink-500 font-body">لا يوجد طلاب للتحصيل.</div>
+          <p className="text-center py-16 text-ink-400 text-sm">جارٍ التحميل…</p>
+        ) : filtered.length === 0 ? (
+          <p className="text-center py-16 text-ink-400 text-sm">لا توجد سجلات في هذا التصنيف.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-right border-collapse text-sm">
-              <thead>
-                <tr className="bg-cream-50/70 border-b border-ink-200/60 text-ink-500 text-xs font-bold">
-                  <th className="p-4 pr-6">العضوية</th>
-                  <th className="p-4">اسم الطالب</th>
-                  <th className="p-4">المرحلة / الصف</th>
-                  <th className="p-4">حالة الدفع الحالية</th>
-                  <th className="p-4 pl-6 text-left">تعديل الحالة</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-ink-100">
-                {students.map(s => (
-                  <tr key={s.id} className="hover:bg-cream-50/20">
-                    <td className="p-4 pr-6 font-display font-semibold text-ink-500">#{s.membershipNo}</td>
-                    <td className="p-4 font-semibold text-ink-900">{s.studentName}</td>
-                    <td className="p-4 text-ink-500">{s.stage} - {s.grade}</td>
-                    <td className="p-4">
-                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${s.paymentStatus === 'paid' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
-                        {s.paymentStatus === 'paid' ? 'مدفوع' : 'لم يدفع'}
+          <>
+            <div className="hidden lg:block overflow-x-auto scroll-soft">
+              <table className="tbl">
+                <thead>
+                  <tr><th>الطالب</th><th>العضوية</th><th>نوع الدفع</th><th>الإيصال</th><th>الحالة</th><th></th></tr>
+                </thead>
+                <tbody>
+                  {filtered.map((s) => (
+                    <tr key={s.id}>
+                      <td className="font-medium">{s.studentName}</td>
+                      <td dir="ltr" className="text-right font-mono text-ink-500">#{s.membershipNo}</td>
+                      <td><span className="pill pill-gray">{s.paymentType === 'now' ? 'فوري' : 'آجل'}</span></td>
+                      <td>
+                        {s.paymentReceipt ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={s.paymentReceipt}
+                            alt="إيصال"
+                            onClick={() => openReceipt(s.paymentReceipt!)}
+                            className="w-12 h-12 object-cover rounded-md border border-ink-200 cursor-pointer"
+                          />
+                        ) : (
+                          <span className="text-ink-300 text-xs">—</span>
+                        )}
+                      </td>
+                      <td>
+                        <span className={`pill ${s.paymentStatus === 'paid' ? 'pill-green' : isReview(s) ? 'pill-yellow' : 'pill-red'}`}>
+                          {s.paymentStatus === 'paid' ? 'مدفوع' : isReview(s) ? 'بانتظار المراجعة' : 'لم يدفع'}
+                        </span>
+                      </td>
+                      <td>
+                        {s.paymentStatus !== 'paid' && (
+                          <button
+                            onClick={() => confirm(s.id)}
+                            disabled={busyId === s.id}
+                            className="btn text-white border-transparent py-1 px-3 text-xs"
+                            style={{ background: '#1B7A43' }}
+                          >
+                            ✅ تأكيد الدفع
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <ul className="lg:hidden divide-y divide-ink-200">
+              {filtered.map((s) => (
+                <li key={s.id} className="p-4 flex items-center gap-3">
+                  {s.paymentReceipt ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={s.paymentReceipt}
+                      alt="إيصال"
+                      onClick={() => openReceipt(s.paymentReceipt!)}
+                      className="w-14 h-14 object-cover rounded-lg border border-ink-200 cursor-pointer shrink-0"
+                    />
+                  ) : (
+                    <div className="w-14 h-14 rounded-lg bg-cream-100 flex items-center justify-center text-ink-300 text-xs shrink-0">
+                      لا إيصال
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-ink-900 truncate">{s.studentName}</div>
+                    <div className="text-xs text-ink-400 mt-0.5">
+                      <span dir="ltr" className="font-mono">#{s.membershipNo}</span> · {s.paymentType === 'now' ? 'فوري' : 'آجل'}
+                    </div>
+                    <div className="mt-1.5">
+                      <span className={`pill ${s.paymentStatus === 'paid' ? 'pill-green' : isReview(s) ? 'pill-yellow' : 'pill-red'}`}>
+                        {s.paymentStatus === 'paid' ? 'مدفوع' : isReview(s) ? 'بانتظار المراجعة' : 'لم يدفع'}
                       </span>
-                    </td>
-                    <td className="p-4 pl-6 text-left">
-                      <button
-                        onClick={() => togglePayment(s.id, s.paymentStatus)}
-                        disabled={updatingId === s.id}
-                        className={`btn btn-sm ${s.paymentStatus === 'paid' ? 'btn-secondary text-red-600 border-red-200 hover:bg-red-50' : 'btn-primary'}`}
-                      >
-                        {updatingId === s.id ? 'جاري التحديث…' : (s.paymentStatus === 'paid' ? 'إلغاء تأكيد الدفع' : 'تأكيد استلام الرسوم')}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    </div>
+                  </div>
+                  {s.paymentStatus !== 'paid' && (
+                    <button
+                      onClick={() => confirm(s.id)}
+                      disabled={busyId === s.id}
+                      className="btn text-white border-transparent py-2 px-3 text-xs shrink-0"
+                      style={{ background: '#1B7A43' }}
+                    >
+                      ✅ تأكيد
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </>
         )}
       </div>
-
     </div>
   );
 }

@@ -25,8 +25,13 @@ export async function GET(req: NextRequest) {
 
     let students = await getStudents();
 
-    // Role-based scoping: supervisor only sees their group's students
-    if (supervisor.role !== 'admin') {
+    // Role-based scoping: supervisor only sees their group's students if they are not in a global role.
+    const roles = supervisor.role.split(',').map(r => r.trim());
+    const isGlobal = roles.some(r =>
+      ['admin', 'finance', 'cultural_supervisor', 'social_supervisor', 'general_supervisor', 'attendance_supervisor'].includes(r)
+    );
+
+    if (!isGlobal) {
       const allowedGroupIds = supervisor.groupIds
         .split(',')
         .map(id => parseInt(id.trim(), 10))
@@ -89,19 +94,9 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'معرّف الطالب غير صحيح' }, { status: 400 });
     }
 
-    // Check permissions
+    // Check permissions: ONLY admin (General Manager) can edit student details.
     if (supervisor.role !== 'admin') {
-      // If supervisor, check if they are allowed to edit this student (student must be in their group)
-      const allowedGroupIds = supervisor.groupIds
-        .split(',')
-        .map(gId => parseInt(gId.trim(), 10))
-        .filter(gId => !isNaN(gId));
-
-      const students = await getStudents();
-      const student = students.find(s => s.id === id);
-      if (!student || student.groupId === null || !allowedGroupIds.includes(student.groupId)) {
-        return NextResponse.json({ error: 'غير مصرح لك بتعديل بيانات هذا الطالب' }, { status: 403 });
-      }
+      return NextResponse.json({ error: 'غير مصرح لك بتعديل بيانات الطلاب، التعديل متاح للمدير العام فقط.' }, { status: 403 });
     }
 
     // Auto-set registrationStatus based on paymentStatus

@@ -2,111 +2,106 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { site } from '@/content';
 
-export default function SupervisorLoginPage() {
+export default function SupervisorLogin() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setError('');
-    setLoading(true);
-
+    setBusy(true);
+    setErr('');
     try {
-      const res = await fetch('/api/supervisor/auth/login', {
+      const r = await fetch('/api/supervisor/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'فشل تسجيل الدخول');
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setErr(j.error ?? 'فشل تسجيل الدخول');
+        setBusy(false);
+        return;
       }
-
-      router.push('/supervisor');
-      router.refresh();
-    } catch (err: any) {
-      setError(err.message || 'حدث خطأ غير متوقع');
-    } finally {
-      setLoading(false);
+      router.replace('/supervisor');
+    } catch {
+      setErr('تعذّر الاتصال بالخادم');
+      setBusy(false);
     }
-  };
+  }
 
   return (
-    <main className="supervisor-body min-h-screen flex items-center justify-center bg-cream-50 px-6 py-12 relative overflow-hidden">
-      {/* Background gradients matching Nibras visual identity */}
+    <div className="supervisor-body min-h-screen flex items-center justify-center px-6 py-12 relative">
       <div
         aria-hidden
         className="absolute inset-0 pointer-events-none"
         style={{
           background:
-            'radial-gradient(40rem 24rem at 50% 10%, rgba(245,166,35,0.08), transparent 60%), radial-gradient(30rem 20rem at 10% 80%, rgba(43,175,217,0.06), transparent 60%)'
+            'radial-gradient(50rem 30rem at 50% 25%, rgba(245,166,35,0.08), transparent 60%), radial-gradient(40rem 28rem at 80% 80%, rgba(43,175,217,0.06), transparent 60%)'
         }}
       />
-
-      <div className="relative w-full max-w-md card p-8 sm:p-10 bg-white">
+      <div className="relative w-full max-w-md">
         <div className="text-center mb-8">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/logos/nibras-icon.png"
-            alt="شعار النادي"
-            className="w-16 h-16 object-contain mx-auto mb-4"
+            src={site.logos.lockupVertical}
+            alt={site.clubNameAr}
+            className="mx-auto h-28 w-auto select-none"
+            draggable={false}
           />
-          <h1 className="font-display text-3xl text-ink-900">بوابة المشرفين</h1>
-          <p className="text-sm text-ink-500 mt-2">نادي نبراس الصيفي — لوحة الإدارة والتحضير</p>
+          <p className="mt-4 text-ink-500 text-sm">لوحة تحكم المشرفين</p>
         </div>
 
-        {error && (
-          <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm font-body text-center leading-relaxed">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={submit} className="card p-8 space-y-5">
           <div>
-            <label className="label block mb-2" htmlFor="email">
-              اسم المستخدم أو البريد الإلكتروني
-            </label>
+            <h1 className="text-2xl font-bold text-ink-900 mb-1">تسجيل الدخول</h1>
+            <p className="text-sm text-ink-500">أدخل بيانات حسابك للمتابعة.</p>
+          </div>
+
+          <div>
+            <label className="label">البريد الإلكتروني / اسم المستخدم</label>
             <input
-              id="email"
-              type="text"
-              required
-              placeholder="admin"
+              className="field"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="input w-full ltr text-left"
-              disabled={loading}
+              autoComplete="username"
+              placeholder="admin"
             />
           </div>
-
           <div>
-            <label className="label block mb-2" htmlFor="password">
-              كلمة المرور
-            </label>
+            <label className="label">كلمة المرور</label>
             <input
-              id="password"
+              className="field"
               type="password"
-              required
-              placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="input w-full ltr text-left"
-              disabled={loading}
+              autoComplete="current-password"
+              placeholder="••••••"
             />
           </div>
 
-          <button
-            type="submit"
-            className="btn btn-primary btn-lg w-full mt-6"
-            disabled={loading}
-          >
-            {loading ? 'جاري التحقق…' : 'تسجيل الدخول'}
+          {err && (
+            <div
+              className="text-sm rounded-md p-3 border"
+              style={{ color: 'var(--red)', background: '#FDEAE6', borderColor: 'rgba(251,59,30,0.25)' }}
+            >
+              {err}
+            </div>
+          )}
+
+          <button type="submit" disabled={busy} className="btn btn-primary btn-lg w-full">
+            {busy ? '...' : 'دخول'}
           </button>
+
+          <p className="text-xs text-ink-400 text-center pt-3 border-t border-ink-200">
+            الدخول الافتراضي للمدير: <span dir="ltr">admin / 12345</span>
+          </p>
         </form>
       </div>
-    </main>
+    </div>
   );
 }
