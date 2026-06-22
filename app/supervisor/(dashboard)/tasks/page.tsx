@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import { pushToast } from '@/components/Toast';
 import { useSupervisor } from '@/components/SupervisorShell';
 
-type Student = { id: number; membershipNo: number; studentName: string; stage: string; grade: string; registrationStatus: string };
+type Student = { id: number; membershipNo: number; studentName: string; stage: string; grade: string; registrationStatus: string; paymentStatus: string };
 type SupervisorUser = { id: number; name: string; email: string };
 type Task = {
   id: string;
@@ -395,7 +395,7 @@ export default function TasksPage() {
     if (!statsTask) return [];
     
     // Filter active student list (approved students only, or all)
-    const activeStudents = students.filter(s => s.registrationStatus === 'approved');
+    const activeStudents = students.filter(s => s.registrationStatus === 'approved' && s.paymentStatus === 'paid');
 
     // If restricted, only show students in visibleToIds scope
     const scopedStudents = statsTask.visibility === 'restricted'
@@ -435,7 +435,7 @@ export default function TasksPage() {
   const statsCounts = useMemo(() => {
     if (!statsTask) return { total: 0, submitted: 0, missing: 0, pending: 0 };
     
-    const activeStudents = students.filter(s => s.registrationStatus === 'approved');
+    const activeStudents = students.filter(s => s.registrationStatus === 'approved' && s.paymentStatus === 'paid');
     const scopedStudents = statsTask.visibility === 'restricted'
       ? activeStudents.filter(s => statsTask.visibleToIds.includes(s.id))
       : activeStudents;
@@ -1229,7 +1229,7 @@ export default function TasksPage() {
                         onClick={() => {
                           const query = scopeSearch.trim().toLowerCase();
                           const toSelect = students
-                            .filter(s => s.registrationStatus === 'approved')
+                            .filter(s => s.registrationStatus === 'approved' && s.paymentStatus === 'paid')
                             .filter(s => !query || s.studentName.toLowerCase().includes(query))
                             .map(s => s.id);
                           setScopeSelected(Array.from(new Set([...scopeSelected, ...toSelect])));
@@ -1249,7 +1249,7 @@ export default function TasksPage() {
 
                   <div className="max-h-60 overflow-y-auto border border-ink-200 rounded-lg p-2 space-y-1.5 scroll-soft bg-ink-50/20">
                     {students
-                      .filter(s => s.registrationStatus === 'approved')
+                      .filter(s => s.registrationStatus === 'approved' && s.paymentStatus === 'paid')
                       .filter(s => !scopeSearch.trim() || s.studentName.toLowerCase().includes(scopeSearch.trim().toLowerCase()))
                       .map(student => {
                         const checked = scopeSelected.includes(student.id);

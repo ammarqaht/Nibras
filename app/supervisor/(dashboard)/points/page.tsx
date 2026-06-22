@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { pushToast } from '@/components/Toast';
 
-type Student = { id: number; membershipNo: number; studentName: string; groupId: number | null; registrationStatus: string };
+type Student = { id: number; membershipNo: number; studentName: string; groupId: number | null; registrationStatus: string; paymentStatus: string };
 type Group = { id: number; name: string };
 type Point = {
   id: number; registrationId: number; delta: number; reason: string;
@@ -46,7 +46,7 @@ export default function PointsPage() {
     const grj = await gr.json().catch(() => ({ groups: [] }));
     const prj = await pr.json().catch(() => ({ points: [] }));
     const allSt: Student[] = srj.students ?? [];
-    setStudents(allSt.filter((s) => s.registrationStatus === 'approved'));
+    setStudents(allSt.filter((s) => s.registrationStatus === 'approved' && s.paymentStatus === 'paid'));
     setGroups(grj.groups ?? []);
     setPoints(prj.points ?? []);
     setLoading(false);

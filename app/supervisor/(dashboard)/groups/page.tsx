@@ -6,7 +6,7 @@ import { pushToast } from '@/components/Toast';
 import { useSupervisor } from '@/components/SupervisorShell';
 
 type Group = { id: number; name: string; stage: string };
-type Student = { id: number; studentName: string; stage: string; grade: string; groupId: number | null; registrationStatus: string };
+type Student = { id: number; studentName: string; stage: string; grade: string; groupId: number | null; registrationStatus: string; paymentStatus: string };
 type Supervisor = { id: number; name: string; groupIds: string };
 
 export default function GroupsPage() {
@@ -39,7 +39,7 @@ export default function GroupsPage() {
     setGroups(grj.groups ?? []);
     setSupervisors(suj.supervisors ?? []);
     const allSt: Student[] = srj.students ?? [];
-    setStudents(allSt.filter((s) => s.registrationStatus === 'approved'));
+    setStudents(allSt.filter((s) => s.registrationStatus === 'approved' && s.paymentStatus === 'paid'));
     setLoading(false);
   }
   useEffect(() => { load(); }, []);

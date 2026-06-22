@@ -21,38 +21,6 @@ const STAGES = [
   { key: 'stage:ثانوي', label: 'مرحلة الثانوي' }
 ];
 
-// SVG Icon components matching the website style
-const SpeakerIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
-  </svg>
-);
-
-const EditIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-  </svg>
-);
-
-const TrashIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-  </svg>
-);
-
-const EyeIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-  </svg>
-);
-
-const CloseIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-  </svg>
-);
-
 // Helper function to compress base64 images client-side before sending
 const compressImage = (base64Str: string, maxWidth = 800, maxHeight = 800, quality = 0.75): Promise<string> => {
   return new Promise((resolve) => {
@@ -293,10 +261,12 @@ export default function AnnouncementsPage() {
                 <button
                   type="button"
                   onClick={() => setCoverImage(null)}
-                  className="absolute top-1.5 right-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full p-1.5 leading-none shadow-md flex items-center justify-center"
+                  className="absolute top-1.5 right-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full p-1.5 shadow-md flex items-center justify-center"
                   title="إزالة الصورة"
                 >
-                  <CloseIcon className="w-3.5 h-3.5" />
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 6 6 18M6 6l12 12" />
+                  </svg>
                 </button>
               </div>
             )}
@@ -348,10 +318,12 @@ export default function AnnouncementsPage() {
                     <button
                       type="button"
                       onClick={() => setContentImages((prev) => prev.filter((_, i) => i !== idx))}
-                      className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 leading-none shadow-md flex items-center justify-center"
+                      className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 shadow-md flex items-center justify-center"
                       title="حذف"
                     >
-                      <CloseIcon className="w-3 h-3" />
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M18 6 6 18M6 6l12 12" />
+                      </svg>
                     </button>
                   </div>
                 ))}
@@ -438,8 +410,8 @@ export default function AnnouncementsPage() {
                     />
                   </div>
                 ) : (
-                  <div className="w-16 h-16 rounded-xl bg-cream-50 flex items-center justify-center flex-shrink-0 text-brand-600 border border-ink-100">
-                    <SpeakerIcon className="w-6 h-6 text-brand" />
+                  <div className="w-16 h-16 rounded-xl bg-cream-50 flex items-center justify-center flex-shrink-0 text-brand-600 border border-ink-100 text-xl">
+                    📢
                   </div>
                 )}
 
@@ -448,7 +420,11 @@ export default function AnnouncementsPage() {
                   <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                     <h3 className="font-bold text-ink-900 text-sm truncate max-w-[200px] sm:max-w-xs">{a.title}</h3>
                     <span className="pill pill-blue text-[10px] py-0.5 px-2 truncate flex items-center gap-1" title={audLabel(a.audience)}>
-                      <SpeakerIcon className="w-3 h-3 text-brand-600" />
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h2" />
+                        <path d="m6 9 12-6v16L6 15" />
+                        <path d="M18 9h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2" />
+                      </svg>
                       {audLabel(a.audience)}
                     </span>
                   </div>
@@ -471,7 +447,10 @@ export default function AnnouncementsPage() {
                     type="button"
                     title="عرض كامل التفاصيل"
                   >
-                    <EyeIcon className="w-3 h-3 text-ink-600" />
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
                     عرض
                   </button>
                   <button
@@ -479,15 +458,23 @@ export default function AnnouncementsPage() {
                     className="btn btn-secondary py-1 px-2 text-[11px] font-semibold flex items-center gap-1"
                     type="button"
                   >
-                    <EditIcon className="w-3 h-3 text-ink-600" />
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                    </svg>
                     تعديل
                   </button>
                   <button
                     onClick={() => del(a.id)}
-                    className="btn btn-danger py-1 px-2 text-[11px] font-semibold flex items-center justify-center"
+                    className="btn btn-danger py-1 px-2.5 text-[11px] font-semibold flex items-center justify-center"
                     type="button"
+                    title="حذف"
                   >
-                    <TrashIcon className="w-3 h-3" />
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 6h18" />
+                      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                    </svg>
                   </button>
                 </div>
               </div>
@@ -512,10 +499,12 @@ export default function AnnouncementsPage() {
                 />
                 <button
                   onClick={() => setActiveDetails(null)}
-                  className="absolute top-3 right-3 bg-black/65 hover:bg-black/85 text-white rounded-full w-8 h-8 flex items-center justify-center transition-colors shadow-md leading-none"
+                  className="absolute top-3 right-3 bg-black/65 hover:bg-black/85 text-white rounded-full w-8 h-8 flex items-center justify-center transition-colors shadow-md"
                   type="button"
                 >
-                  <CloseIcon className="w-4 h-4" />
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 6L6 18M6 6l12 12" />
+                  </svg>
                 </button>
               </div>
             )}
@@ -530,7 +519,9 @@ export default function AnnouncementsPage() {
                     className="text-ink-400 hover:text-ink-600 flex items-center justify-center"
                     type="button"
                   >
-                    <CloseIcon className="w-5 h-5" />
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
                   </button>
                 </div>
               )}
@@ -543,9 +534,21 @@ export default function AnnouncementsPage() {
 
               {/* Metadata */}
               <div className="flex items-center gap-3 text-xs text-ink-500 flex-wrap">
-                <span>📅 {new Date(activeDetails.createdAt).toLocaleString('ar')}</span>
+                <span className="flex items-center gap-1 text-ink-400">
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                    <line x1="16" y1="2" x2="16" y2="6" />
+                    <line x1="8" y1="2" x2="8" y2="6" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
+                  </svg>
+                  {new Date(activeDetails.createdAt).toLocaleString('ar')}
+                </span>
                 <span className="pill pill-blue text-[11px] flex items-center gap-1">
-                  <SpeakerIcon className="w-3 h-3 text-brand-600" />
+                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h2" />
+                    <path d="m6 9 12-6v16L6 15" />
+                    <path d="M18 9h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2" />
+                  </svg>
                   الجمهور: {audLabel(activeDetails.audience)}
                 </span>
               </div>

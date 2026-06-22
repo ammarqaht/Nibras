@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { pushToast } from '@/components/Toast';
 
-type Student = { id: number; membershipNo: number; studentName: string; stage: string; grade: string; groupId: number | null; registrationStatus: string };
+type Student = { id: number; membershipNo: number; studentName: string; stage: string; grade: string; groupId: number | null; registrationStatus: string; paymentStatus: string };
 type Group = { id: number; name: string };
 type Rec = { registrationId: number; date: string; status: string };
 
@@ -35,7 +35,7 @@ export default function AttendancePage() {
     const sj = await sr.json().catch(() => ({ students: [] }));
     const gj = await gr.json().catch(() => ({ groups: [] }));
     const allSt: Student[] = sj.students ?? [];
-    setStudents(allSt.filter((s) => s.registrationStatus === 'approved'));
+    setStudents(allSt.filter((s) => s.registrationStatus === 'approved' && s.paymentStatus === 'paid'));
     setGroups(gj.groups ?? []);
   }
 
