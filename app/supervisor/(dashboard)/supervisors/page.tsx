@@ -8,17 +8,23 @@ type Sup = { id: number; name: string; email: string; role: string; groupIds: st
 type Group = { id: number; name: string };
 
 const ROLE_MAP: Record<string, string> = {
-  admin: 'مدير عام',
-  attendance_supervisor: 'مشرف تحضير',
-  social_supervisor: 'مشرف اجتماعية',
-  cultural_supervisor: 'مشرف ثقافية',
-  groups_supervisor: 'مشرف أسر',
-  general_supervisor: 'مشرف عام'
+  admin: 'المدير العام',
+  secretary: 'أمين النادي',
+  finance_head: 'مسؤول المالية',
+  media_head: 'مسؤول الإعلامية',
+  cultural_head: 'مسؤول الثقافية',
+  sports_head: 'مسؤول الرياضية',
+  stage_head_elementary: 'مسؤول المرحلة الابتدائية',
+  stage_head_middle: 'مسؤول المرحلة المتوسطة',
+  stage_head_high: 'مسؤول المرحلة الثانوية',
+  media_supervisor: 'مشرف الإعلامية',
+  attendance_supervisor: 'مشرف التحضير',
+  group_supervisor: 'مشرف أسرة/مجموعة'
 };
 
 const getRoleLabel = (roleStr: string) => {
-  if (roleStr === 'admin') return 'مدير عام';
-  if (roleStr === 'finance') return 'المالية';
+  if (roleStr === 'admin') return 'المدير العام';
+  if (roleStr === 'finance') return 'مسؤول المالية';
   return roleStr
     .split(',')
     .map((r) => ROLE_MAP[r.trim()] || r)
@@ -37,7 +43,7 @@ export default function SupervisorsPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [accountType, setAccountType] = useState<'admin' | 'supervisor' | 'finance'>('supervisor');
-  const [selectedRoles, setSelectedRoles] = useState<string[]>(['general_supervisor']);
+  const [selectedRoles, setSelectedRoles] = useState<string[]>(['group_supervisor']);
   const [groupIds, setGroupIds] = useState<number[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [isEditingPrimary, setIsEditingPrimary] = useState(false);
@@ -54,8 +60,10 @@ export default function SupervisorsPage() {
   }
   useEffect(() => { load(); }, []);
 
-  if (user && user.role !== 'admin') {
-    return <div className="card p-10 text-center text-ink-500">هذه الصفحة متاحة للمدير العام فقط.</div>;
+  const roles = user?.role ? user.role.split(',').map((r) => r.trim()) : [];
+  const isAdmin = roles.includes('admin') || roles.includes('secretary');
+  if (user && !isAdmin) {
+    return <div className="card p-10 text-center text-ink-500">هذه الصفحة متاحة للمدير العام وأمين النادي فقط.</div>;
   }
 
   function toggleGroup(id: number) {
@@ -67,7 +75,7 @@ export default function SupervisorsPage() {
     setEmail('');
     setPassword('');
     setAccountType('supervisor');
-    setSelectedRoles(['general_supervisor']);
+    setSelectedRoles(['group_supervisor']);
     setGroupIds([]);
     setEditingId(null);
     setIsEditingPrimary(false);
@@ -82,9 +90,9 @@ export default function SupervisorsPage() {
     setIsEditingPrimary(primary);
     if (s.role === 'admin') {
       setAccountType('admin');
-      setSelectedRoles(['general_supervisor']);
+      setSelectedRoles(['group_supervisor']);
       setGroupIds([]);
-    } else if (s.role === 'finance') {
+    } else if (s.role === 'finance' || s.role === 'finance_head') {
       setAccountType('finance');
       setSelectedRoles([]);
       setGroupIds([]);
@@ -100,18 +108,18 @@ export default function SupervisorsPage() {
     if (!name.trim() || !email.trim()) return pushToast('error', 'أكمل الحقول الإلزامية');
     if (!editingId && !password) return pushToast('error', 'يرجى إدخال كلمة مرور للمشرف الجديد');
 
-    let finalRole = accountType === 'admin' ? 'admin' : accountType === 'finance' ? 'finance' : '';
+    let finalRole = accountType === 'admin' ? 'admin' : accountType === 'finance' ? 'finance_head' : '';
     let finalGroupIds = '';
 
     if (accountType === 'supervisor') {
       if (selectedRoles.length === 0) {
         return pushToast('error', 'يرجى اختيار دور وظيفي واحد على الأقل للمشرف');
       }
-      if (selectedRoles.includes('groups_supervisor') && groupIds.length === 0) {
-        return pushToast('error', 'يجب تحديد المجموعات/الأسر المسؤول عنها مشرف الأسر');
+      if (selectedRoles.includes('group_supervisor') && groupIds.length === 0) {
+        return pushToast('error', 'يجب تحديد المجموعات/الأسر المسؤول عنها مشرف الأسرة');
       }
       finalRole = selectedRoles.join(',');
-      finalGroupIds = selectedRoles.includes('groups_supervisor') ? groupIds.join(',') : '';
+      finalGroupIds = selectedRoles.includes('group_supervisor') ? groupIds.join(',') : '';
     }
 
     setBusy(true);
@@ -214,13 +222,19 @@ export default function SupervisorsPage() {
           {accountType === 'supervisor' && (
             <div className="space-y-3">
               <label className="label font-semibold">الأدوار والوظائف المشرف عليها (تحديد متعدد)</label>
-              <div className="grid grid-cols-1 gap-2">
+              <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto scroll-soft p-1 border border-ink-100 rounded-lg">
                 {[
-                  { key: 'attendance_supervisor', label: 'مشرف تحضير' },
-                  { key: 'social_supervisor', label: 'مشرف اجتماعية' },
-                  { key: 'cultural_supervisor', label: 'مشرف ثقافية' },
-                  { key: 'groups_supervisor', label: 'مشرف أسر' },
-                  { key: 'general_supervisor', label: 'مشرف عام' }
+                  { key: 'secretary', label: 'أمين النادي' },
+                  { key: 'finance_head', label: 'مسؤول المالية' },
+                  { key: 'media_head', label: 'مسؤول الإعلامية' },
+                  { key: 'cultural_head', label: 'مسؤول الثقافية' },
+                  { key: 'sports_head', label: 'مسؤول الرياضية' },
+                  { key: 'stage_head_elementary', label: 'مسؤول المرحلة الابتدائية' },
+                  { key: 'stage_head_middle', label: 'مسؤول المرحلة المتوسطة' },
+                  { key: 'stage_head_high', label: 'مسؤول المرحلة الثانوية' },
+                  { key: 'media_supervisor', label: 'مشرف الإعلامية' },
+                  { key: 'attendance_supervisor', label: 'مشرف التحضير' },
+                  { key: 'group_supervisor', label: 'مشرف أسرة/مجموعة' }
                 ].map((r) => {
                   const active = selectedRoles.includes(r.key);
                   return (
@@ -243,9 +257,9 @@ export default function SupervisorsPage() {
             </div>
           )}
 
-          {accountType === 'supervisor' && selectedRoles.includes('groups_supervisor') && (
+          {accountType === 'supervisor' && selectedRoles.includes('group_supervisor') && (
             <div>
-              <label className="label font-semibold text-brand-600">المجموعات المسؤول عنها (إجباري لمشرف الأسر) <span className="text-red-500">*</span></label>
+              <label className="label font-semibold text-brand-600">المجموعات المسؤول عنها (إجباري لمشرف المجموعة) <span className="text-red-500">*</span></label>
               {groups.length === 0 ? (
                 <p className="text-xs text-ink-400">لا توجد مجموعات بعد — أنشئها من صفحة المجموعات.</p>
               ) : (

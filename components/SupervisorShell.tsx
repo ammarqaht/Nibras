@@ -8,10 +8,32 @@ import ToastHost from './Toast';
 
 export type SupervisorUser = { id: number; email: string; name: string; role: string };
 
+export const ROLE_MAP: Record<string, string> = {
+  admin: 'المدير العام',
+  secretary: 'أمين النادي',
+  finance_head: 'مسؤول المالية',
+  media_head: 'مسؤول الإعلامية',
+  cultural_head: 'مسؤول الثقافية',
+  sports_head: 'مسؤول الرياضية',
+  stage_head_elementary: 'مسؤول المرحلة الابتدائية',
+  stage_head_middle: 'مسؤول المرحلة المتوسطة',
+  stage_head_high: 'مسؤول المرحلة الثانوية',
+  media_supervisor: 'مشرف الإعلامية',
+  attendance_supervisor: 'مشرف التحضير',
+  group_supervisor: 'مشرف أسرة/مجموعة'
+};
+
+export function getArabicRoles(roleString: string): string {
+  if (!roleString) return 'مشرف';
+  const roles = roleString.split(',').map(r => r.trim());
+  const arabicNames = roles.map(r => ROLE_MAP[r] || r);
+  return arabicNames.join('، ');
+}
+
 const SupervisorContext = createContext<{ user: SupervisorUser | null }>({ user: null });
 export const useSupervisor = () => useContext(SupervisorContext);
 
-type NavLink = { href: string; label: string; adminOnly?: boolean; financeOnly?: boolean };
+type NavLink = { href: string; label: string; roles?: string[] };
 
 const LINKS: NavLink[] = [
   { href: '/supervisor', label: 'الرئيسية' },
@@ -20,12 +42,12 @@ const LINKS: NavLink[] = [
   { href: '/supervisor/points', label: 'النقاط' },
   { href: '/supervisor/tasks', label: 'المهام' },
   { href: '/supervisor/groups', label: 'المجموعات' },
-  { href: '/supervisor/payments', label: 'المدفوعات', financeOnly: true },
+  { href: '/supervisor/payments', label: 'المدفوعات', roles: ['admin', 'secretary', 'finance_head'] },
   { href: '/supervisor/invoices', label: 'الفواتير' },
-  { href: '/supervisor/finance', label: 'المالية', financeOnly: true },
+  { href: '/supervisor/finance', label: 'المالية', roles: ['admin', 'secretary', 'finance_head'] },
   { href: '/supervisor/announcements', label: 'الإشعارات' },
-  { href: '/supervisor/supervisors', label: 'المشرفون', adminOnly: true },
-  { href: '/supervisor/settings', label: 'الإعدادات', adminOnly: true }
+  { href: '/supervisor/supervisors', label: 'المشرفون', roles: ['admin', 'secretary'] },
+  { href: '/supervisor/settings', label: 'الإعدادات', roles: ['admin', 'secretary'] }
 ];
 
 export default function SupervisorShell({ children }: { children: React.ReactNode }) {
@@ -115,11 +137,11 @@ export default function SupervisorShell({ children }: { children: React.ReactNod
     );
   }
 
-  const links = LINKS.filter(
-    (l) =>
-      (!l.adminOnly || user?.role === 'admin') &&
-      (!l.financeOnly || user?.role === 'admin' || user?.role === 'finance')
-  );
+  const roles = user?.role ? user.role.split(',').map((r) => r.trim()) : [];
+  const links = LINKS.filter((l) => {
+    if (!l.roles) return true;
+    return l.roles.some((role) => roles.includes(role));
+  });
   const isActive = (href: string) => (href === '/supervisor' ? path === href : path.startsWith(href));
 
   return (
@@ -161,7 +183,7 @@ export default function SupervisorShell({ children }: { children: React.ReactNod
               <span className="hidden sm:flex flex-col items-end leading-tight">
                 <span className="text-sm font-semibold text-ink-900">{user?.name}</span>
                 <span className="text-[0.7rem] text-ink-400">
-                  {user?.role === 'admin' ? 'مدير عام' : 'مشرف'}
+                  {getArabicRoles(user?.role || '')}
                 </span>
               </span>
               <button onClick={logout} className="!hidden lg:!inline-flex btn btn-ghost text-sm">
@@ -176,7 +198,7 @@ export default function SupervisorShell({ children }: { children: React.ReactNod
               <div className="px-3 py-3 flex flex-col gap-1 max-w-7xl mx-auto">
                 <div className="px-3 pb-2 mb-1 border-b border-ink-100">
                   <div className="text-sm font-semibold text-ink-900">{user?.name}</div>
-                  <div className="text-xs text-ink-400">{user?.role === 'admin' ? 'مدير عام' : 'مشرف'}</div>
+                  <div className="text-xs text-ink-400">{getArabicRoles(user?.role || '')}</div>
                 </div>
                 {links.map((l) => (
                   <Link

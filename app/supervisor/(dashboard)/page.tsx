@@ -60,6 +60,9 @@ export default function DashboardHome() {
     .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
     .slice(0, 6);
 
+  const roles = user?.role ? user.role.split(',').map((r) => r.trim()) : [];
+  const canSeePayments = roles.some((r) => ['admin', 'secretary', 'finance_head'].includes(r));
+
   return (
     <div>
       <div className="mb-8">
@@ -160,7 +163,9 @@ export default function DashboardHome() {
               <div className="flex flex-col gap-2.5">
                 <Link href="/supervisor/students" className="btn btn-secondary justify-start">إدارة الطلاب</Link>
                 <Link href="/supervisor/attendance" className="btn btn-secondary justify-start">تسجيل الحضور</Link>
-                <Link href="/supervisor/payments" className="btn btn-secondary justify-start">مراجعة المدفوعات</Link>
+                {canSeePayments && (
+                  <Link href="/supervisor/payments" className="btn btn-secondary justify-start">مراجعة المدفوعات</Link>
+                )}
                 <Link href="/supervisor/points" className="btn btn-secondary justify-start">رصد النقاط</Link>
                 <Link href="/supervisor/announcements" className="btn btn-secondary justify-start">نشر إعلان</Link>
               </div>

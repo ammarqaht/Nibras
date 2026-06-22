@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { getSettings, saveSetting } from '@/lib/services';
+import { getSettings, saveSetting, getSupervisorByEmail } from '@/lib/services';
 
 export async function GET(req: NextRequest) {
   try {
@@ -19,7 +19,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'غير مصرح بالدخول' }, { status: 401 });
     }
 
-    if (session.role !== 'admin') {
+    const supervisor = await getSupervisorByEmail(session.email);
+    if (!supervisor) {
+      return NextResponse.json({ error: 'حساب غير موجود' }, { status: 401 });
+    }
+
+    const roles = supervisor.role.split(',').map(r => r.trim());
+    if (!roles.includes('admin') && !roles.includes('secretary')) {
       return NextResponse.json({ error: 'غير مصرح لك بتعديل الإعدادات' }, { status: 403 });
     }
 

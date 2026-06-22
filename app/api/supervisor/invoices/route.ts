@@ -13,7 +13,8 @@ import { supervisorDepartments } from '@/lib/finance';
 export const runtime = 'nodejs';
 
 function isFinanceOrAdmin(role: string) {
-  return role === 'admin' || role === 'finance';
+  const roles = role.split(',').map(r => r.trim());
+  return roles.includes('admin') || roles.includes('secretary') || roles.includes('finance_head') || roles.includes('finance');
 }
 
 export async function GET(req: NextRequest) {

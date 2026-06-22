@@ -43,7 +43,8 @@ function regPill(status: string) {
 
 export default function StudentsPage() {
   const { user } = useSupervisor();
-  const isAdmin = user?.role === 'admin';
+  const roles = user?.role ? user.role.split(',').map((r) => r.trim()) : [];
+  const isAdmin = roles.includes('admin') || roles.includes('secretary');
 
   const [students, setStudents] = useState<Student[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
