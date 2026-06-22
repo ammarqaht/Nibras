@@ -258,14 +258,18 @@ export default function DashboardHome() {
                 <h3 className="font-bold text-ink-900 mb-3 flex items-center gap-2">
                   <span>💸</span> نظرة سريعة: المدفوعات
                 </h3>
-                <div className="flex-1 grid grid-cols-2 gap-3 text-sm">
-                  <div className="bg-cream-50 rounded-lg p-3 text-center border border-ink-100">
-                    <div className="text-xl font-bold text-emerald-600">{stats.payments.paid}</div>
-                    <div className="text-xs text-ink-500">مدفوع ومؤكد</div>
+                <div className="flex-1 grid grid-cols-3 gap-2 text-sm">
+                  <div className="bg-cream-50 rounded-lg p-2 text-center border border-ink-100 flex flex-col justify-center">
+                    <div className="text-lg font-bold text-emerald-600">{stats.payments.paid}</div>
+                    <div className="text-[10px] text-ink-500 font-bold">مدفوع ومؤكد</div>
                   </div>
-                  <div className="bg-cream-50 rounded-lg p-3 text-center border border-ink-100">
-                    <div className="text-xl font-bold text-orange-500">{stats.payments.pendingReview}</div>
-                    <div className="text-xs text-ink-500">بانتظار المراجعة</div>
+                  <div className="bg-cream-50 rounded-lg p-2 text-center border border-ink-100 flex flex-col justify-center">
+                    <div className="text-lg font-bold text-emerald-600">{stats.payments.exempted || 0}</div>
+                    <div className="text-[10px] text-ink-500 font-bold">معفي من الرسوم</div>
+                  </div>
+                  <div className="bg-cream-50 rounded-lg p-2 text-center border border-ink-100 flex flex-col justify-center">
+                    <div className="text-lg font-bold text-orange-500">{stats.payments.pendingReview}</div>
+                    <div className="text-[10px] text-ink-500 font-bold">بانتظار المراجعة</div>
                   </div>
                 </div>
                 {stats.payments.pendingReview > 0 && (

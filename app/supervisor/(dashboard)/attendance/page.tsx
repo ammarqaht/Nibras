@@ -35,7 +35,7 @@ export default function AttendancePage() {
     const sj = await sr.json().catch(() => ({ students: [] }));
     const gj = await gr.json().catch(() => ({ groups: [] }));
     const allSt: Student[] = sj.students ?? [];
-    setStudents(allSt.filter((s) => s.registrationStatus === 'approved' && s.paymentStatus === 'paid'));
+    setStudents(allSt.filter((s) => s.registrationStatus === 'approved' && (s.paymentStatus === 'paid' || s.paymentStatus === 'exempted')));
     setGroups(gj.groups ?? []);
   }
 

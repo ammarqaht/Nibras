@@ -32,7 +32,8 @@ type Group = { id: number; name: string; stage: string };
 
 function paymentPill(s: Student) {
   if (s.paymentStatus === 'paid') return { cls: 'pill-green', label: 'مدفوع' };
-  if (s.paymentType === 'now' && s.paymentReceipt) return { cls: 'pill-yellow', label: 'بانتظار المراجعة 📑' };
+  if (s.paymentStatus === 'exempted') return { cls: 'pill-blue', label: 'معفي' };
+  if (s.paymentStatus !== 'paid' && s.paymentStatus !== 'exempted' && s.paymentType === 'now' && s.paymentReceipt) return { cls: 'pill-yellow', label: 'بانتظار المراجعة 📑' };
   return { cls: 'pill-red', label: 'لم يدفع' };
 }
 function regPill(status: string) {
@@ -805,6 +806,12 @@ function StudentModal({
     if (res) pushToast('success', 'تم تأكيد استلام الدفع');
   }
 
+  async function setExempted() {
+    if (!window.confirm('هل أنت متأكد من إعفاء الطالب من الرسوم؟')) return;
+    const res = await put({ paymentStatus: 'exempted' });
+    if (res) pushToast('success', 'تم إعفاء الطالب من الرسوم');
+  }
+
   async function setReg(status: string) {
     const res = await put({ registrationStatus: status });
     if (res) pushToast('success', status === 'approved' ? 'تم قبول الطالب' : status === 'rejected' ? 'تم رفض الطلب' : 'تم التحديث');
@@ -1016,22 +1023,33 @@ function StudentModal({
                   </div>
                 )}
 
-                {student.paymentStatus !== 'paid' ? (
+                {student.paymentStatus !== 'paid' && student.paymentStatus !== 'exempted' ? (
                   <div className="rounded-lg p-3" style={{ background: '#FCF3DC' }}>
                     <p className="text-sm mb-2" style={{ color: '#9A6B00' }}>لم يتم تأكيد السداد بعد.</p>
                     {isAdmin && (
-                      <button
-                        onClick={confirmPayment}
-                        disabled={busy}
-                        className="btn text-white border-transparent"
-                        style={{ background: '#1B7A43' }}
-                      >
-                        ✅ تأكيد استلام الدفع
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={confirmPayment}
+                          disabled={busy}
+                          className="btn text-white border-transparent text-xs py-1.5 px-3 flex-1 justify-center"
+                          style={{ background: '#1B7A43' }}
+                        >
+                          ✅ تأكيد الدفع
+                        </button>
+                        <button
+                          onClick={setExempted}
+                          disabled={busy}
+                          className="btn btn-secondary text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100 text-xs py-1.5 px-3 flex-1 justify-center"
+                        >
+                          إعفاء
+                        </button>
+                      </div>
                     )}
                   </div>
                 ) : (
-                  <p className="text-sm font-semibold" style={{ color: '#1B7A43' }}>✓ تم تأكيد استلام الدفع</p>
+                  <p className="text-sm font-semibold" style={{ color: student.paymentStatus === 'exempted' ? '#1E40AF' : '#1B7A43' }}>
+                    {student.paymentStatus === 'exempted' ? '✓ تم إعفاء الطالب من الرسوم' : '✓ تم تأكيد استلام الدفع'}
+                  </p>
                 )}
               </div>
 
@@ -1039,7 +1057,7 @@ function StudentModal({
               <div>
                 <div className="label">حالة التسجيل</div>
                 <div className="flex items-center gap-2">
-                  {student.paymentStatus === 'paid' ? (
+                  {student.paymentStatus === 'paid' || student.paymentStatus === 'exempted' ? (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium" style={{ background: '#DEF7E5', color: '#1B7A43' }}>
                       ✓ مقبول
                     </span>

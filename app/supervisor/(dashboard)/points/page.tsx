@@ -46,7 +46,7 @@ export default function PointsPage() {
     const grj = await gr.json().catch(() => ({ groups: [] }));
     const prj = await pr.json().catch(() => ({ points: [] }));
     const allSt: Student[] = srj.students ?? [];
-    setStudents(allSt.filter((s) => s.registrationStatus === 'approved' && s.paymentStatus === 'paid'));
+    setStudents(allSt.filter((s) => s.registrationStatus === 'approved' && (s.paymentStatus === 'paid' || s.paymentStatus === 'exempted')));
     setGroups(grj.groups ?? []);
     setPoints(prj.points ?? []);
     setLoading(false);

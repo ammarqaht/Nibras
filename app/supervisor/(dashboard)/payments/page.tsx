@@ -23,15 +23,16 @@ type Student = {
   registrationStatus: string;
 };
 
-type Tab = 'unpaid' | 'paid' | 'all';
+type Tab = 'unpaid' | 'paid' | 'exempted' | 'all';
 const TABS: { key: Tab; label: string }[] = [
   { key: 'all', label: 'الكل' },
   { key: 'paid', label: 'مدفوع' },
+  { key: 'exempted', label: 'معفي' },
   { key: 'unpaid', label: 'غير مدفوع' }
 ];
 
 function isReview(s: Student) {
-  return s.paymentStatus !== 'paid' && s.paymentType === 'now' && !!s.paymentReceipt;
+  return s.paymentStatus !== 'paid' && s.paymentStatus !== 'exempted' && s.paymentType === 'now' && !!s.paymentReceipt;
 }
 
 
@@ -56,10 +57,29 @@ export default function PaymentsPage() {
     return students.filter((s) => {
       if (tab === 'all') return true;
       if (tab === 'paid') return s.paymentStatus === 'paid';
-      if (tab === 'unpaid') return s.paymentStatus !== 'paid';
+      if (tab === 'exempted') return s.paymentStatus === 'exempted';
+      if (tab === 'unpaid') return s.paymentStatus !== 'paid' && s.paymentStatus !== 'exempted';
       return true;
     });
   }, [students, tab]);
+
+  async function setExempted(id: number) {
+    if (!window.confirm('هل أنت متأكد من إعفاء الطالب من الرسوم؟')) return;
+    setBusyId(id);
+    const r = await fetch('/api/supervisor/students', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, paymentStatus: 'exempted' })
+    });
+    setBusyId(null);
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return pushToast('error', j.error ?? 'فشل إعفاء الطالب');
+    pushToast('success', 'تم إعفاء الطالب من الرسوم');
+    setStudents((prev) => prev.map((s) => (s.id === id ? { ...s, paymentStatus: 'exempted', registrationStatus: 'approved' } : s)));
+    if (selectedStudent?.id === id) {
+      setSelectedStudent((prev) => prev ? { ...prev, paymentStatus: 'exempted', registrationStatus: 'approved' } : null);
+    }
+  }
 
   async function confirm(id: number) {
     setBusyId(id);
@@ -183,8 +203,8 @@ export default function PaymentsPage() {
                         )}
                       </td>
                       <td>
-                        <span className={`pill ${s.paymentStatus === 'paid' ? 'pill-green' : isReview(s) ? 'pill-yellow' : 'pill-red'}`}>
-                          {s.paymentStatus === 'paid' ? 'مدفوع' : isReview(s) ? 'بانتظار المراجعة' : 'لم يدفع'}
+                        <span className={`pill ${s.paymentStatus === 'paid' ? 'pill-green' : s.paymentStatus === 'exempted' ? 'pill-blue' : isReview(s) ? 'pill-yellow' : 'pill-red'}`}>
+                          {s.paymentStatus === 'paid' ? 'مدفوع' : s.paymentStatus === 'exempted' ? 'معفي' : isReview(s) ? 'بانتظار المراجعة' : 'لم يدفع'}
                         </span>
                       </td>
                       <td>
@@ -195,23 +215,32 @@ export default function PaymentsPage() {
                           >
                             👁️ بيانات الطالب
                           </button>
-                          {s.paymentStatus === 'paid' ? (
+                          {s.paymentStatus === 'paid' || s.paymentStatus === 'exempted' ? (
                             <button
                               onClick={() => cancelConfirm(s.id)}
                               disabled={busyId === s.id}
                               className="btn btn-danger py-1 px-3 text-xs flex items-center gap-1"
                             >
-                              ❌ إلغاء التأكيد
+                              ❌ إلغاء الدفع
                             </button>
                           ) : (
-                            <button
-                              onClick={() => confirm(s.id)}
-                              disabled={busyId === s.id}
-                              className="btn text-white border-transparent py-1 px-3 text-xs flex items-center gap-1"
-                              style={{ background: '#1B7A43' }}
-                            >
-                              ✅ تأكيد الدفع
-                            </button>
+                            <>
+                              <button
+                                onClick={() => confirm(s.id)}
+                                disabled={busyId === s.id}
+                                className="btn text-white border-transparent py-1 px-3 text-xs flex items-center gap-1"
+                                style={{ background: '#1B7A43' }}
+                              >
+                                ✅ تأكيد الدفع
+                              </button>
+                              <button
+                                onClick={() => setExempted(s.id)}
+                                disabled={busyId === s.id}
+                                className="btn btn-secondary py-1 px-3 text-xs flex items-center gap-1 text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100"
+                              >
+                                إعفاء
+                              </button>
+                            </>
                           )}
                         </div>
                       </td>
@@ -234,8 +263,8 @@ export default function PaymentsPage() {
                       </h3>
                       <span dir="ltr" className="font-mono text-xs text-ink-400">#{s.membershipNo}</span>
                     </div>
-                    <span className={`pill ${s.paymentStatus === 'paid' ? 'pill-green' : isReview(s) ? 'pill-yellow' : 'pill-red'}`}>
-                      {s.paymentStatus === 'paid' ? 'مدفوع' : isReview(s) ? 'بانتظار المراجعة' : 'لم يدفع'}
+                    <span className={`pill ${s.paymentStatus === 'paid' ? 'pill-green' : s.paymentStatus === 'exempted' ? 'pill-blue' : isReview(s) ? 'pill-yellow' : 'pill-red'}`}>
+                      {s.paymentStatus === 'paid' ? 'مدفوع' : s.paymentStatus === 'exempted' ? 'معفي' : isReview(s) ? 'بانتظار المراجعة' : 'لم يدفع'}
                     </span>
                   </div>
 
@@ -270,31 +299,40 @@ export default function PaymentsPage() {
                   </div>
 
                   {/* Actions Row */}
-                  <div className="flex gap-2 pt-1">
-                    <button
-                      onClick={() => setSelectedStudent(s)}
-                      className="btn btn-secondary py-2 px-3 text-xs flex-1 flex items-center justify-center gap-1"
-                    >
-                      👁️ بيانات الطالب
-                    </button>
-                    {s.paymentStatus === 'paid' ? (
+                  <div className="flex gap-2">
+                    {s.paymentStatus === 'paid' || s.paymentStatus === 'exempted' ? (
                       <button
                         onClick={() => cancelConfirm(s.id)}
                         disabled={busyId === s.id}
-                        className="btn btn-danger py-2 px-3 text-xs flex-1 flex items-center justify-center gap-1"
+                        className="btn btn-danger py-1 px-3 text-xs flex-1 flex items-center justify-center gap-1"
                       >
-                        ❌ إلغاء التأكيد
+                        ❌ إلغاء
                       </button>
                     ) : (
-                      <button
-                        onClick={() => confirm(s.id)}
-                        disabled={busyId === s.id}
-                        className="btn text-white border-transparent py-2 px-3 text-xs flex-1 flex items-center justify-center gap-1"
-                        style={{ background: '#1B7A43' }}
-                      >
-                        ✅ تأكيد الدفع
-                      </button>
+                      <>
+                        <button
+                          onClick={() => confirm(s.id)}
+                          disabled={busyId === s.id}
+                          className="btn text-white border-transparent py-1 px-3 text-xs flex-1 flex items-center justify-center gap-1"
+                          style={{ background: '#1B7A43' }}
+                        >
+                          ✅ تأكيد
+                        </button>
+                        <button
+                          onClick={() => setExempted(s.id)}
+                          disabled={busyId === s.id}
+                          className="btn btn-secondary py-1 px-3 text-xs flex-1 flex items-center justify-center gap-1 text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100"
+                        >
+                          إعفاء
+                        </button>
+                      </>
                     )}
+                    <button
+                      onClick={() => setSelectedStudent(s)}
+                      className="btn btn-secondary py-1 px-3 text-xs flex items-center justify-center"
+                    >
+                      👁️
+                    </button>
                   </div>
                 </div>
               ))}
@@ -407,8 +445,8 @@ function StudentDetailsModal({
         <div className="p-5 overflow-y-auto space-y-4 text-sm scroll-soft flex-1">
           {/* Status Indicators */}
           <div className="flex gap-2 flex-wrap">
-            <span className={`pill ${student.paymentStatus === 'paid' ? 'pill-green' : isReview(student) ? 'pill-yellow' : 'pill-red'}`}>
-              {student.paymentStatus === 'paid' ? 'مدفوع' : isReview(student) ? 'بانتظار المراجعة' : 'لم يدفع'}
+            <span className={`pill ${student.paymentStatus === 'paid' ? 'pill-green' : student.paymentStatus === 'exempted' ? 'pill-blue' : isReview(student) ? 'pill-yellow' : 'pill-red'}`}>
+              {student.paymentStatus === 'paid' ? 'مدفوع' : student.paymentStatus === 'exempted' ? 'معفي' : isReview(student) ? 'بانتظار المراجعة' : 'لم يدفع'}
             </span>
             <span className="pill pill-gray text-xs font-semibold">
               {student.paymentType === 'now' ? 'فوري' : 'آجل'}

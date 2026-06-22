@@ -55,7 +55,8 @@ export async function GET(req: NextRequest) {
     const approvedStudents = students.filter(s => s.registrationStatus === 'approved').length;
     const pendingStudents = students.filter(s => s.registrationStatus === 'pending').length;
     const paidStudents = students.filter(s => s.paymentStatus === 'paid').length;
-    const pendingReviewPayments = students.filter(s => s.paymentStatus !== 'paid' && s.paymentType === 'now' && !!s.paymentReceipt).length;
+    const exemptedStudents = students.filter(s => s.paymentStatus === 'exempted').length;
+    const pendingReviewPayments = students.filter(s => s.paymentStatus !== 'paid' && s.paymentStatus !== 'exempted' && s.paymentType === 'now' && !!s.paymentReceipt).length;
     const conditionStudents = students.filter(s => s.hasCondition).length;
 
     // 2. Attendance
@@ -120,8 +121,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       stats: {
         students: { total: totalStudents, approved: approvedStudents, pending: pendingStudents, conditions: conditionStudents },
-        payments: { paid: paidStudents, pendingReview: pendingReviewPayments },
-        attendance: { presentToday: presentCount, absentToday: absentCount, activeBase: Math.max(approvedStudents, 1) },
+        payments: { paid: paidStudents, exempted: exemptedStudents, pendingReview: pendingReviewPayments },
+        attendance: { presentToday: presentCount, absentToday: absentCount, activeBase: Math.max(paidStudents + exemptedStudents, 1) },
         points: { today: pointsToday, topGroup: topGroup, topGroupPoints: maxPoints },
         tasks: { active: activeTasksCount, pendingReview: pendingSubmissionsCount },
         schedule: { todayCount: todayScheduleCount, nextProgramTitle },
