@@ -8,46 +8,46 @@ import ToastHost from './Toast';
 
 export type SupervisorUser = { id: number; email: string; name: string; role: string };
 
-export const ROLE_MAP: Record<string, string> = {
-  admin: 'المدير العام',
-  secretary: 'أمين النادي',
-  finance_head: 'مسؤول المالية',
-  media_head: 'مسؤول الإعلامية',
-  cultural_head: 'مسؤول الثقافية',
-  sports_head: 'مسؤول الرياضية',
-  stage_head_elementary: 'مسؤول المرحلة الابتدائية',
-  stage_head_middle: 'مسؤول المرحلة المتوسطة',
-  stage_head_high: 'مسؤول المرحلة الثانوية',
-  media_supervisor: 'مشرف الإعلامية',
-  attendance_supervisor: 'مشرف التحضير',
-  group_supervisor: 'مشرف أسرة/مجموعة'
-};
-
-export function getArabicRoles(roleString: string): string {
-  if (!roleString) return 'مشرف';
-  const roles = roleString.split(',').map(r => r.trim());
-  const arabicNames = roles.map(r => ROLE_MAP[r] || r);
-  return arabicNames.join('، ');
-}
-
 const SupervisorContext = createContext<{ user: SupervisorUser | null }>({ user: null });
 export const useSupervisor = () => useContext(SupervisorContext);
 
 type NavLink = { href: string; label: string; roles?: string[] };
 
+const ROLE_MAP: Record<string, string> = {
+  admin: 'مدير عام',
+  finance: 'مسؤول المالية',
+  attendance_supervisor: 'مشرف تحضير',
+  social_supervisor: 'مشرف اجتماعية',
+  cultural_supervisor: 'مشرف ثقافية',
+  groups_supervisor: 'مشرف أسر',
+  general_supervisor: 'مشرف عام',
+  finance_supervisor: 'مسؤول المالية',
+  media_supervisor: 'مسؤول الإعلامية'
+};
+
+const getRoleLabel = (roleStr: string) => {
+  if (roleStr === 'admin') return 'مدير عام';
+  if (roleStr === 'finance') return 'مسؤول المالية';
+  return roleStr
+    .split(',')
+    .map((r) => ROLE_MAP[r.trim()] || r)
+    .filter(Boolean)
+    .join('، ') || 'مشرف';
+};
+
 const LINKS: NavLink[] = [
   { href: '/supervisor', label: 'الرئيسية' },
   { href: '/supervisor/students', label: 'الطلاب' },
-  { href: '/supervisor/attendance', label: 'الحضور' },
-  { href: '/supervisor/points', label: 'النقاط' },
-  { href: '/supervisor/tasks', label: 'المهام' },
-  { href: '/supervisor/groups', label: 'المجموعات' },
-  { href: '/supervisor/payments', label: 'المدفوعات', roles: ['admin', 'secretary', 'finance_head'] },
+  { href: '/supervisor/attendance', label: 'الحضور', roles: ['attendance_supervisor', 'general_supervisor'] },
+  { href: '/supervisor/points', label: 'النقاط', roles: ['social_supervisor', 'cultural_supervisor', 'general_supervisor'] },
+  { href: '/supervisor/tasks', label: 'المهام', roles: ['general_supervisor'] },
+  { href: '/supervisor/groups', label: 'المجموعات', roles: ['groups_supervisor', 'general_supervisor'] },
+  { href: '/supervisor/payments', label: 'المدفوعات', roles: ['finance', 'finance_supervisor'] },
   { href: '/supervisor/invoices', label: 'الفواتير' },
-  { href: '/supervisor/finance', label: 'المالية', roles: ['admin', 'secretary', 'finance_head'] },
-  { href: '/supervisor/announcements', label: 'الإشعارات' },
-  { href: '/supervisor/supervisors', label: 'المشرفون', roles: ['admin', 'secretary'] },
-  { href: '/supervisor/settings', label: 'الإعدادات', roles: ['admin', 'secretary'] }
+  { href: '/supervisor/finance', label: 'المالية', roles: ['finance', 'finance_supervisor'] },
+  { href: '/supervisor/announcements', label: 'الإشعارات', roles: ['media_supervisor', 'general_supervisor'] },
+  { href: '/supervisor/supervisors', label: 'المشرفون', roles: ['admin'] },
+  { href: '/supervisor/settings', label: 'الإعدادات', roles: ['admin'] }
 ];
 
 export default function SupervisorShell({ children }: { children: React.ReactNode }) {
@@ -137,11 +137,18 @@ export default function SupervisorShell({ children }: { children: React.ReactNod
     );
   }
 
-  const roles = user?.role ? user.role.split(',').map((r) => r.trim()) : [];
+  const userRoles = user?.role ? user.role.split(',').map((r) => r.trim()) : [];
+  const isAdmin = userRoles.includes('admin');
+
   const links = LINKS.filter((l) => {
+    if (isAdmin) return true;
     if (!l.roles) return true;
-    return l.roles.some((role) => roles.includes(role));
+    return l.roles.some((r) => userRoles.includes(r));
   });
+
+  const currentLink = LINKS.find((l) => path === l.href || (l.href !== '/supervisor' && path.startsWith(l.href)));
+  const hasAccess = !currentLink || isAdmin || !currentLink.roles || currentLink.roles.some((r) => userRoles.includes(r));
+
   const isActive = (href: string) => (href === '/supervisor' ? path === href : path.startsWith(href));
 
   return (
@@ -183,7 +190,7 @@ export default function SupervisorShell({ children }: { children: React.ReactNod
               <span className="hidden sm:flex flex-col items-end leading-tight">
                 <span className="text-sm font-semibold text-ink-900">{user?.name}</span>
                 <span className="text-[0.7rem] text-ink-400">
-                  {getArabicRoles(user?.role || '')}
+                  {getRoleLabel(user?.role ?? '')}
                 </span>
               </span>
               <button onClick={logout} className="!hidden lg:!inline-flex btn btn-ghost text-sm">
@@ -198,7 +205,7 @@ export default function SupervisorShell({ children }: { children: React.ReactNod
               <div className="px-3 py-3 flex flex-col gap-1 max-w-7xl mx-auto">
                 <div className="px-3 pb-2 mb-1 border-b border-ink-100">
                   <div className="text-sm font-semibold text-ink-900">{user?.name}</div>
-                  <div className="text-xs text-ink-400">{getArabicRoles(user?.role || '')}</div>
+                  <div className="text-xs text-ink-400">{getRoleLabel(user?.role ?? '')}</div>
                 </div>
                 {links.map((l) => (
                   <Link
@@ -223,7 +230,15 @@ export default function SupervisorShell({ children }: { children: React.ReactNod
           )}
         </header>
 
-        <main className="flex-1 px-4 md:px-8 py-6 md:py-7 max-w-7xl mx-auto w-full">{children}</main>
+        <main className="flex-1 px-4 md:px-8 py-6 md:py-7 max-w-7xl mx-auto w-full">
+          {hasAccess ? (
+            children
+          ) : (
+            <div className="card p-10 text-center text-ink-500 font-sans mt-8">
+              🔒 عذراً، لا تملك الصلاحية الكافية للوصول إلى هذه الصفحة.
+            </div>
+          )}
+        </main>
       </div>
     </SupervisorContext.Provider>
   );

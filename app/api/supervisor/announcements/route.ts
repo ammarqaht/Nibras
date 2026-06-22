@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { getAnnouncements, createAnnouncement } from '@/lib/services';
+import { getAnnouncements, createAnnouncement, getSupervisorByEmail } from '@/lib/services';
 
 export async function GET(req: NextRequest) {
   try {
@@ -22,6 +22,17 @@ export async function POST(req: NextRequest) {
     const session = getSession(req);
     if (!session) {
       return NextResponse.json({ error: 'غير مصرح بالدخول' }, { status: 401 });
+    }
+
+    const supervisor = await getSupervisorByEmail(session.email);
+    if (!supervisor) {
+      return NextResponse.json({ error: 'حساب غير موجود' }, { status: 401 });
+    }
+
+    const roles = supervisor.role.split(',').map(r => r.trim());
+    const isAllowed = roles.some(r => ['admin', 'media_supervisor', 'general_supervisor'].includes(r));
+    if (!isAllowed) {
+      return NextResponse.json({ error: 'غير مصرح لك بنشر الإعلانات' }, { status: 403 });
     }
 
     const body = await req.json();

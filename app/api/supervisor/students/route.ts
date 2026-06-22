@@ -25,26 +25,20 @@ export async function GET(req: NextRequest) {
 
     let students = await getStudents();
 
+    // Role-based scoping: supervisor only sees their group's students if they are not in a global role.
     const roles = supervisor.role.split(',').map(r => r.trim());
-    const hasGlobalAccess = roles.some(r =>
-      ['admin', 'secretary', 'finance_head', 'media_head'].includes(r)
+    const isGlobal = roles.some(r =>
+      ['admin', 'finance', 'finance_supervisor', 'media_supervisor', 'cultural_supervisor', 'social_supervisor', 'general_supervisor', 'attendance_supervisor'].includes(r)
     );
 
-    // Identify stage heads and their allowed stages
-    const allowedStages: string[] = [];
-    if (roles.includes('stage_head_elementary')) allowedStages.push('ابتدائي');
-    if (roles.includes('stage_head_middle')) allowedStages.push('متوسط');
-    if (roles.includes('stage_head_high')) allowedStages.push('ثانوي');
+    if (!isGlobal) {
+      const allowedGroupIds = supervisor.groupIds
+        .split(',')
+        .map(id => parseInt(id.trim(), 10))
+        .filter(id => !isNaN(id));
 
-    // If supervisor is a stage head and not global, only return students of their stage
-    if (allowedStages.length > 0 && !hasGlobalAccess) {
-      students = students.filter(s => allowedStages.includes(s.stage));
+      students = students.filter(s => s.groupId !== null && allowedGroupIds.includes(s.groupId));
     }
-
-    // Parse supervisor groupIds for group supervisor matching
-    const supervisorGroupIds = supervisor.groupIds
-      ? supervisor.groupIds.split(',').map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id))
-      : [];
 
     // Apply search query
     if (search) {
@@ -75,23 +69,7 @@ export async function GET(req: NextRequest) {
       students = students.filter(s => s.groupId === gId);
     }
 
-    // Apply masking to sensitive fields for unauthorized students
-    const maskedStudents = students.map(s => {
-      // Check full details access for this student
-      const hasFullAccess =
-        hasGlobalAccess ||
-        allowedStages.includes(s.stage) ||
-        (s.groupId !== null && supervisorGroupIds.includes(s.groupId));
-
-      return {
-        ...s,
-        nationalId: hasFullAccess ? s.nationalId : 'محجوب',
-        guardianPhone: hasFullAccess ? s.guardianPhone : 'محجوب',
-        studentPhone: s.studentPhone ? (hasFullAccess ? s.studentPhone : 'محجوب') : null
-      };
-    });
-
-    return NextResponse.json({ students: maskedStudents });
+    return NextResponse.json({ students });
   } catch (error) {
     console.error('students GET error', error);
     return NextResponse.json({ error: 'حدث خطأ أثناء تحميل البيانات' }, { status: 500 });
@@ -116,10 +94,25 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'معرّف الطالب غير صحيح' }, { status: 400 });
     }
 
-    // Check permissions: ONLY admin (General Manager) or secretary (Club Secretary) can edit student details.
+    // Check permissions: ONLY admin (General Manager) or finance (Finance Officer) can edit.
     const roles = supervisor.role.split(',').map(r => r.trim());
-    if (!roles.includes('admin') && !roles.includes('secretary')) {
-      return NextResponse.json({ error: 'غير مصرح لك بتعديل بيانات الطلاب، التعديل متاح للمدير العام وأمين النادي فقط.' }, { status: 403 });
+    const isAdmin = roles.includes('admin');
+    const isFinance = roles.includes('finance') || roles.includes('finance_supervisor');
+
+    if (!isAdmin && !isFinance) {
+      return NextResponse.json({ error: 'غير مصرح لك بإجراء هذه العملية.' }, { status: 403 });
+    }
+
+    // Finance officer can only update payment fields
+    if (!isAdmin && isFinance) {
+      const allowedKeys = ['id', 'paymentStatus', 'registrationStatus', 'paymentType', 'paymentReceipt'];
+      const keys = Object.keys(body);
+      const invalidKeys = keys.filter(k => !allowedKeys.includes(k));
+      if (invalidKeys.length > 0) {
+        return NextResponse.json({
+          error: 'غير مصرح لك بتعديل بيانات الطلاب الشخصية، التعديل متاح للمدير العام فقط.'
+        }, { status: 403 });
+      }
     }
 
     // Auto-set registrationStatus based on paymentStatus
@@ -165,17 +158,6 @@ export async function POST(req: NextRequest) {
     const session = getSession(req);
     if (!session) {
       return NextResponse.json({ error: 'غير مصرح بالدخول' }, { status: 401 });
-    }
-
-    const supervisor = await getSupervisorByEmail(session.email);
-    if (!supervisor) {
-      return NextResponse.json({ error: 'حساب غير موجود' }, { status: 401 });
-    }
-
-    // Check permissions: ONLY admin (General Manager) or secretary (Club Secretary) can add student details manually.
-    const roles = supervisor.role.split(',').map(r => r.trim());
-    if (!roles.includes('admin') && !roles.includes('secretary')) {
-      return NextResponse.json({ error: 'غير مصرح لك بإضافة طلاب، هذه الصلاحية للمدير العام وأمين النادي فقط.' }, { status: 403 });
     }
 
     const body = await req.json();
@@ -232,13 +214,8 @@ export async function DELETE(req: NextRequest) {
     }
 
     const supervisor = await getSupervisorByEmail(session.email);
-    if (!supervisor) {
-      return NextResponse.json({ error: 'حساب غير موجود' }, { status: 401 });
-    }
-
-    const roles = supervisor.role.split(',').map(r => r.trim());
-    if (!roles.includes('admin') && !roles.includes('secretary')) {
-      return NextResponse.json({ error: 'غير مصرح لك بحذف الطلاب، الحذف متاح للمدير العام وأمين النادي فقط.' }, { status: 403 });
+    if (!supervisor || supervisor.role !== 'admin') {
+      return NextResponse.json({ error: 'غير مصرح لك بحذف الطلاب' }, { status: 403 });
     }
 
     const { searchParams } = new URL(req.url);
