@@ -76,6 +76,9 @@ export default function AnnouncementsPage() {
   const [coverImage, setCoverImage] = useState<string | null>(null);
   const [contentImages, setContentImages] = useState<string[]>([]);
 
+  // Detailed Modal View state
+  const [activeDetails, setActiveDetails] = useState<Announcement | null>(null);
+
   async function loadAnnouncements() {
     const r = await fetch('/api/supervisor/announcements', { cache: 'no-store' });
     setItems((await r.json().catch(() => ({ announcements: [] }))).announcements ?? []);
@@ -156,6 +159,7 @@ export default function AnnouncementsPage() {
   }
 
   const startEdit = (a: Announcement) => {
+    setActiveDetails(null);
     setEditId(a.id);
     setTitle(a.title);
     setBody(a.body);
@@ -171,11 +175,12 @@ export default function AnnouncementsPage() {
     }
     setContentImages(contentImgs);
 
-    if (a.audience === 'all' || a.audience === 'students' || a.audience === 'guardians') {
-      setSelectedAudience([a.audience]);
-    } else {
-      setSelectedAudience(a.audience.split(','));
-    }
+    // Filter out legacy values like 'all', 'students', 'guardians' so they do not stack with stage/group values
+    const filteredAudience = a.audience
+      .split(',')
+      .map((x) => x.trim())
+      .filter((x) => x.startsWith('stage:') || x.startsWith('group:'));
+    setSelectedAudience(filteredAudience);
   };
 
   const cancelEdit = () => {
@@ -198,6 +203,7 @@ export default function AnnouncementsPage() {
     }
     pushToast('success', 'تم حذف الإعلان بنجاح');
     if (editId === id) cancelEdit();
+    if (activeDetails?.id === id) setActiveDetails(null);
     loadAnnouncements();
   }
 
@@ -217,6 +223,7 @@ export default function AnnouncementsPage() {
         }
         return item;
       })
+      .filter(Boolean)
       .join('، ');
   };
 
@@ -376,89 +383,185 @@ export default function AnnouncementsPage() {
           </div>
         </form>
 
-        {/* Announcements List */}
-        <div className="lg:col-span-2 space-y-4">
+        {/* Compact Announcements List */}
+        <div className="lg:col-span-2 space-y-3">
           {loading ? (
             <div className="card p-12 text-center text-ink-400 text-sm">جارٍ تحميل الإعلانات…</div>
           ) : items.length === 0 ? (
             <div className="card p-12 text-center text-ink-400 text-sm">لا توجد إعلانات منشورة حالياً.</div>
           ) : (
             items.map((a) => (
-              <div key={a.id} className="card bg-white border border-ink-150 hover:shadow-md transition-shadow overflow-hidden">
-                {/* Cover Image displayed ABOVE title */}
-                {a.imageUrl && (
-                  <div className="relative h-48 w-full overflow-hidden border-b border-ink-150">
+              <div
+                key={a.id}
+                className="card bg-white border border-ink-150 hover:shadow-md transition-shadow p-3 flex gap-4 items-center"
+              >
+                {/* Small Cover Image Thumbnail */}
+                {a.imageUrl ? (
+                  <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 border border-ink-100 bg-ink-50">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={a.imageUrl}
                       alt={a.title}
-                      onClick={() => window.open(a.imageUrl!, '_blank')}
-                      className="w-full h-full object-cover cursor-pointer hover:scale-[1.01] transition-transform duration-200"
+                      className="w-full h-full object-cover"
                     />
                   </div>
+                ) : (
+                  <div className="w-16 h-16 rounded-xl bg-cream-50 flex items-center justify-center flex-shrink-0 text-brand-600 border border-ink-100 text-xl">
+                    📢
+                  </div>
                 )}
-                
-                <div className="p-5">
-                  <div className="flex items-start justify-between gap-3 mb-2 flex-wrap">
-                    <div>
-                      <h3 className="font-bold text-ink-900 text-base leading-snug">{a.title}</h3>
-                      <div className="text-[0.7rem] text-ink-400 mt-1" dir="ltr">
-                        {new Date(a.createdAt).toLocaleString('ar')}
-                      </div>
-                    </div>
-                    <span className="pill pill-blue text-xs max-w-xs truncate" title={audLabel(a.audience)}>
-                      📢 {audLabel(a.audience)}
+
+                {/* Text Info (Title & Short description snippet) */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                    <h3 className="font-bold text-ink-900 text-sm truncate max-w-[200px] sm:max-w-xs">{a.title}</h3>
+                    <span className="pill pill-blue text-[10px] py-0.5 px-2 truncate" title={audLabel(a.audience)}>
+                      {audLabel(a.audience)}
                     </span>
                   </div>
+                  
+                  {/* Short snippet of content */}
+                  <p className="text-xs text-ink-500 line-clamp-1 leading-relaxed pl-2">
+                    {a.body}
+                  </p>
 
-                  <p className="text-sm text-ink-700 leading-relaxed whitespace-pre-wrap mt-2">{a.body}</p>
-
-                  {/* Render content images gallery if present */}
-                  {(() => {
-                    let contentImgList: string[] = [];
-                    if (a.images) {
-                      try {
-                        contentImgList = JSON.parse(a.images);
-                      } catch {}
-                    }
-                    if (contentImgList.length === 0) return null;
-                    return (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-4 pt-3 border-t border-ink-100">
-                        {contentImgList.map((src, idx) => (
-                          <div key={idx} className="overflow-hidden rounded-xl border border-ink-150 shadow-sm aspect-video bg-ink-50">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={src}
-                              alt={`مرفق محتوى ${idx + 1}`}
-                              onClick={() => window.open(src, '_blank')}
-                              className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform duration-200"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })()}
-
-                  <div className="flex gap-2 justify-end mt-4 border-t border-ink-100 pt-3">
-                    <button
-                      onClick={() => startEdit(a)}
-                      className="btn btn-secondary py-1 px-3 text-xs"
-                    >
-                      ✎ تعديل الإعلان
-                    </button>
-                    <button
-                      onClick={() => del(a.id)}
-                      className="btn btn-danger py-1 px-3 text-xs"
-                    >
-                      🗑️ حذف
-                    </button>
+                  <div className="text-[9px] text-ink-400 mt-1" dir="ltr">
+                    {new Date(a.createdAt).toLocaleString('ar')}
                   </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex flex-row gap-1 flex-shrink-0 items-center">
+                  <button
+                    onClick={() => setActiveDetails(a)}
+                    className="btn btn-secondary py-1 px-2 text-[11px] font-semibold"
+                    type="button"
+                    title="عرض كامل التفاصيل"
+                  >
+                    🔍 عرض
+                  </button>
+                  <button
+                    onClick={() => startEdit(a)}
+                    className="btn btn-secondary py-1 px-2 text-[11px] font-semibold"
+                    type="button"
+                  >
+                    ✎ تعديل
+                  </button>
+                  <button
+                    onClick={() => del(a.id)}
+                    className="btn btn-danger py-1 px-2 text-[11px] font-semibold"
+                    type="button"
+                  >
+                    🗑️
+                  </button>
                 </div>
               </div>
             ))
           )}
         </div>
       </div>
+
+      {/* Detailed Modal for viewing full announcement */}
+      {activeDetails && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fade-in" dir="rtl">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-ink-150 flex flex-col">
+            
+            {/* Modal Cover Image */}
+            {activeDetails.imageUrl && (
+              <div className="relative h-56 w-full overflow-hidden flex-shrink-0">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={activeDetails.imageUrl}
+                  alt={activeDetails.title}
+                  className="w-full h-full object-cover"
+                />
+                <button
+                  onClick={() => setActiveDetails(null)}
+                  className="absolute top-3 right-3 bg-black/65 hover:bg-black/85 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold text-lg transition-colors shadow-md leading-none"
+                  type="button"
+                >
+                  ×
+                </button>
+              </div>
+            )}
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-4">
+              {!activeDetails.imageUrl && (
+                <div className="flex justify-between items-start border-b border-ink-100 pb-3">
+                  <h2 className="text-xl font-bold text-ink-900">{activeDetails.title}</h2>
+                  <button
+                    onClick={() => setActiveDetails(null)}
+                    className="text-ink-400 hover:text-ink-600 font-bold text-2xl"
+                    type="button"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+
+              {activeDetails.imageUrl && (
+                <div className="border-b border-ink-100 pb-2">
+                  <h2 className="text-xl font-bold text-ink-900">{activeDetails.title}</h2>
+                </div>
+              )}
+
+              {/* Metadata */}
+              <div className="flex items-center gap-3 text-xs text-ink-500 flex-wrap">
+                <span>📅 {new Date(activeDetails.createdAt).toLocaleString('ar')}</span>
+                <span className="pill pill-blue text-[11px]">
+                  📢 الجمهور: {audLabel(activeDetails.audience)}
+                </span>
+              </div>
+
+              {/* Full Text */}
+              <p className="text-sm text-ink-700 leading-relaxed whitespace-pre-wrap">
+                {activeDetails.body}
+              </p>
+
+              {/* Content Gallery */}
+              {(() => {
+                let contentImgList: string[] = [];
+                if (activeDetails.images) {
+                  try {
+                    contentImgList = JSON.parse(activeDetails.images);
+                  } catch {}
+                }
+                if (contentImgList.length === 0) return null;
+                return (
+                  <div className="space-y-2 border-t border-ink-100 pt-4">
+                    <h4 className="text-xs font-bold text-ink-900">الصور المرفقة بالمنشور:</h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {contentImgList.map((src, idx) => (
+                        <div key={idx} className="overflow-hidden rounded-xl border border-ink-150 shadow-sm aspect-video bg-ink-50">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={src}
+                            alt={`مرفق تفاصيل ${idx + 1}`}
+                            onClick={() => window.open(src, '_blank')}
+                            className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform duration-200"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-ink-100 flex justify-end bg-cream-50/50 rounded-b-2xl flex-shrink-0">
+              <button
+                onClick={() => setActiveDetails(null)}
+                className="btn btn-secondary px-5 py-1.5"
+                type="button"
+              >
+                إغلاق
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
