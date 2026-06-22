@@ -61,6 +61,28 @@ export default function LandingMotion() {
       );
       els.forEach((el) => io.observe(el));
       cleanups.push(() => io.disconnect());
+
+      // Fallback scroll-active observer for mobile if screen is small
+      if (window.innerWidth <= 768) {
+        const mobileIo = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (entry.isIntersecting) {
+                entry.target.classList.add('active-mobile');
+              } else {
+                entry.target.classList.remove('active-mobile');
+              }
+            });
+          },
+          {
+            rootMargin: '-35% 0px -35% 0px', // targets the middle 30% of the screen
+            threshold: 0
+          }
+        );
+        const cards = document.querySelectorAll<HTMLElement>('.card');
+        cards.forEach((card) => mobileIo.observe(card));
+        cleanups.push(() => mobileIo.disconnect());
+      }
     }
 
     async function run() {
@@ -145,6 +167,20 @@ export default function LandingMotion() {
             }
           );
         }
+      });
+
+      // ---- Mobile Scroll-Active Cards (Center of Viewport) ----
+      const mm = gsap.matchMedia();
+      mm.add("(max-width: 768px)", () => {
+        const cards = gsap.utils.toArray('.card') as HTMLElement[];
+        cards.forEach((card) => {
+          ScrollTrigger.create({
+            trigger: card,
+            start: 'top 65%',
+            end: 'bottom 35%',
+            toggleClass: 'active-mobile',
+          });
+        });
       });
 
       ScrollTrigger.refresh();
