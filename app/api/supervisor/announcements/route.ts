@@ -42,12 +42,12 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { title, body: contentText, audience, imageUrl } = body;
+    const { title, body: contentText, audience, imageUrl, images } = body;
     if (!title || !contentText || !audience) {
       return NextResponse.json({ error: 'البيانات غير كاملة (العنوان والمحتوى والجمهور مطلوبان)' }, { status: 400 });
     }
 
-    const announcement = await createAnnouncement(title, contentText, audience, imageUrl);
+    const announcement = await createAnnouncement(title, contentText, audience, imageUrl, images);
     return NextResponse.json({ success: true, announcement });
   } catch (error) {
     console.error('announcements POST error', error);
@@ -83,7 +83,8 @@ export async function PUT(req: NextRequest) {
       title: body.title,
       body: body.body,
       audience: body.audience,
-      imageUrl: body.imageUrl
+      imageUrl: body.imageUrl,
+      images: body.images
     });
 
     return NextResponse.json({ success: true, announcement: updated });

@@ -103,6 +103,7 @@ export type AnnouncementInfo = {
   body: string;
   audience: string;
   imageUrl?: string | null;
+  images?: string | null;
   createdAt: string;
 };
 
@@ -692,6 +693,7 @@ export async function getAnnouncements(): Promise<AnnouncementInfo[]> {
       body: a.body,
       audience: a.audience,
       imageUrl: a.imageUrl,
+      images: a.images,
       createdAt: a.createdAt.toISOString()
     }));
   } else {
@@ -699,11 +701,11 @@ export async function getAnnouncements(): Promise<AnnouncementInfo[]> {
   }
 }
 
-export async function createAnnouncement(title: string, body: string, audience: string, imageUrl?: string | null): Promise<AnnouncementInfo> {
+export async function createAnnouncement(title: string, body: string, audience: string, imageUrl?: string | null, images?: string | null): Promise<AnnouncementInfo> {
   if (hasDatabase) {
     const prisma = getPrisma()!;
     const a = await prisma.announcement.create({
-      data: { title, body, audience, imageUrl }
+      data: { title, body, audience, imageUrl, images }
     });
     return {
       id: a.id,
@@ -711,6 +713,7 @@ export async function createAnnouncement(title: string, body: string, audience: 
       body: a.body,
       audience: a.audience,
       imageUrl: a.imageUrl,
+      images: a.images,
       createdAt: a.createdAt.toISOString()
     };
   } else {
@@ -721,6 +724,7 @@ export async function createAnnouncement(title: string, body: string, audience: 
       body,
       audience,
       imageUrl: imageUrl || null,
+      images: images || null,
       createdAt: new Date().toISOString()
     };
     list.push(newAnnounce);
@@ -729,7 +733,7 @@ export async function createAnnouncement(title: string, body: string, audience: 
   }
 }
 
-export async function updateAnnouncement(id: number, patch: { title?: string; body?: string; audience?: string; imageUrl?: string | null }): Promise<AnnouncementInfo | null> {
+export async function updateAnnouncement(id: number, patch: { title?: string; body?: string; audience?: string; imageUrl?: string | null; images?: string | null }): Promise<AnnouncementInfo | null> {
   if (hasDatabase) {
     const prisma = getPrisma()!;
     const a = await prisma.announcement.update({
@@ -738,7 +742,8 @@ export async function updateAnnouncement(id: number, patch: { title?: string; bo
         title: patch.title,
         body: patch.body,
         audience: patch.audience,
-        imageUrl: patch.imageUrl
+        imageUrl: patch.imageUrl,
+        images: patch.images
       }
     });
     return {
@@ -747,6 +752,7 @@ export async function updateAnnouncement(id: number, patch: { title?: string; bo
       body: a.body,
       audience: a.audience,
       imageUrl: a.imageUrl,
+      images: a.images,
       createdAt: a.createdAt.toISOString()
     };
   } else {

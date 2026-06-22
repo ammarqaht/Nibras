@@ -9,6 +9,7 @@ type Announcement = {
   body: string;
   audience: string;
   imageUrl?: string | null;
+  images?: string | null;
   createdAt: string;
 };
 
@@ -19,6 +20,47 @@ const STAGES = [
   { key: 'stage:متوسط', label: 'مرحلة المتوسط' },
   { key: 'stage:ثانوي', label: 'مرحلة الثانوي' }
 ];
+
+// Helper function to compress base64 images client-side before sending
+const compressImage = (base64Str: string, maxWidth = 800, maxHeight = 800, quality = 0.75): Promise<string> => {
+  return new Promise((resolve) => {
+    if (!base64Str || !base64Str.startsWith('data:image/')) {
+      resolve(base64Str);
+      return;
+    }
+    const img = new Image();
+    img.src = base64Str;
+    img.onload = () => {
+      let width = img.width;
+      let height = img.height;
+
+      if (width > maxWidth || height > maxHeight) {
+        if (width > height) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        } else {
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      } else {
+        resolve(base64Str);
+      }
+    };
+    img.onerror = () => {
+      resolve(base64Str);
+    };
+  });
+};
 
 export default function AnnouncementsPage() {
   const [items, setItems] = useState<Announcement[]>([]);
@@ -31,7 +73,8 @@ export default function AnnouncementsPage() {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [selectedAudience, setSelectedAudience] = useState<string[]>([]);
-  const [image, setImage] = useState<string | null>(null);
+  const [coverImage, setCoverImage] = useState<string | null>(null);
+  const [contentImages, setContentImages] = useState<string[]>([]);
 
   async function loadAnnouncements() {
     const r = await fetch('/api/supervisor/announcements', { cache: 'no-store' });
@@ -50,14 +93,28 @@ export default function AnnouncementsPage() {
     })();
   }, []);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onloadend = () => {
-      setImage(reader.result as string);
+    reader.onloadend = async () => {
+      const compressed = await compressImage(reader.result as string, 900, 900, 0.8);
+      setCoverImage(compressed);
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleContentImagesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    Array.from(files).forEach((file) => {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const compressed = await compressImage(reader.result as string, 800, 800, 0.7);
+        setContentImages((prev) => [...prev, compressed]);
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   const toggleAudience = (key: string) => {
@@ -79,7 +136,8 @@ export default function AnnouncementsPage() {
       title: title.trim(),
       body: body.trim(),
       audience: audienceStr,
-      imageUrl: image
+      imageUrl: coverImage,
+      images: contentImages.length > 0 ? JSON.stringify(contentImages) : null
     };
 
     const r = await fetch('/api/supervisor/announcements', {
@@ -101,7 +159,18 @@ export default function AnnouncementsPage() {
     setEditId(a.id);
     setTitle(a.title);
     setBody(a.body);
-    setImage(a.imageUrl || null);
+    setCoverImage(a.imageUrl || null);
+    
+    let contentImgs: string[] = [];
+    if (a.images) {
+      try {
+        contentImgs = JSON.parse(a.images);
+      } catch {
+        contentImgs = [];
+      }
+    }
+    setContentImages(contentImgs);
+
     if (a.audience === 'all' || a.audience === 'students' || a.audience === 'guardians') {
       setSelectedAudience([a.audience]);
     } else {
@@ -113,7 +182,8 @@ export default function AnnouncementsPage() {
     setEditId(null);
     setTitle('');
     setBody('');
-    setImage(null);
+    setCoverImage(null);
+    setContentImages([]);
     setSelectedAudience([]);
   };
 
@@ -163,6 +233,37 @@ export default function AnnouncementsPage() {
           <h2 className="text-lg font-bold text-ink-900 border-b border-ink-100 pb-2">
             {editId ? 'تعديل الإعلان الحالي' : 'إنشاء إعلان جديد'}
           </h2>
+
+          {/* 1. Cover Image Upload (ABOVE title) */}
+          <div>
+            <label className="label">صورة الغلاف / مصغرة الإعلان (اختياري)</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleCoverChange}
+              className="field w-full cursor-pointer file:ml-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-cream-100 file:text-brand hover:file:bg-cream-200"
+            />
+            {coverImage && (
+              <div className="mt-2.5 relative">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={coverImage}
+                  alt="معاينة الغلاف"
+                  className="w-full h-36 object-cover rounded-xl border border-ink-200 shadow-inner"
+                />
+                <button
+                  type="button"
+                  onClick={() => setCoverImage(null)}
+                  className="absolute top-1.5 right-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full p-1.5 leading-none shadow-md"
+                  title="إزالة الصورة"
+                >
+                  ×
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* 2. Title Input */}
           <div>
             <label className="label">عنوان الإعلان</label>
             <input
@@ -172,6 +273,8 @@ export default function AnnouncementsPage() {
               placeholder="اكتب عنوان الإعلان هنا…"
             />
           </div>
+
+          {/* 3. Content Textarea */}
           <div>
             <label className="label">محتوى الإعلان</label>
             <textarea
@@ -183,31 +286,36 @@ export default function AnnouncementsPage() {
             />
           </div>
 
-          {/* Image Upload */}
+          {/* 4. Multiple Content Images Upload (BELOW content) */}
           <div>
-            <label className="label">صورة الإعلان (اختياري)</label>
+            <label className="label">صور إضافية للمنشور (اختياري - متعدد)</label>
             <input
               type="file"
               accept="image/*"
-              onChange={handleImageChange}
+              multiple
+              onChange={handleContentImagesChange}
               className="field w-full cursor-pointer file:ml-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-cream-100 file:text-brand hover:file:bg-cream-200"
             />
-            {image && (
-              <div className="mt-2.5 relative">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={image}
-                  alt="معاينة"
-                  className="w-full h-36 object-cover rounded-xl border border-ink-200 shadow-inner"
-                />
-                <button
-                  type="button"
-                  onClick={() => setImage(null)}
-                  className="absolute top-1.5 right-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full p-1.5 leading-none shadow-md"
-                  title="إزالة الصورة"
-                >
-                  ×
-                </button>
+            {contentImages.length > 0 && (
+              <div className="grid grid-cols-3 gap-2 mt-2.5">
+                {contentImages.map((src, idx) => (
+                  <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border border-ink-150 shadow-sm">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={src}
+                      alt={`مرفق ${idx + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setContentImages((prev) => prev.filter((_, i) => i !== idx))}
+                      className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 leading-none shadow-md text-xs"
+                      title="حذف"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -276,46 +384,75 @@ export default function AnnouncementsPage() {
             <div className="card p-12 text-center text-ink-400 text-sm">لا توجد إعلانات منشورة حالياً.</div>
           ) : (
             items.map((a) => (
-              <div key={a.id} className="card p-5 bg-white border border-ink-150 hover:shadow-md transition-shadow">
-                <div className="flex items-start justify-between gap-3 mb-2 flex-wrap">
-                  <div>
-                    <h3 className="font-bold text-ink-900 text-base leading-snug">{a.title}</h3>
-                    <div className="text-[0.7rem] text-ink-400 mt-1" dir="ltr">
-                      {new Date(a.createdAt).toLocaleString('ar')}
-                    </div>
-                  </div>
-                  <span className="pill pill-blue text-xs max-w-xs truncate" title={audLabel(a.audience)}>
-                    📢 {audLabel(a.audience)}
-                  </span>
-                </div>
-                
+              <div key={a.id} className="card bg-white border border-ink-150 hover:shadow-md transition-shadow overflow-hidden">
+                {/* Cover Image displayed ABOVE title */}
                 {a.imageUrl && (
-                  <div className="my-3 overflow-hidden rounded-xl border border-ink-150 shadow-inner">
+                  <div className="relative h-48 w-full overflow-hidden border-b border-ink-150">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={a.imageUrl}
                       alt={a.title}
                       onClick={() => window.open(a.imageUrl!, '_blank')}
-                      className="w-full max-h-72 object-cover cursor-pointer hover:scale-[1.01] transition-transform duration-200"
+                      className="w-full h-full object-cover cursor-pointer hover:scale-[1.01] transition-transform duration-200"
                     />
                   </div>
                 )}
+                
+                <div className="p-5">
+                  <div className="flex items-start justify-between gap-3 mb-2 flex-wrap">
+                    <div>
+                      <h3 className="font-bold text-ink-900 text-base leading-snug">{a.title}</h3>
+                      <div className="text-[0.7rem] text-ink-400 mt-1" dir="ltr">
+                        {new Date(a.createdAt).toLocaleString('ar')}
+                      </div>
+                    </div>
+                    <span className="pill pill-blue text-xs max-w-xs truncate" title={audLabel(a.audience)}>
+                      📢 {audLabel(a.audience)}
+                    </span>
+                  </div>
 
-                <p className="text-sm text-ink-700 leading-relaxed whitespace-pre-wrap mt-2">{a.body}</p>
+                  <p className="text-sm text-ink-700 leading-relaxed whitespace-pre-wrap mt-2">{a.body}</p>
 
-                <div className="flex gap-2 justify-end mt-4 border-t border-ink-100 pt-3">
-                  <button
-                    onClick={() => startEdit(a)}
-                    className="btn btn-secondary py-1 px-3 text-xs"
-                  >
-                    ✎ تعديل الإعلان
-                  </button>
-                  <button
-                    onClick={() => del(a.id)}
-                    className="btn btn-danger py-1 px-3 text-xs"
-                  >
-                    🗑️ حذف
-                  </button>
+                  {/* Render content images gallery if present */}
+                  {(() => {
+                    let contentImgList: string[] = [];
+                    if (a.images) {
+                      try {
+                        contentImgList = JSON.parse(a.images);
+                      } catch {}
+                    }
+                    if (contentImgList.length === 0) return null;
+                    return (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-4 pt-3 border-t border-ink-100">
+                        {contentImgList.map((src, idx) => (
+                          <div key={idx} className="overflow-hidden rounded-xl border border-ink-150 shadow-sm aspect-video bg-ink-50">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={src}
+                              alt={`مرفق محتوى ${idx + 1}`}
+                              onClick={() => window.open(src, '_blank')}
+                              className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform duration-200"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+
+                  <div className="flex gap-2 justify-end mt-4 border-t border-ink-100 pt-3">
+                    <button
+                      onClick={() => startEdit(a)}
+                      className="btn btn-secondary py-1 px-3 text-xs"
+                    >
+                      ✎ تعديل الإعلان
+                    </button>
+                    <button
+                      onClick={() => del(a.id)}
+                      className="btn btn-danger py-1 px-3 text-xs"
+                    >
+                      🗑️ حذف
+                    </button>
+                  </div>
                 </div>
               </div>
             ))

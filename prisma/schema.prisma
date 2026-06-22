@@ -79,6 +79,7 @@ model Announcement {
   body      String
   audience  String   // 'students' | 'guardians' | 'all' or comma-separated stages/groups
   imageUrl  String?  // Optional base64 or url for image
+  images    String?  // Optional JSON string of multiple base64 content images
   createdAt DateTime @default(now())
 }
 
