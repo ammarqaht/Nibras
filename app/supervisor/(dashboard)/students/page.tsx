@@ -43,8 +43,7 @@ function regPill(status: string) {
 
 export default function StudentsPage() {
   const { user } = useSupervisor();
-  const roles = user?.role ? user.role.split(',').map((r) => r.trim()) : [];
-  const isAdmin = roles.includes('admin') || roles.includes('secretary');
+  const isAdmin = user?.role === 'admin';
 
   const [students, setStudents] = useState<Student[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -55,10 +54,40 @@ export default function StudentsPage() {
   const [search, setSearch] = useState('');
   const [fStage, setFStage] = useState('');
   const [fPay, setFPay] = useState('');
-  const [fReg, setFReg] = useState(() =>
-    typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('registrationStatus') || '' : ''
-  );
   const [fGroup, setFGroup] = useState('');
+
+  const [visibleCols, setVisibleCols] = useState({
+    studentName: true,
+    guardianPhone: true,
+    membershipNo: true,
+    stage: true,
+    group: true,
+    nationalId: false,
+    studentPhone: false,
+    neighborhood: false,
+    paymentStatus: false,
+    hasCondition: false,
+  });
+  const [showColSettings, setShowColSettings] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('nibras_student_cols');
+    if (saved) {
+      try {
+        setVisibleCols(JSON.parse(saved));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, []);
+
+  const setVisibleCol = (key: keyof typeof visibleCols, val: boolean) => {
+    setVisibleCols((prev) => {
+      const next = { ...prev, [key]: val };
+      localStorage.setItem('nibras_student_cols', JSON.stringify(next));
+      return next;
+    });
+  };
 
   async function load() {
     const [sr, gr] = await Promise.all([
@@ -76,9 +105,13 @@ export default function StudentsPage() {
     load();
   }, []);
 
+  const approvedStudents = useMemo(() => {
+    return students.filter((s) => s.registrationStatus === 'approved');
+  }, [students]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return students.filter((s) => {
+    return approvedStudents.filter((s) => {
       if (q) {
         const hit =
           s.studentName.toLowerCase().includes(q) ||
@@ -90,11 +123,10 @@ export default function StudentsPage() {
       }
       if (fStage && s.stage !== fStage) return false;
       if (fPay && s.paymentStatus !== fPay) return false;
-      if (fReg && s.registrationStatus !== fReg) return false;
       if (fGroup && String(s.groupId) !== fGroup) return false;
       return true;
     });
-  }, [students, search, fStage, fPay, fReg, fGroup]);
+  }, [approvedStudents, search, fStage, fPay, fGroup]);
 
   // optimistic local update after a PUT
   function applyUpdate(updated: Student) {
@@ -134,14 +166,131 @@ export default function StudentsPage() {
       <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-ink-900 mb-1">سجل الطلاب</h1>
-          <p className="text-sm text-ink-500">{filtered.length} طالب من أصل {students.length}</p>
+          <p className="text-sm text-ink-500">{filtered.length} طالب من أصل {approvedStudents.length}</p>
         </div>
-        <button onClick={exportCsv} className="btn btn-secondary text-sm">⬇︎ تصدير CSV</button>
+        <div className="flex gap-2 items-center relative">
+          <button
+            onClick={() => setShowColSettings(!showColSettings)}
+            className="btn btn-secondary text-sm flex items-center gap-1.5"
+          >
+            ⚙️ تخصيص الأعمدة
+          </button>
+          
+          {showColSettings && (
+            <div className="absolute left-0 top-full mt-2 w-64 bg-white border border-ink-200 rounded-xl shadow-xl z-50 p-4 font-sans text-right" dir="rtl">
+              <h3 className="font-bold text-ink-900 mb-3 text-sm border-b border-ink-100 pb-2">تخصيص الأعمدة المعروضة</h3>
+              <div className="space-y-2 max-h-60 overflow-y-auto scroll-soft">
+                <label className="flex items-center gap-2.5 text-sm text-ink-700 cursor-pointer hover:bg-cream-50 p-1.5 rounded-lg select-none">
+                  <input
+                    type="checkbox"
+                    checked={visibleCols.studentName}
+                    onChange={(e) => setVisibleCol('studentName', e.target.checked)}
+                    className="rounded border-ink-300 text-primary-600 focus:ring-primary-500 w-4 h-4"
+                  />
+                  <span>الاسم</span>
+                </label>
+                <label className="flex items-center gap-2.5 text-sm text-ink-700 cursor-pointer hover:bg-cream-50 p-1.5 rounded-lg select-none">
+                  <input
+                    type="checkbox"
+                    checked={visibleCols.guardianPhone}
+                    onChange={(e) => setVisibleCol('guardianPhone', e.target.checked)}
+                    className="rounded border-ink-300 text-primary-600 focus:ring-primary-500 w-4 h-4"
+                  />
+                  <span>رقم ولي الأمر</span>
+                </label>
+                <label className="flex items-center gap-2.5 text-sm text-ink-700 cursor-pointer hover:bg-cream-50 p-1.5 rounded-lg select-none">
+                  <input
+                    type="checkbox"
+                    checked={visibleCols.membershipNo}
+                    onChange={(e) => setVisibleCol('membershipNo', e.target.checked)}
+                    className="rounded border-ink-300 text-primary-600 focus:ring-primary-500 w-4 h-4"
+                  />
+                  <span>رقم العضوية</span>
+                </label>
+                <label className="flex items-center gap-2.5 text-sm text-ink-700 cursor-pointer hover:bg-cream-50 p-1.5 rounded-lg select-none">
+                  <input
+                    type="checkbox"
+                    checked={visibleCols.stage}
+                    onChange={(e) => setVisibleCol('stage', e.target.checked)}
+                    className="rounded border-ink-300 text-primary-600 focus:ring-primary-500 w-4 h-4"
+                  />
+                  <span>المرحلة / الصف</span>
+                </label>
+                <label className="flex items-center gap-2.5 text-sm text-ink-700 cursor-pointer hover:bg-cream-50 p-1.5 rounded-lg select-none">
+                  <input
+                    type="checkbox"
+                    checked={visibleCols.group}
+                    onChange={(e) => setVisibleCol('group', e.target.checked)}
+                    className="rounded border-ink-300 text-primary-600 focus:ring-primary-500 w-4 h-4"
+                  />
+                  <span>المجموعة / الأسرة</span>
+                </label>
+                <label className="flex items-center gap-2.5 text-sm text-ink-700 cursor-pointer hover:bg-cream-50 p-1.5 rounded-lg select-none">
+                  <input
+                    type="checkbox"
+                    checked={visibleCols.nationalId}
+                    onChange={(e) => setVisibleCol('nationalId', e.target.checked)}
+                    className="rounded border-ink-300 text-primary-600 focus:ring-primary-500 w-4 h-4"
+                  />
+                  <span>رقم الهوية</span>
+                </label>
+                <label className="flex items-center gap-2.5 text-sm text-ink-700 cursor-pointer hover:bg-cream-50 p-1.5 rounded-lg select-none">
+                  <input
+                    type="checkbox"
+                    checked={visibleCols.studentPhone}
+                    onChange={(e) => setVisibleCol('studentPhone', e.target.checked)}
+                    className="rounded border-ink-300 text-primary-600 focus:ring-primary-500 w-4 h-4"
+                  />
+                  <span>جوال الطالب</span>
+                </label>
+                <label className="flex items-center gap-2.5 text-sm text-ink-700 cursor-pointer hover:bg-cream-50 p-1.5 rounded-lg select-none">
+                  <input
+                    type="checkbox"
+                    checked={visibleCols.neighborhood}
+                    onChange={(e) => setVisibleCol('neighborhood', e.target.checked)}
+                    className="rounded border-ink-300 text-primary-600 focus:ring-primary-500 w-4 h-4"
+                  />
+                  <span>الحي السكني</span>
+                </label>
+                <label className="flex items-center gap-2.5 text-sm text-ink-700 cursor-pointer hover:bg-cream-50 p-1.5 rounded-lg select-none">
+                  <input
+                    type="checkbox"
+                    checked={visibleCols.paymentStatus}
+                    onChange={(e) => setVisibleCol('paymentStatus', e.target.checked)}
+                    className="rounded border-ink-300 text-primary-600 focus:ring-primary-500 w-4 h-4"
+                  />
+                  <span>حالة الدفع</span>
+                </label>
+                <label className="flex items-center gap-2.5 text-sm text-ink-700 cursor-pointer hover:bg-cream-50 p-1.5 rounded-lg select-none">
+                  <input
+                    type="checkbox"
+                    checked={visibleCols.hasCondition}
+                    onChange={(e) => setVisibleCol('hasCondition', e.target.checked)}
+                    className="rounded border-ink-300 text-primary-600 focus:ring-primary-500 w-4 h-4"
+                  />
+                  <span>الحالة الصحية</span>
+                </label>
+              </div>
+              <div className="mt-3 pt-2 border-t border-ink-100 flex justify-end">
+                <button
+                  onClick={() => setShowColSettings(false)}
+                  className="btn btn-primary text-xs py-1 px-3"
+                >
+                  إغلاق
+                </button>
+              </div>
+            </div>
+          )}
+
+          <button onClick={exportCsv} className="btn btn-secondary text-sm flex items-center gap-1.5">
+            ⬇︎ تصدير CSV
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
       <div className="card p-4 mb-5">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           <input
             className="field lg:col-span-1"
             placeholder="بحث بالاسم / الهوية / الجوال / العضوية…"
@@ -156,12 +305,6 @@ export default function StudentsPage() {
             <option value="">كل حالات الدفع</option>
             <option value="paid">مدفوع</option>
             <option value="unpaid">غير مدفوع</option>
-          </select>
-          <select className="field" value={fReg} onChange={(e) => setFReg(e.target.value)}>
-            <option value="">كل حالات التسجيل</option>
-            <option value="pending">قيد المراجعة</option>
-            <option value="approved">مقبول</option>
-            <option value="rejected">مرفوض</option>
           </select>
           <select className="field" value={fGroup} onChange={(e) => setFGroup(e.target.value)}>
             <option value="">كل المجموعات</option>
@@ -183,28 +326,60 @@ export default function StudentsPage() {
               <table className="tbl">
                 <thead>
                   <tr>
-                    <th>الطالب</th>
-                    <th>العضوية</th>
-                    <th>المرحلة / الصف</th>
-                    <th>الدفع</th>
-                    <th>التسجيل</th>
+                    {visibleCols.studentName && <th>الطالب</th>}
+                    {visibleCols.membershipNo && <th>العضوية</th>}
+                    {visibleCols.guardianPhone && <th>رقم ولي الأمر</th>}
+                    {visibleCols.stage && <th>المرحلة / الصف</th>}
+                    {visibleCols.group && <th>المجموعة</th>}
+                    {visibleCols.nationalId && <th>رقم الهوية</th>}
+                    {visibleCols.studentPhone && <th>جوال الطالب</th>}
+                    {visibleCols.neighborhood && <th>الحي</th>}
+                    {visibleCols.paymentStatus && <th>الدفع</th>}
+                    {visibleCols.hasCondition && <th>الحالة الصحية</th>}
                     <th></th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map((s) => {
                     const pp = paymentPill(s);
-                    const rp = regPill(s.registrationStatus);
+                    const groupName = groups.find((g) => g.id === s.groupId)?.name || 'بدون مجموعة';
                     return (
                       <tr key={s.id} className="cursor-pointer" onClick={() => setSelected(s)}>
-                        <td className="font-medium">
-                          {s.studentName}
-                          {s.hasCondition && <span title="حالة صحية" className="mr-1">🚨</span>}
-                        </td>
-                        <td dir="ltr" className="text-right font-mono text-ink-500">#{s.membershipNo}</td>
-                        <td className="text-ink-500 text-sm">{s.stage} — {s.grade}</td>
-                        <td><span className={`pill ${pp.cls}`}>{pp.label}</span></td>
-                        <td><span className={`pill ${rp.cls}`}>{rp.label}</span></td>
+                        {visibleCols.studentName && (
+                          <td className="font-medium">
+                            {s.studentName}
+                            {s.hasCondition && <span title="حالة صحية" className="mr-1">🚨</span>}
+                          </td>
+                        )}
+                        {visibleCols.membershipNo && (
+                          <td dir="ltr" className="text-right font-mono text-ink-500">#{s.membershipNo}</td>
+                        )}
+                        {visibleCols.guardianPhone && (
+                          <td dir="ltr" className="text-right font-mono text-ink-500">{s.guardianPhone}</td>
+                        )}
+                        {visibleCols.stage && (
+                          <td className="text-ink-500 text-sm">{s.stage} — {s.grade}</td>
+                        )}
+                        {visibleCols.group && (
+                          <td className="text-ink-500 text-sm">{groupName}</td>
+                        )}
+                        {visibleCols.nationalId && (
+                          <td dir="ltr" className="text-right font-mono text-ink-500">{s.nationalId}</td>
+                        )}
+                        {visibleCols.studentPhone && (
+                          <td dir="ltr" className="text-right font-mono text-ink-500">{s.studentPhone || '—'}</td>
+                        )}
+                        {visibleCols.neighborhood && (
+                          <td className="text-ink-500 text-sm">{s.neighborhood}</td>
+                        )}
+                        {visibleCols.paymentStatus && (
+                          <td><span className={`pill ${pp.cls}`}>{pp.label}</span></td>
+                        )}
+                        {visibleCols.hasCondition && (
+                          <td className="text-ink-500 text-sm">
+                            {s.hasCondition ? (s.conditionNote || 'نعم 🚨') : 'لا'}
+                          </td>
+                        )}
                         <td>
                           <button
                             className="btn btn-secondary py-1 px-3 text-xs"
@@ -224,25 +399,77 @@ export default function StudentsPage() {
             <ul className="lg:hidden divide-y divide-ink-200">
               {filtered.map((s) => {
                 const pp = paymentPill(s);
-                const rp = regPill(s.registrationStatus);
+                const groupName = groups.find((g) => g.id === s.groupId)?.name || 'بدون مجموعة';
                 return (
                   <li
                     key={s.id}
                     onClick={() => setSelected(s)}
-                    className="py-2.5 px-4 flex items-center gap-3 active:bg-cream-100 cursor-pointer"
+                    className="py-3 px-4 flex items-center gap-3 active:bg-cream-100 cursor-pointer text-right"
+                    dir="rtl"
                   >
-                    <div className="min-w-0 flex-1">
-                      <div className="font-semibold text-ink-900 truncate">
-                        {s.studentName}
-                        {s.hasCondition && <span title="حالة صحية" className="mr-1">🚨</span>}
+                    <div className="min-w-0 flex-1 space-y-1">
+                      {visibleCols.studentName && (
+                        <div className="font-semibold text-ink-900 truncate">
+                          {s.studentName}
+                          {s.hasCondition && <span title="حالة صحية" className="mr-1">🚨</span>}
+                        </div>
+                      )}
+                      
+                      <div className="text-xs text-ink-500 flex flex-wrap gap-x-2 gap-y-1">
+                        {visibleCols.membershipNo && (
+                          <span dir="ltr" className="font-mono">#{s.membershipNo}</span>
+                        )}
+                        {visibleCols.stage && (
+                          <>
+                            {visibleCols.membershipNo && <span className="text-ink-300">·</span>}
+                            <span>{s.stage} — {s.grade}</span>
+                          </>
+                        )}
+                        {visibleCols.group && (
+                          <>
+                            {(visibleCols.membershipNo || visibleCols.stage) && <span className="text-ink-300">·</span>}
+                            <span>{groupName}</span>
+                          </>
+                        )}
                       </div>
-                      <div className="text-xs text-ink-400 mt-0.5">
-                        <span dir="ltr" className="font-mono">#{s.membershipNo}</span> · {s.stage} — {s.grade}
+
+                      <div className="text-xs text-ink-500 space-y-0.5">
+                        {visibleCols.guardianPhone && (
+                          <div>
+                            <span className="text-ink-400">ولي الأمر: </span>
+                            <span dir="ltr">{s.guardianPhone}</span>
+                          </div>
+                        )}
+                        {visibleCols.studentPhone && s.studentPhone && (
+                          <div>
+                            <span className="text-ink-400">جوال الطالب: </span>
+                            <span dir="ltr">{s.studentPhone}</span>
+                          </div>
+                        )}
+                        {visibleCols.nationalId && (
+                          <div>
+                            <span className="text-ink-400">رقم الهوية: </span>
+                            <span dir="ltr">{s.nationalId}</span>
+                          </div>
+                        )}
+                        {visibleCols.neighborhood && (
+                          <div>
+                            <span className="text-ink-400">الحي: </span>
+                            <span>{s.neighborhood}</span>
+                          </div>
+                        )}
                       </div>
-                      <div className="flex flex-wrap gap-1.5 mt-2">
-                        <span className={`pill ${pp.cls}`}>{pp.label}</span>
-                        <span className={`pill ${rp.cls}`}>{rp.label}</span>
-                      </div>
+
+                      {(visibleCols.paymentStatus || (visibleCols.hasCondition && s.hasCondition)) && (
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {visibleCols.paymentStatus && (
+                            <span className={`pill ${pp.cls}`}>{pp.label}</span>
+                          )}
+                          {visibleCols.hasCondition && s.hasCondition && (
+                            <span className="pill pill-red">🚨 {s.conditionNote || 'حالة صحية'}</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <span className="text-ink-300 text-xl shrink-0">‹</span>
                   </li>
