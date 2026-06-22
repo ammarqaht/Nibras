@@ -41,6 +41,7 @@ const LINKS: NavLink[] = [
   { href: '/supervisor/attendance', label: 'الحضور', roles: ['attendance_supervisor', 'general_supervisor'] },
   { href: '/supervisor/points', label: 'النقاط', roles: ['social_supervisor', 'cultural_supervisor', 'general_supervisor'] },
   { href: '/supervisor/tasks', label: 'المهام', roles: ['general_supervisor'] },
+  { href: '/supervisor/schedule', label: 'الجدول' },
   { href: '/supervisor/groups', label: 'المجموعات', roles: ['groups_supervisor', 'general_supervisor'] },
   { href: '/supervisor/payments', label: 'المدفوعات', roles: ['finance', 'finance_supervisor'] },
   { href: '/supervisor/invoices', label: 'الفواتير' },

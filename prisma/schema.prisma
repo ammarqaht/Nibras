@@ -9,28 +9,28 @@ datasource db {
 }
 
 model Registration {
-  id                 Int      @id @default(autoincrement())
-  membershipNo       Int      @unique
-  studentName        String
-  nationalId         String
-  guardianPhone      String
-  studentPhone       String?
-  stage              String
-  grade              String
-  neighborhood       String
-  locationLat        Float?
-  locationLng        Float?
-  mapLink            String?
-  hasCondition       Boolean  @default(false)
-  conditionNote      String?
-  createdAt          DateTime @default(now())
-  
+  id            Int      @id @default(autoincrement())
+  membershipNo  Int      @unique
+  studentName   String
+  nationalId    String
+  guardianPhone String
+  studentPhone  String?
+  stage         String
+  grade         String
+  neighborhood  String
+  locationLat   Float?
+  locationLng   Float?
+  mapLink       String?
+  hasCondition  Boolean  @default(false)
+  conditionNote String?
+  createdAt     DateTime @default(now())
+
   // Custom additions for dashboard
-  paymentStatus      String   @default("unpaid")
+  paymentStatus      String       @default("unpaid")
   groupId            Int?
-  registrationStatus String   @default("pending")
-  paymentType        String   @default("later") // 'now' | 'later'
-  paymentReceipt     String?                    // Base64 string of receipt image
+  registrationStatus String       @default("pending")
+  paymentType        String       @default("later") // 'now' | 'later'
+  paymentReceipt     String? // Base64 string of receipt image
   submissions        Submission[]
 
   @@index([nationalId])
@@ -42,8 +42,8 @@ model Supervisor {
   email        String   @unique
   passwordHash String
   role         String   @default("supervisor") // 'admin' | 'supervisor' | 'finance'
-  groupIds     String   @default("")           // comma-separated group IDs (e.g. "1,2")
-  departments  String   @default("")           // comma-separated department keys (e.g. "cultural,families")
+  groupIds     String   @default("") // comma-separated group IDs (e.g. "1,2")
+  departments  String   @default("") // comma-separated department keys (e.g. "cultural,families")
   createdAt    DateTime @default(now())
 }
 
@@ -57,8 +57,8 @@ model Group {
 model Attendance {
   id             Int      @id @default(autoincrement())
   registrationId Int
-  date           String   // Format 'YYYY-MM-DD'
-  status         String   // 'present' | 'absent' | 'late'
+  date           String // Format 'YYYY-MM-DD'
+  status         String // 'present' | 'absent' | 'late'
   recordedBy     String?
   createdAt      DateTime @default(now())
 }
@@ -66,9 +66,9 @@ model Attendance {
 model Point {
   id             Int      @id @default(autoincrement())
   registrationId Int
-  delta          Int      // +points or -points
+  delta          Int // +points or -points
   reason         String
-  category       String   // 'behavior' | 'participation' | 'activity' | 'other'
+  category       String // 'behavior' | 'participation' | 'activity' | 'other'
   recordedBy     String?
   createdAt      DateTime @default(now())
 }
@@ -77,9 +77,9 @@ model Announcement {
   id        Int      @id @default(autoincrement())
   title     String
   body      String
-  audience  String   // 'students' | 'guardians' | 'all' or comma-separated stages/groups
-  imageUrl  String?  // Optional base64 or url for image
-  images    String?  // Optional JSON string of multiple base64 content images
+  audience  String // 'students' | 'guardians' | 'all' or comma-separated stages/groups
+  imageUrl  String? // Optional base64 or url for image
+  images    String? // Optional JSON string of multiple base64 content images
   createdAt DateTime @default(now())
 }
 
@@ -93,25 +93,25 @@ model Invoice {
   invoiceNo      Int       @unique
   title          String
   vendor         String?
-  invoiceDate    String?   // free-text date as printed on the invoice
-  category       String?   // 'food' | 'supplies' | 'prizes' | 'transport' | 'other'
-  department     String    // department key the invoice is filed under
-  supervisorId   Int       // who entered it (from the session)
+  invoiceDate    String? // free-text date as printed on the invoice
+  category       String? // 'food' | 'supplies' | 'prizes' | 'transport' | 'other'
+  department     String // department key the invoice is filed under
+  supervisorId   Int // who entered it (from the session)
   supervisorName String
-  groupId        Int?      // optional linked group/activity
+  groupId        Int? // optional linked group/activity
   items          String    @default("[]") // JSON: [{ name, qty, price }]
   subtotal       Float?
   tax            Float?
   total          Float
   currency       String    @default("SAR")
-  imageData      String?   // base64 data URL of the photographed invoice
+  imageData      String? // base64 data URL of the photographed invoice
   entryMode      String    @default("manual") // 'photo' | 'manual'
   aiExtracted    Boolean   @default(false)
   aiConfidence   Float?
   status         String    @default("pending") // 'pending' | 'approved' | 'rejected' | 'on_hold'
   settlement     String    @default("unsettled") // 'unsettled' | 'handed_over'
-  reviewedBy     String?   // finance reviewer name
-  reviewNote     String?   // rejection / hold reason
+  reviewedBy     String? // finance reviewer name
+  reviewNote     String? // rejection / hold reason
   settledAt      DateTime?
   createdAt      DateTime  @default(now())
 
@@ -152,4 +152,17 @@ model Submission {
   registration    Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
 
   @@unique([registrationId, taskId])
+}
+
+model Schedule {
+  id           String   @id @default(cuid())
+  title        String
+  date         String // Format 'YYYY-MM-DD'
+  startTime    String // Format 'HH:MM'
+  endTime      String // Format 'HH:MM'
+  role         String // e.g. 'cultural_supervisor', 'social_supervisor', etc.
+  supervisorId Int
+  createdAt    DateTime @default(now())
+
+  @@index([date])
 }
