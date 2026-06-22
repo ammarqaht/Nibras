@@ -6,7 +6,7 @@ import { pushToast } from '@/components/Toast';
 import { useSupervisor } from '@/components/SupervisorShell';
 
 type Group = { id: number; name: string; stage: string };
-type Student = { id: number; studentName: string; stage: string; grade: string; groupId: number | null };
+type Student = { id: number; studentName: string; stage: string; grade: string; groupId: number | null; registrationStatus: string };
 
 export default function GroupsPage() {
   const { user } = useSupervisor();
@@ -26,10 +26,13 @@ export default function GroupsPage() {
   async function load() {
     const [gr, sr] = await Promise.all([
       fetch('/api/supervisor/groups', { cache: 'no-store' }),
-      fetch('/api/supervisor/students?registrationStatus=approved', { cache: 'no-store' })
+      fetch('/api/supervisor/students', { cache: 'no-store' })
     ]);
-    setGroups((await gr.json().catch(() => ({ groups: [] }))).groups ?? []);
-    setStudents((await sr.json().catch(() => ({ students: [] }))).students ?? []);
+    const grj = await gr.json().catch(() => ({ groups: [] }));
+    const srj = await sr.json().catch(() => ({ students: [] }));
+    setGroups(grj.groups ?? []);
+    const allSt: Student[] = srj.students ?? [];
+    setStudents(allSt.filter((s) => s.registrationStatus === 'approved'));
     setLoading(false);
   }
   useEffect(() => { load(); }, []);

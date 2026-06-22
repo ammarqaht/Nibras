@@ -41,6 +41,120 @@ function regPill(status: string) {
   return { cls: 'pill-yellow', label: 'قيد المراجعة' };
 }
 
+function StageMultiSelectDropdown({
+  selected,
+  onChange,
+}: {
+  selected: string[];
+  onChange: (val: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const toggleGrade = (grade: string, stageKey: string) => {
+    const gradeKey = `grade:${grade}`;
+    let nextSelected = selected.includes(gradeKey)
+      ? selected.filter((k) => k !== gradeKey)
+      : [...selected, gradeKey];
+
+    const stageInfo = stages.find((st) => st.key === stageKey);
+    if (stageInfo) {
+      const allGradesKeys = stageInfo.grades.map((g) => `grade:${g}`);
+      const hasAllGrades = allGradesKeys.every((gk) => nextSelected.includes(gk));
+      if (hasAllGrades) {
+        if (!nextSelected.includes(`stage:${stageKey}`)) {
+          nextSelected.push(`stage:${stageKey}`);
+        }
+      } else {
+        nextSelected = nextSelected.filter((k) => k !== `stage:${stageKey}`);
+      }
+    }
+    onChange(nextSelected);
+  };
+
+  const toggleStage = (stageKey: string) => {
+    const stageKeyStr = `stage:${stageKey}`;
+    const stageInfo = stages.find((st) => st.key === stageKey);
+    if (!stageInfo) return;
+
+    const allGradesKeys = stageInfo.grades.map((g) => `grade:${g}`);
+    const isStageSelected = selected.includes(stageKeyStr);
+
+    let nextSelected = selected;
+    if (isStageSelected) {
+      nextSelected = nextSelected.filter((k) => k !== stageKeyStr && !allGradesKeys.includes(k));
+    } else {
+      const toAdd = [stageKeyStr, ...allGradesKeys].filter((k) => !nextSelected.includes(k));
+      nextSelected = [...nextSelected, ...toAdd];
+    }
+    onChange(nextSelected);
+  };
+
+  const selectedGradesCount = selected.filter((k) => k.startsWith('grade:')).length;
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="field flex items-center justify-between gap-2 text-right w-full bg-white select-none"
+      >
+        <span>
+          {selectedGradesCount > 0
+            ? `المراحل (${selectedGradesCount})`
+            : 'تصفية المراحل'}
+        </span>
+        <span className="text-ink-400 text-xs">▼</span>
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 mt-1 w-full min-w-[240px] max-h-80 overflow-y-auto bg-white border border-ink-200 rounded-xl shadow-xl z-50 p-3 space-y-3 scroll-soft text-right" dir="rtl">
+            {stages.map((stage) => {
+              const stageKeyStr = `stage:${stage.key}`;
+              const isStageChecked = selected.includes(stageKeyStr);
+              
+              return (
+                <div key={stage.key} className="space-y-1">
+                  <label className="flex items-center gap-2 px-1.5 py-1 rounded-lg hover:bg-cream-50 cursor-pointer text-sm font-semibold select-none">
+                    <input
+                      type="checkbox"
+                      checked={isStageChecked}
+                      onChange={() => toggleStage(stage.key)}
+                      className="rounded border-ink-300 text-primary-600 focus:ring-primary-500 w-4 h-4"
+                    />
+                    <span className="text-ink-900">{stage.label}</span>
+                  </label>
+
+                  <div className="mr-6 space-y-1 border-r border-ink-100 pr-2">
+                    {stage.grades.map((grade) => {
+                      const gradeKeyStr = `grade:${grade}`;
+                      const isGradeChecked = selected.includes(gradeKeyStr);
+                      return (
+                        <label
+                          key={grade}
+                          className="flex items-center gap-2 px-1.5 py-0.5 rounded-lg hover:bg-cream-50 cursor-pointer text-xs select-none"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isGradeChecked}
+                            onChange={() => toggleGrade(grade, stage.key)}
+                            className="rounded border-ink-300 text-primary-600 focus:ring-primary-500 w-3.5 h-3.5"
+                          />
+                          <span className="text-ink-700">{grade}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function MultiSelectDropdown({
   label,
   options,
@@ -112,7 +226,6 @@ export default function StudentsPage() {
   // filters
   const [search, setSearch] = useState('');
   const [fStages, setFStages] = useState<string[]>([]);
-  const [fGrades, setFGrades] = useState<string[]>([]);
   const [fGroups, setFGroups] = useState<string[]>([]);
   const [fNeighborhoods, setFNeighborhoods] = useState<string[]>([]);
 
@@ -152,7 +265,7 @@ export default function StudentsPage() {
 
   async function load() {
     const [sr, gr] = await Promise.all([
-      fetch('/api/supervisor/students?registrationStatus=approved', { cache: 'no-store' }),
+      fetch('/api/supervisor/students', { cache: 'no-store' }),
       fetch('/api/supervisor/groups', { cache: 'no-store' })
     ]);
     const sj = await sr.json().catch(() => ({ students: [] }));
@@ -166,19 +279,18 @@ export default function StudentsPage() {
     load();
   }, []);
 
-  const neighborhoods = useMemo(() => {
-    const list = students.map((s) => s.neighborhood?.trim()).filter(Boolean);
-    return Array.from(new Set(list));
+  const approvedStudents = useMemo(() => {
+    return students.filter((s) => s.registrationStatus === 'approved');
   }, [students]);
 
-  const grades = useMemo(() => {
-    const list = students.map((s) => s.grade?.trim()).filter(Boolean);
+  const neighborhoods = useMemo(() => {
+    const list = approvedStudents.map((s) => s.neighborhood?.trim()).filter(Boolean);
     return Array.from(new Set(list));
-  }, [students]);
+  }, [approvedStudents]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return students.filter((s) => {
+    return approvedStudents.filter((s) => {
       if (q) {
         const hit =
           s.studentName.toLowerCase().includes(q) ||
@@ -188,13 +300,16 @@ export default function StudentsPage() {
           String(s.membershipNo).includes(q);
         if (!hit) return false;
       }
-      if (fStages.length > 0 && !fStages.includes(s.stage)) return false;
-      if (fGrades.length > 0 && !fGrades.includes(s.grade)) return false;
+      if (fStages.length > 0) {
+        const hasStageMatch = fStages.includes(`stage:${s.stage}`);
+        const hasGradeMatch = fStages.includes(`grade:${s.grade}`);
+        if (!hasStageMatch && !hasGradeMatch) return false;
+      }
       if (fGroups.length > 0 && !fGroups.includes(String(s.groupId))) return false;
       if (fNeighborhoods.length > 0 && !fNeighborhoods.includes(s.neighborhood)) return false;
       return true;
     });
-  }, [students, search, fStages, fGrades, fGroups, fNeighborhoods]);
+  }, [approvedStudents, search, fStages, fGroups, fNeighborhoods]);
 
   // optimistic local update after a PUT
   function applyUpdate(updated: Student) {
@@ -234,7 +349,7 @@ export default function StudentsPage() {
       <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-ink-900 mb-1">سجل الطلاب</h1>
-          <p className="text-sm text-ink-500">{filtered.length} طالب من أصل {students.length}</p>
+          <p className="text-sm text-ink-500">{filtered.length} طالب من أصل {approvedStudents.length}</p>
         </div>
         <div className="flex gap-2 items-center relative">
           <button
@@ -367,55 +482,87 @@ export default function StudentsPage() {
 
       {/* Filters */}
       <div className="card p-4 mb-5">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-          <input
-            className="field lg:col-span-1"
-            placeholder="بحث بالاسم / الهوية / الجوال / العضوية…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <MultiSelectDropdown
-            label="تصفية المراحل"
-            options={stages.map((s) => ({ value: s.key, label: s.label }))}
-            selected={fStages}
-            onChange={setFStages}
-          />
-          <MultiSelectDropdown
-            label="تصفية الصفوف"
-            options={grades.map((g) => ({ value: g, label: g }))}
-            selected={fGrades}
-            onChange={setFGrades}
-          />
-          <MultiSelectDropdown
-            label="تصفية المجموعات"
-            options={groups.map((g) => ({ value: String(g.id), label: g.name }))}
-            selected={fGroups}
-            onChange={setFGroups}
-          />
-          <MultiSelectDropdown
-            label="تصفية الأحياء"
-            options={neighborhoods.map((n) => ({ value: n, label: n }))}
-            selected={fNeighborhoods}
-            onChange={setFNeighborhoods}
-          />
-        </div>
-
-        {(search || fStages.length > 0 || fGrades.length > 0 || fGroups.length > 0 || fNeighborhoods.length > 0) && (
-          <div className="mt-3 pt-3 border-t border-ink-100 flex justify-end">
-            <button
-              onClick={() => {
-                setSearch('');
-                setFStages([]);
-                setFGrades([]);
-                setFGroups([]);
-                setFNeighborhoods([]);
-              }}
-              className="btn btn-ghost text-xs text-ink-500 hover:text-ink-900 flex items-center gap-1.5"
-            >
-              ✕ إلغاء التصفية
-            </button>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Search Input with Clear Button */}
+          <div className="relative flex items-center w-full">
+            <input
+              className="field pl-8 w-full"
+              placeholder="بحث بالاسم / الهوية / الجوال / العضوية…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute left-2.5 text-ink-400 hover:text-ink-900 text-lg font-bold leading-none p-1"
+                title="مسح البحث"
+              >
+                ×
+              </button>
+            )}
           </div>
-        )}
+
+          {/* Stage Dropdown with Clear Button */}
+          <div className="flex items-center gap-1.5 w-full">
+            <div className="flex-1 min-w-0">
+              <StageMultiSelectDropdown
+                selected={fStages}
+                onChange={setFStages}
+              />
+            </div>
+            {fStages.length > 0 && (
+              <button
+                onClick={() => setFStages([])}
+                className="text-ink-400 hover:text-ink-900 text-xl font-bold p-1 leading-none shrink-0"
+                title="مسح تصفية المراحل"
+              >
+                ×
+              </button>
+            )}
+          </div>
+
+          {/* Group Dropdown with Clear Button */}
+          <div className="flex items-center gap-1.5 w-full">
+            <div className="flex-1 min-w-0">
+              <MultiSelectDropdown
+                label="تصفية المجموعات"
+                options={groups.map((g) => ({ value: String(g.id), label: g.name }))}
+                selected={fGroups}
+                onChange={setFGroups}
+              />
+            </div>
+            {fGroups.length > 0 && (
+              <button
+                onClick={() => setFGroups([])}
+                className="text-ink-400 hover:text-ink-900 text-xl font-bold p-1 leading-none shrink-0"
+                title="مسح تصفية المجموعات"
+              >
+                ×
+              </button>
+            )}
+          </div>
+
+          {/* Neighborhood Dropdown with Clear Button */}
+          <div className="flex items-center gap-1.5 w-full">
+            <div className="flex-1 min-w-0">
+              <MultiSelectDropdown
+                label="تصفية الأحياء"
+                options={neighborhoods.map((n) => ({ value: n, label: n }))}
+                selected={fNeighborhoods}
+                onChange={setFNeighborhoods}
+              />
+            </div>
+            {fNeighborhoods.length > 0 && (
+              <button
+                onClick={() => setFNeighborhoods([])}
+                className="text-ink-400 hover:text-ink-900 text-xl font-bold p-1 leading-none shrink-0"
+                title="مسح تصفية الأحياء"
+              >
+                ×
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Table */}

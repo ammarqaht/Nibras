@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { pushToast } from '@/components/Toast';
 
-type Student = { id: number; membershipNo: number; studentName: string; stage: string; grade: string; groupId: number | null };
+type Student = { id: number; membershipNo: number; studentName: string; stage: string; grade: string; groupId: number | null; registrationStatus: string };
 type Group = { id: number; name: string };
 type Rec = { registrationId: number; date: string; status: string };
 
@@ -29,12 +29,13 @@ export default function AttendancePage() {
 
   async function loadStatic() {
     const [sr, gr] = await Promise.all([
-      fetch('/api/supervisor/students?registrationStatus=approved', { cache: 'no-store' }),
+      fetch('/api/supervisor/students', { cache: 'no-store' }),
       fetch('/api/supervisor/groups', { cache: 'no-store' })
     ]);
     const sj = await sr.json().catch(() => ({ students: [] }));
     const gj = await gr.json().catch(() => ({ groups: [] }));
-    setStudents(sj.students ?? []);
+    const allSt: Student[] = sj.students ?? [];
+    setStudents(allSt.filter((s) => s.registrationStatus === 'approved'));
     setGroups(gj.groups ?? []);
   }
 

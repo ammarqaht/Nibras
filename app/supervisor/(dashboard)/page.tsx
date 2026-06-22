@@ -57,6 +57,7 @@ export default function DashboardHome() {
   const attendanceRate = activeBase ? Math.round((presentToday / activeBase) * 100) : 0;
 
   const recent = [...students]
+    .filter((s) => s.registrationStatus === 'approved')
     .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
     .slice(0, 6);
 

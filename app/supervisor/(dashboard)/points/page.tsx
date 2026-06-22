@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { pushToast } from '@/components/Toast';
 
-type Student = { id: number; membershipNo: number; studentName: string; groupId: number | null };
+type Student = { id: number; membershipNo: number; studentName: string; groupId: number | null; registrationStatus: string };
 type Group = { id: number; name: string };
 type Point = {
   id: number; registrationId: number; delta: number; reason: string;
@@ -38,13 +38,17 @@ export default function PointsPage() {
 
   async function loadAll() {
     const [sr, gr, pr] = await Promise.all([
-      fetch('/api/supervisor/students?registrationStatus=approved', { cache: 'no-store' }),
+      fetch('/api/supervisor/students', { cache: 'no-store' }),
       fetch('/api/supervisor/groups', { cache: 'no-store' }),
       fetch('/api/supervisor/points', { cache: 'no-store' })
     ]);
-    setStudents((await sr.json().catch(() => ({ students: [] }))).students ?? []);
-    setGroups((await gr.json().catch(() => ({ groups: [] }))).groups ?? []);
-    setPoints((await pr.json().catch(() => ({ points: [] }))).points ?? []);
+    const srj = await sr.json().catch(() => ({ students: [] }));
+    const grj = await gr.json().catch(() => ({ groups: [] }));
+    const prj = await pr.json().catch(() => ({ points: [] }));
+    const allSt: Student[] = srj.students ?? [];
+    setStudents(allSt.filter((s) => s.registrationStatus === 'approved'));
+    setGroups(grj.groups ?? []);
+    setPoints(prj.points ?? []);
     setLoading(false);
   }
   useEffect(() => { loadAll(); }, []);
