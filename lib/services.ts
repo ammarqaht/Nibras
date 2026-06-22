@@ -901,17 +901,59 @@ export async function deleteStudent(id: number): Promise<boolean> {
   if (hasDatabase) {
     const prisma = getPrisma()!;
     try {
+      // 1. Delete associated data first to keep database clean
+      await prisma.submission.deleteMany({ where: { registrationId: id } });
+      await prisma.point.deleteMany({ where: { registrationId: id } });
+      await prisma.attendance.deleteMany({ where: { registrationId: id } });
+
+      // 2. Delete student
       await prisma.registration.delete({ where: { id } });
+
+      // 3. Reset the autoincrement sequence to prevent gaps when deleting last student
+      const maxStudent = await prisma.registration.findFirst({
+        orderBy: { id: 'desc' }
+      });
+      if (maxStudent) {
+        await prisma.$executeRawUnsafe(
+          `SELECT setval(pg_get_serial_sequence('"Registration"', 'id'), ${maxStudent.id});`
+        );
+      } else {
+        await prisma.$executeRawUnsafe(
+          `ALTER SEQUENCE "Registration_id_seq" RESTART WITH 1;`
+        );
+      }
+
       return true;
-    } catch {
+    } catch (err) {
+      console.error('Error deleting student from DB:', err);
       return false;
     }
   } else {
-    const list = await getStudents();
-    const index = list.findIndex(s => s.id === id);
+    // JSON Fallback mode
+    const path = await import('path');
+    const COUNTER_FILE = path.join(DATA_DIR, 'membership-counter.json');
+
+    const registrations = await readJsonFile<any[]>(FILE_REGISTRATIONS, []);
+    const index = registrations.findIndex(s => s.id === id);
     if (index === -1) return false;
-    list.splice(index, 1);
-    await writeJsonFile(FILE_REGISTRATIONS, list);
+    
+    registrations.splice(index, 1);
+    await writeJsonFile(FILE_REGISTRATIONS, registrations);
+
+    // Clean up related JSON files
+    const attendance = await readJsonFile<any[]>(FILE_ATTENDANCE, []);
+    await writeJsonFile(FILE_ATTENDANCE, attendance.filter(a => a.registrationId !== id));
+
+    const points = await readJsonFile<any[]>(FILE_POINTS, []);
+    await writeJsonFile(FILE_POINTS, points.filter(p => p.registrationId !== id));
+
+    const submissions = await readJsonFile<any[]>(FILE_SUBMISSIONS, []);
+    await writeJsonFile(FILE_SUBMISSIONS, submissions.filter(s => s.registrationId !== id));
+
+    // Reset local counter to current max ID
+    const maxId = registrations.length > 0 ? Math.max(...registrations.map(r => r.id)) : 0;
+    await writeJsonFile(COUNTER_FILE, { count: maxId });
+
     return true;
   }
 }
