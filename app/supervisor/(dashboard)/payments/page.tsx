@@ -183,12 +183,12 @@ export default function PaymentsPage() {
               <table className="tbl">
                 <thead>
                   <tr>
-                    <th>الطالب</th>
-                    <th>العضوية</th>
-                    <th>نوع الدفع</th>
-                    <th>الإيصال</th>
-                    <th>الحالة</th>
-                    <th className="text-center pl-6">الإجراءات</th>
+                    <th className="w-[25%]">الطالب</th>
+                    <th className="w-[10%]">العضوية</th>
+                    <th className="w-[10%]">نوع الدفع</th>
+                    <th className="w-[10%]">الإيصال</th>
+                    <th className="w-[10%]">الحالة</th>
+                    <th className="!text-center pl-6 w-[35%]">الإجراءات</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -227,7 +227,7 @@ export default function PaymentsPage() {
                         </span>
                       </td>
                       <td>
-                        <div className="flex items-center gap-2 justify-center pl-6">
+                        <div className="flex items-center gap-2 justify-end pl-6">
                           <button
                             onClick={() => setSelectedStudent(s)}
                             className="btn btn-secondary py-1 px-3 text-xs flex items-center gap-1"
