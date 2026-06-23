@@ -51,6 +51,7 @@ const LINKS: NavLink[] = [
   { id: 'invoices', href: '/supervisor/invoices', label: 'الفواتير' },
   { id: 'finance', href: '/supervisor/finance', label: 'المالية', roles: ['finance', 'finance_supervisor'] },
   { id: 'announcements', href: '/supervisor/announcements', label: 'الإشعارات', roles: ['media_supervisor', 'general_supervisor'] },
+  { id: 'analytics', href: '/supervisor/analytics', label: 'الإحصائيات', roles: ['admin', 'general_supervisor', 'attendance_supervisor'] },
   { id: 'account', href: '/supervisor/account', label: 'حسابي' },
   { id: 'supervisors', href: '/supervisor/supervisors', label: 'المشرفون', roles: ['admin'] },
   { id: 'settings', href: '/supervisor/settings', label: 'الإعدادات' }

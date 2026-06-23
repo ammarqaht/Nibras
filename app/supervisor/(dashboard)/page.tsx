@@ -62,6 +62,283 @@ const DEFAULT_SLOTS = [
   { label: 'الفقرة الثالثة (07:30 م - 08:45 م)', start: '19:30', end: '20:45' }
 ];
 
+// ─── helpers ─────────────────────────────────────────────────────────────────
+function AttendanceRing({ percent, color = 'var(--accent)' }: { percent: number; color?: string }) {
+  const r = 28, c = 2 * Math.PI * r;
+  return (
+    <div className="relative w-16 h-16 flex items-center justify-center shrink-0">
+      <svg className="w-full h-full -rotate-90">
+        <circle cx="32" cy="32" r={r} fill="transparent" stroke="var(--bg-soft)" strokeWidth="4.5" />
+        <circle cx="32" cy="32" r={r} fill="transparent" stroke={color} strokeWidth="5"
+          strokeDasharray={c} strokeDashoffset={c * (1 - percent / 100)} strokeLinecap="round" />
+      </svg>
+      <span className="absolute text-xs font-extrabold" style={{ color }}>{percent}%</span>
+    </div>
+  );
+}
+
+function SmallCard({ accent, icon, label, value, sub }: { accent: string; icon: React.ReactNode; label: string; value: React.ReactNode; sub?: React.ReactNode }) {
+  return (
+    <div className="card p-5 flex items-center gap-4 relative overflow-hidden">
+      <div className="absolute top-0 right-0 w-1.5 h-full" style={{ backgroundColor: accent }} />
+      <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 text-white" style={{ backgroundColor: accent + '22', color: accent }}>
+        {icon}
+      </div>
+      <div className="space-y-0.5 min-w-0">
+        <div className="text-[10px] text-ink-400 font-bold">{label}</div>
+        <div className="text-xl font-bold text-ink-900">{value}</div>
+        {sub && <div className="text-[10px] text-ink-500 font-semibold">{sub}</div>}
+      </div>
+    </div>
+  );
+}
+
+function AttendanceCard({ label, present, absent, percent, color, sub }: { label: string; present: number; absent: number; percent: number; color: string; sub?: string }) {
+  return (
+    <div className="card p-5 flex items-center justify-between relative overflow-hidden">
+      <div className="absolute top-0 right-0 w-1.5 h-full" style={{ backgroundColor: color }} />
+      <div className="space-y-1 min-w-0">
+        <div className="text-xs text-ink-500 font-bold">{label}</div>
+        <div className="text-xl font-bold text-ink-900">{present} <span className="text-sm text-ink-400 font-medium">حاضر</span></div>
+        <div className="text-sm font-semibold text-red-500">{absent} <span className="text-xs text-ink-400 font-medium">معتذر</span></div>
+        {sub && <div className="text-[10px] text-ink-400 font-semibold">{sub}</div>}
+      </div>
+      <AttendanceRing percent={percent} color={color} />
+    </div>
+  );
+}
+
+function NextProgramCard({ program }: { program: { title: string; date: string; startTime: string } | null }) {
+  const formatDate = (d: string) => {
+    const days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+    const dt = new Date(d);
+    return `${days[dt.getDay()]} ${dt.toLocaleDateString('ar-SA', { month: 'short', day: 'numeric' })}`;
+  };
+  return (
+    <div className="card p-5 flex items-center gap-4 relative overflow-hidden">
+      <div className="absolute top-0 right-0 w-1.5 h-full bg-indigo-500" />
+      <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+          <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" />
+          <line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+        </svg>
+      </div>
+      <div className="space-y-0.5 min-w-0">
+        <div className="text-[10px] text-ink-400 font-bold">أقرب برنامج للجنتك</div>
+        {program ? (
+          <>
+            <div className="text-sm font-bold text-ink-900 truncate">{program.title}</div>
+            <div className="text-[10px] text-indigo-600 font-semibold">{formatDate(program.date)} · {program.startTime}</div>
+          </>
+        ) : (
+          <div className="text-sm font-bold text-ink-400">لا يوجد برنامج قادم</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function QuickInfoCards({ roles, isAdmin, isFinanceRole, isAttendanceRole, isPointsRole, isGroupsRole, isGeneralRole, isStageRole, isMediaRole, stats, attendancePercent, groupAttendancePercent }: {
+  roles: string[]; isAdmin: boolean; isFinanceRole: boolean; isAttendanceRole: boolean; isPointsRole: boolean;
+  isGroupsRole: boolean; isGeneralRole: boolean; isStageRole: boolean; isMediaRole: boolean;
+  stats: any; attendancePercent: number; groupAttendancePercent: number;
+}) {
+  const overallPresent = stats?.attendanceOverall?.presentToday ?? 0;
+  const overallAbsent = stats?.attendanceOverall?.absentToday ?? 0;
+
+  // Admin / General supervisor
+  if (isAdmin) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <SmallCard
+          accent="#22c55e"
+          icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.7199m0 0-.003-.031a6.062 6.062 0 0 1 3.518-5.563 3 3 0 1 1 4.966 0 6.062 6.062 0 0 1 3.518 5.563" /></svg>}
+          label="الطلاب المقبولين"
+          value={stats?.students?.approved ?? 0}
+          sub={`من إجمالي ${stats?.students?.total ?? 0} مسجّل`}
+        />
+        <AttendanceCard
+          label="حضور اليوم"
+          present={overallPresent} absent={overallAbsent}
+          percent={attendancePercent} color="var(--accent)"
+        />
+      </div>
+    );
+  }
+
+  if (isGeneralRole) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-1 gap-4 max-w-sm">
+        <AttendanceCard
+          label="حضور اليوم"
+          present={overallPresent} absent={overallAbsent}
+          percent={attendancePercent} color="var(--accent)"
+        />
+      </div>
+    );
+  }
+
+  // Finance supervisor
+  if (isFinanceRole) {
+    const fs = stats?.financeStats;
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <SmallCard accent="#f59e0b"
+          icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" /></svg>}
+          label="فواتير معلّقة" value={stats?.invoices?.pendingReview ?? 0} sub="بانتظار الموافقة"
+        />
+        <SmallCard accent="#ef4444"
+          icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" /></svg>}
+          label="مدفوعات معلّقة" value={stats?.payments?.pendingReview ?? 0} sub="بانتظار المراجعة"
+        />
+        <SmallCard accent="#10b981"
+          icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>}
+          label="صافي الرصيد" value={`${(fs?.netBalance ?? 0).toLocaleString('ar')} ر.س`} sub="إيرادات الطلاب − المصروفات"
+        />
+        <SmallCard accent="#8b5cf6"
+          icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" /></svg>}
+          label="مصاريف هذا الشهر" value={`${(fs?.thisMonthExpenses ?? 0).toLocaleString('ar')} ر.س`} sub="إجمالي الفواتير المعتمدة"
+        />
+      </div>
+    );
+  }
+
+  // Attendance supervisor
+  if (isAttendanceRole) {
+    const as = stats?.attendanceStats;
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <AttendanceCard
+          label="حضور اليوم" present={overallPresent} absent={overallAbsent}
+          percent={attendancePercent} color="var(--accent)"
+        />
+        <SmallCard accent="#12B3D5"
+          icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 14.25v2.25m3-4.5v4.5m3-6.75v6.75m3-9v9M6 20.25h12A2.25 2.25 0 0 0 20.25 18V6A2.25 2.25 0 0 0 18 3.75H6A2.25 2.25 0 0 0 3.75 6v12A2.25 2.25 0 0 0 6 20.25Z" /></svg>}
+          label="متوسط آخر 7 أيام" value={`${as?.avg7DayAttendance ?? 0}%`} sub="معدّل نسبة الحضور اليومية"
+        />
+        <SmallCard accent="#f97316"
+          icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" /></svg>}
+          label="غياب متكرر" value={as?.consecutiveAbsentCount ?? 0} sub="طالب غاب يومين متتاليين أو أكثر"
+        />
+      </div>
+    );
+  }
+
+  // Points supervisors (social/cultural/scientific/sports)
+  if (isPointsRole) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <AttendanceCard
+          label="حضور اليوم" present={overallPresent} absent={overallAbsent}
+          percent={attendancePercent} color="var(--accent)"
+        />
+        <NextProgramCard program={stats?.nextCommitteeProgram ?? null} />
+      </div>
+    );
+  }
+
+  // Groups supervisor
+  if (isGroupsRole) {
+    const gs = stats?.groupStats;
+    const myPresent = stats?.attendance?.presentToday ?? 0;
+    const myAbsent = stats?.attendance?.absentToday ?? 0;
+    const myTotal = myPresent + myAbsent;
+    const myPct = myTotal > 0 ? Math.round(myPresent / myTotal * 100) : 0;
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <SmallCard accent="#22c55e"
+          icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.7199m0 0-.003-.031a6.062 6.062 0 0 1 3.518-5.563 3 3 0 1 1 4.966 0 6.062 6.062 0 0 1 3.518 5.563" /></svg>}
+          label="طلاب الأسرة" value={stats?.myStudents?.length ?? 0} sub="إجمالي طلاب أسرتك"
+        />
+        <AttendanceCard
+          label="حضور الأسرة اليوم" present={myPresent} absent={myAbsent}
+          percent={myPct} color="#12B3D5"
+        />
+        <SmallCard accent="#f59e0b"
+          icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" /></svg>}
+          label="ترتيب الأسرة" value={gs?.myGroupRank != null ? `#${gs.myGroupRank}` : '—'} sub="بين جميع الأسر في النقاط"
+        />
+        <SmallCard accent="#8b5cf6"
+          icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>}
+          label="نقاط الأسرة" value={gs?.myGroupPoints ?? 0} sub="إجمالي نقاط الأسرة"
+        />
+      </div>
+    );
+  }
+
+  // Stage supervisor
+  if (isStageRole) {
+    const ss = stats?.stageStats;
+    const sp = ss?.attendanceToday?.present ?? 0;
+    const sa = ss?.attendanceToday?.absent ?? 0;
+    const st = sp + sa;
+    const spct = st > 0 ? Math.round(sp / st * 100) : 0;
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <SmallCard accent="#22c55e"
+          icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.7199m0 0-.003-.031a6.062 6.062 0 0 1 3.518-5.563 3 3 0 1 1 4.966 0 6.062 6.062 0 0 1 3.518 5.563" /></svg>}
+          label={`طلاب مرحلة ${ss?.stageName ?? ''} المقبولين`} value={ss?.approvedCount ?? 0} sub="طالب مقبول في مرحلتك"
+        />
+        <AttendanceCard
+          label="حضور المرحلة اليوم" present={sp} absent={sa}
+          percent={spct} color="#103F91"
+        />
+        <div className="card p-5 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-1.5 h-full bg-amber-400" />
+          <div className="text-[10px] text-ink-400 font-bold mb-3">أوائل المرحلة</div>
+          {ss?.top3?.length > 0 ? (
+            <div className="space-y-2">
+              {ss.top3.map((s: { name: string; points: number }, i: number) => (
+                <div key={i} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-amber-50 text-amber-600 text-[10px] font-extrabold flex items-center justify-center border border-amber-200">{i + 1}</span>
+                    <span className="text-xs font-semibold text-ink-800 truncate max-w-[110px]">{s.name}</span>
+                  </div>
+                  <span className="text-xs font-bold text-amber-600">{s.points} نقطة</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-xs text-ink-400 text-center py-3">لا توجد نقاط بعد</div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Media supervisor
+  if (isMediaRole) {
+    const lastAnn = stats?.announcements?.announcementsList?.[0];
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <SmallCard accent="#12B3D5"
+          icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" /></svg>}
+          label="إعلانات منشورة" value={stats?.announcements?.total ?? 0} sub="إجمالي الإعلانات"
+        />
+        <NextProgramCard program={stats?.nextCommitteeProgram ?? null} />
+        <SmallCard accent="#8b5cf6"
+          icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2Z" /></svg>}
+          label="مهام نشطة" value={stats?.tasks?.active ?? 0} sub="مهمة نشطة حالياً"
+        />
+        <div className="card p-5 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-1.5 h-full bg-teal-500" />
+          <div className="text-[10px] text-ink-400 font-bold mb-2">آخر إعلان</div>
+          {lastAnn ? (
+            <>
+              <div className="text-xs font-bold text-ink-900 line-clamp-2 mb-1">{lastAnn.title}</div>
+              <div className="text-[10px] text-ink-400">{new Date(lastAnn.createdAt).toLocaleDateString('ar-SA', { month: 'short', day: 'numeric' })}</div>
+            </>
+          ) : (
+            <div className="text-xs text-ink-400 text-center py-3">لا توجد إعلانات</div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
 export default function DashboardHome() {
   const { user } = useSupervisor();
   const [stats, setStats] = useState<any>(null);
@@ -99,10 +376,19 @@ export default function DashboardHome() {
   const hasPerm = (p: string) => perms.includes('*') || perms.includes(p);
 
   const roles = user?.role ? user.role.split(',').map((r) => r.trim()) : [];
-  
+
   const canSeeStudentDetails = roles.some((r) =>
     ['admin', 'general_supervisor', 'finance', 'finance_supervisor', 'administrative_supervisor'].includes(r)
   );
+
+  const isAdmin = roles.includes('admin');
+  const isFinanceRole = roles.some(r => ['finance', 'finance_supervisor'].includes(r));
+  const isAttendanceRole = roles.includes('attendance_supervisor');
+  const isPointsRole = roles.some(r => ['social_supervisor', 'cultural_supervisor', 'scientific_supervisor', 'sports_supervisor'].includes(r));
+  const isGroupsRole = roles.includes('groups_supervisor');
+  const isGeneralRole = roles.includes('general_supervisor');
+  const isStageRole = roles.includes('stage_supervisor');
+  const isMediaRole = roles.includes('media_supervisor');
 
   const allowedLinks = ALL_LINKS.filter(link => {
     if (link.id === 'students') {
@@ -379,91 +665,21 @@ export default function DashboardHome() {
             </div>
           )}
 
-          {/* Top Metrics Row */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            
-            {/* Club-wide Attendance Ring Widget */}
-            <div className="card p-5 flex items-center justify-between relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-1.5 h-full bg-brand" />
-              <div className="space-y-1">
-                <div className="text-xs text-ink-500 font-bold">الحضور العام اليوم</div>
-                <div className="text-xl font-bold text-ink-900">{stats?.attendanceOverall?.presentToday || 0} من {stats?.attendanceOverall?.activeBase || 0}</div>
-                <div className="text-[10px] text-ink-400 font-semibold">نسبة حضور النادي بالكامل</div>
-              </div>
-              <div className="relative w-16 h-16 flex items-center justify-center shrink-0">
-                <svg className="w-full h-full transform -rotate-90">
-                  <circle cx="32" cy="32" r="28" fill="transparent" stroke="var(--bg-soft)" strokeWidth="4.5" />
-                  <circle 
-                    cx="32" cy="32" r="28" fill="transparent" stroke="var(--accent)" strokeWidth="5"
-                    strokeDasharray={2 * Math.PI * 28}
-                    strokeDashoffset={2 * Math.PI * 28 * (1 - (attendancePercent / 100))}
-                    strokeLinecap="round"
-                  />
-                </svg>
-                <span className="absolute text-xs font-extrabold text-brand-700">{attendancePercent}%</span>
-              </div>
-            </div>
-
-            {/* Scoped Group Attendance Widget (if not global/manages group) */}
-            {!isGlobal && stats?.myStudents?.length > 0 ? (
-              <div className="card p-5 flex items-center justify-between relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-1.5 h-full bg-cyan-500" />
-                <div className="space-y-1">
-                  <div className="text-xs text-ink-500 font-bold">حضور طلاب الأسرة</div>
-                  <div className="text-xl font-bold text-ink-900">{stats?.attendance?.presentToday || 0} من {stats?.attendance?.activeBase || 0}</div>
-                  <div className="text-[10px] text-ink-400 font-semibold">نسبة حضور أسرتك الخاصة اليوم</div>
-                </div>
-                <div className="relative w-16 h-16 flex items-center justify-center shrink-0">
-                  <svg className="w-full h-full transform -rotate-90">
-                    <circle cx="32" cy="32" r="28" fill="transparent" stroke="var(--bg-soft)" strokeWidth="4.5" />
-                    <circle 
-                      cx="32" cy="32" r="28" fill="transparent" stroke="var(--blue-deep)" strokeWidth="5"
-                      strokeDasharray={2 * Math.PI * 28}
-                      strokeDashoffset={2 * Math.PI * 28 * (1 - (groupAttendancePercent / 100))}
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                  <span className="absolute text-xs font-extrabold text-cyan-600">{groupAttendancePercent}%</span>
-                </div>
-              </div>
-            ) : canSeeStudentDetails ? (
-              <div className="card p-5 flex items-center gap-4 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-1.5 h-full bg-green-500" />
-                <div className="w-10 h-10 rounded-lg bg-green-50 text-green-600 flex items-center justify-center shrink-0">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.7199m0 0-.003-.031a6.062 6.062 0 0 1 3.518-5.563 3 3 0 1 1 4.966 0 6.062 6.062 0 0 1 3.518 5.563" />
-                  </svg>
-                </div>
-                <div className="space-y-0.5">
-                  <div className="text-[10px] text-ink-400 font-bold">الطلاب المقبولين</div>
-                  <div className="text-xl font-bold text-ink-900">{stats?.students?.approved || 0}</div>
-                  <div className="text-[10px] text-ink-500 font-semibold">من إجمالي {stats?.students?.total || 0} مسجل</div>
-                </div>
-              </div>
-            ) : null}
-
-            {/* Active Tasks metric */}
-            {canSeeTasks && (
-              <div className="card p-5 flex items-center gap-4 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-1.5 h-full bg-purple-500" />
-                <div className="w-10 h-10 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2Z" />
-                  </svg>
-                </div>
-                <div className="space-y-0.5">
-                  <div className="text-[10px] text-ink-400 font-bold">المهام والأنشطة النشطة</div>
-                  <div className="text-xl font-bold text-ink-900">{stats?.tasks?.active || 0}</div>
-                  {stats?.tasks?.pendingReview > 0 ? (
-                    <div className="text-[10px] text-orange-600 font-bold animate-pulse">يوجد {stats.tasks.pendingReview} تسليم قيد المراجعة</div>
-                  ) : (
-                    <div className="text-[10px] text-ink-500 font-semibold">لا توجد تسليمات معلقة</div>
-                  )}
-                </div>
-              </div>
-            )}
-
-          </div>
+          {/* Quick Info Cards — role-specific */}
+          <QuickInfoCards
+            roles={roles}
+            isAdmin={isAdmin}
+            isFinanceRole={isFinanceRole}
+            isAttendanceRole={isAttendanceRole}
+            isPointsRole={isPointsRole}
+            isGroupsRole={isGroupsRole}
+            isGeneralRole={isGeneralRole}
+            isStageRole={isStageRole}
+            isMediaRole={isMediaRole}
+            stats={stats}
+            attendancePercent={attendancePercent}
+            groupAttendancePercent={groupAttendancePercent}
+          />
 
           {/* Main Content Layout Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

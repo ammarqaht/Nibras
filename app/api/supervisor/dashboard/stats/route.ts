@@ -11,7 +11,8 @@ import {
   getInvoices,
   getAnnouncements,
   getAllSupervisors,
-  getSupervisorByEmail
+  getSupervisorByEmail,
+  getSettings
 } from '@/lib/services';
 
 function todayStr() {
@@ -165,6 +166,122 @@ export async function GET(req: NextRequest) {
       createdAt: a.createdAt
     }));
 
+    // --- Role-specific extras ---
+    const isFinanceRole = roles.some(r => ['finance', 'finance_supervisor'].includes(r));
+    const isAttendanceRole = roles.includes('attendance_supervisor');
+    const isStageRole = roles.includes('stage_supervisor');
+    const committeeRoles = ['social_supervisor', 'cultural_supervisor', 'scientific_supervisor', 'sports_supervisor', 'media_supervisor'];
+    const myCommitteeRoles = roles.filter(r => committeeRoles.includes(r));
+
+    // FINANCE: net balance + this-month expenses
+    let financeStats: { netBalance: number; thisMonthExpenses: number } | null = null;
+    if (isFinanceRole) {
+      const settings = await getSettings();
+      const clubFee = parseInt(settings.clubFeesValue || '300', 10);
+      const studentRevenue = paidStudents * clubFee;
+      const thisMonth = today.substring(0, 7); // YYYY-MM
+      const thisMonthExpenses = approvedInvoices
+        .filter((i: any) => (i.createdAt as string).startsWith(thisMonth))
+        .reduce((sum: number, i: any) => sum + i.total, 0);
+      financeStats = { netBalance: studentRevenue - totalSpent, thisMonthExpenses };
+    }
+
+    // ATTENDANCE: avg last 7 days + consecutive absent count
+    let attendanceStats: { avg7DayAttendance: number; consecutiveAbsentCount: number } | null = null;
+    if (isAttendanceRole) {
+      const last7: string[] = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(); d.setDate(d.getDate() - i);
+        last7.push(d.toISOString().split('T')[0]);
+      }
+      const dayRates = last7.map(day => {
+        const recs = attendance.filter((a: any) => a.date === day);
+        const p = recs.filter((a: any) => a.status === 'present').length;
+        return recs.length > 0 ? (p / recs.length) * 100 : null;
+      }).filter((v): v is number => v !== null);
+      const avg7DayAttendance = dayRates.length > 0
+        ? Math.round(dayRates.reduce((a, b) => a + b, 0) / dayRates.length) : 0;
+
+      const last30: string[] = [];
+      for (let i = 29; i >= 0; i--) {
+        const d = new Date(); d.setDate(d.getDate() - i);
+        last30.push(d.toISOString().split('T')[0]);
+      }
+      const approvedList = students.filter((s: any) => s.registrationStatus === 'approved');
+      let consecutiveAbsentCount = 0;
+      for (const student of approvedList) {
+        const absentDates = attendance
+          .filter((a: any) => a.registrationId === student.id && a.status === 'absent' && last30.includes(a.date))
+          .map((a: any) => a.date).sort();
+        let streak = 1, maxStreak = 0;
+        for (let i = 1; i < absentDates.length; i++) {
+          const diff = (new Date(absentDates[i]).getTime() - new Date(absentDates[i - 1]).getTime()) / 86400000;
+          if (diff === 1) { streak++; maxStreak = Math.max(maxStreak, streak); }
+          else streak = 1;
+        }
+        if (maxStreak >= 2) consecutiveAbsentCount++;
+      }
+      attendanceStats = { avg7DayAttendance, consecutiveAbsentCount };
+    }
+
+    // COMMITTEE: next upcoming program for the supervisor's committee role(s)
+    let nextCommitteeProgram: { title: string; date: string; startTime: string } | null = null;
+    if (myCommitteeRoles.length > 0) {
+      const upcoming = schedules
+        .filter((s: any) => s.date >= today && myCommitteeRoles.includes(s.role))
+        .sort((a: any, b: any) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
+      if (upcoming.length > 0) {
+        nextCommitteeProgram = { title: upcoming[0].title, date: upcoming[0].date, startTime: upcoming[0].startTime };
+      }
+    }
+
+    // GROUPS: rank and points for the supervisor's own group
+    let groupStats: { myGroupRank: number | null; myGroupPoints: number } | null = null;
+    if (roles.includes('groups_supervisor') && supervisor.groupIds) {
+      const myGroupId = parseInt(supervisor.groupIds.split(',')[0].trim(), 10);
+      if (!isNaN(myGroupId)) {
+        const ranked = groups
+          .map((g: any) => ({ id: g.id, points: groupPointsMap[g.id] || 0 }))
+          .sort((a: any, b: any) => b.points - a.points);
+        const rankIdx = ranked.findIndex((g: any) => g.id === myGroupId);
+        groupStats = { myGroupRank: rankIdx >= 0 ? rankIdx + 1 : null, myGroupPoints: groupPointsMap[myGroupId] || 0 };
+      }
+    }
+
+    // STAGE: stage-specific approved count, today attendance, top 3 by points
+    let stageStats: {
+      stageName: string;
+      approvedCount: number;
+      attendanceToday: { present: number; absent: number };
+      top3: { name: string; points: number }[];
+    } | null = null;
+    if (isStageRole && supervisor.stage) {
+      const stageStudents = students.filter((s: any) => s.stage === supervisor.stage);
+      const stageApprovedCount = stageStudents.filter((s: any) => s.registrationStatus === 'approved').length;
+      const stageStudentIds = new Set(stageStudents.map((s: any) => s.id));
+      const stageTodayAtt = attendance.filter((a: any) => a.date === today && stageStudentIds.has(a.registrationId));
+      const studentPointsSums: Record<number, number> = {};
+      for (const p of points) {
+        if (stageStudentIds.has(p.registrationId)) {
+          studentPointsSums[p.registrationId] = (studentPointsSums[p.registrationId] || 0) + p.delta;
+        }
+      }
+      const top3 = stageStudents
+        .filter((s: any) => s.registrationStatus === 'approved')
+        .map((s: any) => ({ name: s.studentName, points: studentPointsSums[s.id] || 0 }))
+        .sort((a: any, b: any) => b.points - a.points)
+        .slice(0, 3);
+      stageStats = {
+        stageName: supervisor.stage,
+        approvedCount: stageApprovedCount,
+        attendanceToday: {
+          present: stageTodayAtt.filter((a: any) => a.status === 'present').length,
+          absent: stageTodayAtt.filter((a: any) => a.status === 'absent').length
+        },
+        top3
+      };
+    }
+
     return NextResponse.json({
       isGlobal,
       stats: {
@@ -178,7 +295,12 @@ export async function GET(req: NextRequest) {
         schedule: { todayCount: todayScheduleCount, nextProgramTitle, todayPrograms: sortedTodaySchedules },
         groups: { total: totalGroups },
         invoices: { pendingReview: pendingInvoices, totalSpent },
-        announcements: { total: recentAnnouncements, announcementsList }
+        announcements: { total: recentAnnouncements, announcementsList },
+        financeStats,
+        attendanceStats,
+        nextCommitteeProgram,
+        groupStats,
+        stageStats
       }
     });
 
