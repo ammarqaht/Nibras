@@ -194,6 +194,7 @@ export default function PaymentsPage() {
                 <tbody>
                   {filtered.map((s) => (
                     <tr key={s.id}>
+                      <td className="font-medium">
                         {s.studentName}
                         {s.hasCondition && (
                           <span title="حالة صحية" className="mr-1 inline-flex items-center text-red-600">
@@ -204,6 +205,7 @@ export default function PaymentsPage() {
                             </svg>
                           </span>
                         )}
+                      </td>
                       <td dir="ltr" className="text-right font-mono text-ink-500">#{s.membershipNo}</td>
                       <td><span className="pill pill-gray">{s.paymentType === 'now' ? 'فوري' : 'آجل'}</span></td>
                       <td>

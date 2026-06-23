@@ -644,6 +644,7 @@ export default function StudentsPage() {
                         {visibleCols.paymentStatus && (
                           <td><span className={`pill ${pp.cls}`}>{pp.label}</span></td>
                         )}
+                        {visibleCols.hasCondition && (
                           <td className="text-ink-500 text-sm">
                             {s.hasCondition ? (
                               <span className="inline-flex items-center gap-1 text-red-600 font-medium">
@@ -656,6 +657,7 @@ export default function StudentsPage() {
                               </span>
                             ) : 'لا'}
                           </td>
+                        )}
                         <td>
                           <button
                             className="btn btn-secondary py-1 px-3 text-xs"
