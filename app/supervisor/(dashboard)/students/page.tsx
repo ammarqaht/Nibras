@@ -218,8 +218,13 @@ function MultiSelectDropdown({
 export default function StudentsPage() {
   const { user } = useSupervisor();
   const isAdmin = user?.role === 'admin';
+  const roles = user?.role ? user.role.split(',').map((r) => r.trim()) : [];
+  const isGlobal = roles.some((r) =>
+    ['admin', 'finance', 'finance_supervisor', 'media_supervisor', 'cultural_supervisor', 'social_supervisor', 'general_supervisor', 'attendance_supervisor'].includes(r)
+  );
 
   const [students, setStudents] = useState<Student[]>([]);
+
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Student | null>(null);
@@ -249,12 +254,37 @@ export default function StudentsPage() {
     const saved = localStorage.getItem('nibras_student_cols');
     if (saved) {
       try {
-        setVisibleCols(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        if (!isGlobal) {
+          parsed.guardianPhone = false;
+          parsed.studentPhone = false;
+          parsed.paymentStatus = false;
+        }
+        setVisibleCols(parsed);
       } catch (e) {
         console.error(e);
       }
+    } else if (!isGlobal) {
+      setVisibleCols((prev) => ({
+        ...prev,
+        guardianPhone: false,
+        studentPhone: false,
+        paymentStatus: false
+      }));
     }
-  }, []);
+  }, [isGlobal]);
+
+  useEffect(() => {
+    if (!isGlobal) {
+      setVisibleCols((prev) => ({
+        ...prev,
+        guardianPhone: false,
+        studentPhone: false,
+        paymentStatus: false
+      }));
+    }
+  }, [isGlobal]);
+
 
   const setVisibleCol = (key: keyof typeof visibleCols, val: boolean) => {
     setVisibleCols((prev) => {
@@ -319,22 +349,32 @@ export default function StudentsPage() {
   }
 
   function exportCsv() {
-    const headers = [
+    const headers = isGlobal ? [
       'رقم العضوية', 'اسم الطالب', 'رقم الهوية', 'جوال ولي الأمر', 'جوال الطالب',
       'المرحلة', 'الصف', 'الحي', 'حالة الدفع', 'نوع الدفع', 'حالة التسجيل', 'حالة صحية'
+    ] : [
+      'رقم العضوية', 'اسم الطالب', 'رقم الهوية',
+      'المرحلة', 'الصف', 'الحي', 'نوع الدفع', 'حالة التسجيل', 'حالة صحية'
     ];
     const esc = (v: unknown) => {
       const str = String(v ?? '');
       return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
     };
-    const rows = filtered.map((s) => [
+    const rows = filtered.map((s) => isGlobal ? [
       s.membershipNo, s.studentName, s.nationalId, s.guardianPhone, s.studentPhone ?? '',
       s.stage, s.grade, s.neighborhood,
       s.paymentStatus === 'paid' ? 'مدفوع' : 'غير مدفوع',
       s.paymentType === 'now' ? 'فوري' : 'آجل',
       s.registrationStatus === 'approved' ? 'مقبول' : s.registrationStatus === 'rejected' ? 'مرفوض' : 'قيد المراجعة',
       s.hasCondition ? 'نعم' : 'لا'
+    ] : [
+      s.membershipNo, s.studentName, s.nationalId,
+      s.stage, s.grade, s.neighborhood,
+      s.paymentType === 'now' ? 'فوري' : 'آجل',
+      s.registrationStatus === 'approved' ? 'مقبول' : s.registrationStatus === 'rejected' ? 'مرفوض' : 'قيد المراجعة',
+      s.hasCondition ? 'نعم' : 'لا'
     ]);
+
     const csv = '﻿' + [headers.join(','), ...rows.map((r) => r.map(esc).join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -386,15 +426,18 @@ export default function StudentsPage() {
                   />
                   <span>الاسم</span>
                 </label>
-                <label className="flex items-center gap-2.5 text-sm text-ink-700 cursor-pointer hover:bg-cream-50 p-1.5 rounded-lg select-none">
-                  <input
-                    type="checkbox"
-                    checked={visibleCols.guardianPhone}
-                    onChange={(e) => setVisibleCol('guardianPhone', e.target.checked)}
-                    className="rounded border-ink-300 text-primary-600 focus:ring-primary-500 w-4 h-4"
-                  />
-                  <span>رقم ولي الأمر</span>
-                </label>
+                {isGlobal && (
+                  <label className="flex items-center gap-2.5 text-sm text-ink-700 cursor-pointer hover:bg-cream-50 p-1.5 rounded-lg select-none">
+                    <input
+                      type="checkbox"
+                      checked={visibleCols.guardianPhone}
+                      onChange={(e) => setVisibleCol('guardianPhone', e.target.checked)}
+                      className="rounded border-ink-300 text-primary-600 focus:ring-primary-500 w-4 h-4"
+                    />
+                    <span>رقم ولي الأمر</span>
+                  </label>
+                )}
+
                 <label className="flex items-center gap-2.5 text-sm text-ink-700 cursor-pointer hover:bg-cream-50 p-1.5 rounded-lg select-none">
                   <input
                     type="checkbox"
@@ -431,15 +474,18 @@ export default function StudentsPage() {
                   />
                   <span>رقم الهوية</span>
                 </label>
-                <label className="flex items-center gap-2.5 text-sm text-ink-700 cursor-pointer hover:bg-cream-50 p-1.5 rounded-lg select-none">
-                  <input
-                    type="checkbox"
-                    checked={visibleCols.studentPhone}
-                    onChange={(e) => setVisibleCol('studentPhone', e.target.checked)}
-                    className="rounded border-ink-300 text-primary-600 focus:ring-primary-500 w-4 h-4"
-                  />
-                  <span>جوال الطالب</span>
-                </label>
+                {isGlobal && (
+                  <label className="flex items-center gap-2.5 text-sm text-ink-700 cursor-pointer hover:bg-cream-50 p-1.5 rounded-lg select-none">
+                    <input
+                      type="checkbox"
+                      checked={visibleCols.studentPhone}
+                      onChange={(e) => setVisibleCol('studentPhone', e.target.checked)}
+                      className="rounded border-ink-300 text-primary-600 focus:ring-primary-500 w-4 h-4"
+                    />
+                    <span>جوال الطالب</span>
+                  </label>
+                )}
+
                 <label className="flex items-center gap-2.5 text-sm text-ink-700 cursor-pointer hover:bg-cream-50 p-1.5 rounded-lg select-none">
                   <input
                     type="checkbox"
@@ -449,15 +495,18 @@ export default function StudentsPage() {
                   />
                   <span>الحي السكني</span>
                 </label>
-                <label className="flex items-center gap-2.5 text-sm text-ink-700 cursor-pointer hover:bg-cream-50 p-1.5 rounded-lg select-none">
-                  <input
-                    type="checkbox"
-                    checked={visibleCols.paymentStatus}
-                    onChange={(e) => setVisibleCol('paymentStatus', e.target.checked)}
-                    className="rounded border-ink-300 text-primary-600 focus:ring-primary-500 w-4 h-4"
-                  />
-                  <span>حالة الدفع</span>
-                </label>
+                {isGlobal && (
+                  <label className="flex items-center gap-2.5 text-sm text-ink-700 cursor-pointer hover:bg-cream-50 p-1.5 rounded-lg select-none">
+                    <input
+                      type="checkbox"
+                      checked={visibleCols.paymentStatus}
+                      onChange={(e) => setVisibleCol('paymentStatus', e.target.checked)}
+                      className="rounded border-ink-300 text-primary-600 focus:ring-primary-500 w-4 h-4"
+                    />
+                    <span>حالة الدفع</span>
+                  </label>
+                )}
+
                 <label className="flex items-center gap-2.5 text-sm text-ink-700 cursor-pointer hover:bg-cream-50 p-1.5 rounded-lg select-none">
                   <input
                     type="checkbox"
@@ -527,25 +576,28 @@ export default function StudentsPage() {
           </div>
 
           {/* Group Dropdown with Clear Button */}
-          <div className="flex items-center gap-1.5 w-full">
-            <div className="flex-1 min-w-0">
-              <MultiSelectDropdown
-                label="تصفية المجموعات"
-                options={groups.map((g) => ({ value: String(g.id), label: g.name }))}
-                selected={fGroups}
-                onChange={setFGroups}
-              />
+          {isGlobal && (
+            <div className="flex items-center gap-1.5 w-full">
+              <div className="flex-1 min-w-0">
+                <MultiSelectDropdown
+                  label="تصفية المجموعات"
+                  options={groups.map((g) => ({ value: String(g.id), label: g.name }))}
+                  selected={fGroups}
+                  onChange={setFGroups}
+                />
+              </div>
+              {fGroups.length > 0 && (
+                <button
+                  onClick={() => setFGroups([])}
+                  className="text-ink-400 hover:text-ink-900 text-xl font-bold p-1 leading-none shrink-0"
+                  title="مسح تصفية المجموعات"
+                >
+                  ×
+                </button>
+              )}
             </div>
-            {fGroups.length > 0 && (
-              <button
-                onClick={() => setFGroups([])}
-                className="text-ink-400 hover:text-ink-900 text-xl font-bold p-1 leading-none shrink-0"
-                title="مسح تصفية المجموعات"
-              >
-                ×
-              </button>
-            )}
-          </div>
+          )}
+
 
           {/* Neighborhood Dropdown with Clear Button */}
           <div className="flex items-center gap-1.5 w-full">
@@ -586,15 +638,16 @@ export default function StudentsPage() {
                     {visibleCols.index && <th>الرقم</th>}
                     {visibleCols.studentName && <th>الطالب</th>}
                     {visibleCols.membershipNo && <th>العضوية</th>}
-                    {visibleCols.guardianPhone && <th>رقم ولي الأمر</th>}
+                    {visibleCols.guardianPhone && isGlobal && <th>رقم ولي الأمر</th>}
                     {visibleCols.stage && <th>المرحلة / الصف</th>}
                     {visibleCols.group && <th>المجموعة</th>}
                     {visibleCols.nationalId && <th>رقم الهوية</th>}
-                    {visibleCols.studentPhone && <th>جوال الطالب</th>}
+                    {visibleCols.studentPhone && isGlobal && <th>جوال الطالب</th>}
                     {visibleCols.neighborhood && <th>الحي</th>}
-                    {visibleCols.paymentStatus && <th>الدفع</th>}
+                    {visibleCols.paymentStatus && isGlobal && <th>الدفع</th>}
                     {visibleCols.hasCondition && <th>الحالة الصحية</th>}
                     <th></th>
+
                   </tr>
                 </thead>
                 <tbody>
@@ -623,7 +676,7 @@ export default function StudentsPage() {
                         {visibleCols.membershipNo && (
                           <td dir="ltr" className="text-right font-mono text-ink-500">#{s.membershipNo}</td>
                         )}
-                        {visibleCols.guardianPhone && (
+                        {visibleCols.guardianPhone && isGlobal && (
                           <td dir="ltr" className="text-right font-mono text-ink-500">{s.guardianPhone}</td>
                         )}
                         {visibleCols.stage && (
@@ -635,13 +688,13 @@ export default function StudentsPage() {
                         {visibleCols.nationalId && (
                           <td dir="ltr" className="text-right font-mono text-ink-500">{s.nationalId}</td>
                         )}
-                        {visibleCols.studentPhone && (
+                        {visibleCols.studentPhone && isGlobal && (
                           <td dir="ltr" className="text-right font-mono text-ink-500">{s.studentPhone || '—'}</td>
                         )}
                         {visibleCols.neighborhood && (
                           <td className="text-ink-500 text-sm">{s.neighborhood}</td>
                         )}
-                        {visibleCols.paymentStatus && (
+                        {visibleCols.paymentStatus && isGlobal && (
                           <td><span className={`pill ${pp.cls}`}>{pp.label}</span></td>
                         )}
                         {visibleCols.hasCondition && (
@@ -658,6 +711,7 @@ export default function StudentsPage() {
                             ) : 'لا'}
                           </td>
                         )}
+
                         <td>
                           <button
                             className="btn btn-secondary py-1 px-3 text-xs"
@@ -749,11 +803,12 @@ export default function StudentsPage() {
                         )}
                       </div>
 
-                      {(visibleCols.paymentStatus || (visibleCols.hasCondition && s.hasCondition)) && (
+                      {(visibleCols.paymentStatus && isGlobal || (visibleCols.hasCondition && s.hasCondition)) && (
                         <div className="flex flex-wrap gap-1.5 pt-1">
-                          {visibleCols.paymentStatus && (
+                          {visibleCols.paymentStatus && isGlobal && (
                             <span className={`pill ${pp.cls}`}>{pp.label}</span>
                           )}
+
                           {visibleCols.hasCondition && s.hasCondition && (
                             <span className="pill pill-red inline-flex items-center gap-1">
                               <svg className="w-3 h-3 text-red-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -781,6 +836,7 @@ export default function StudentsPage() {
           student={selected}
           groups={groups}
           isAdmin={isAdmin}
+          isGlobal={isGlobal}
           onClose={() => setSelected(null)}
           onUpdated={applyUpdate}
           onDeleted={(id) => {
@@ -788,6 +844,7 @@ export default function StudentsPage() {
             setSelected(null);
           }}
         />
+
       )}
     </div>
   );
@@ -799,6 +856,7 @@ function StudentModal({
   student,
   groups,
   isAdmin,
+  isGlobal,
   onClose,
   onUpdated,
   onDeleted
@@ -806,10 +864,12 @@ function StudentModal({
   student: Student;
   groups: Group[];
   isAdmin: boolean;
+  isGlobal: boolean;
   onClose: () => void;
   onUpdated: (s: Student) => void;
   onDeleted: (id: number) => void;
 }) {
+
   const [edit, setEdit] = useState(false);
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState<Student>(student);
@@ -906,7 +966,7 @@ function StudentModal({
       `رقم العضوية: #${student.membershipNo}\n` +
       `رقم الهوية: ${student.nationalId}\n` +
       `المرحلة: ${student.stage} - ${student.grade}\n` +
-      `جوال ولي الأمر: ${student.guardianPhone}\n` +
+      (isGlobal ? `جوال ولي الأمر: ${student.guardianPhone}\n` : '') +
       `الحي: ${student.neighborhood}\n` +
       `الموقع: ${locLine}`;
     navigator.clipboard.writeText(msg).then(
@@ -914,6 +974,7 @@ function StudentModal({
       () => pushToast('error', 'تعذّر النسخ')
     );
   }
+
 
   const pp = paymentPill(student);
   const rp = regPill(student.registrationStatus);
@@ -1026,50 +1087,19 @@ function StudentModal({
               </div>
 
               {/* Contact Actions */}
-              <div className="border-t border-ink-200 pt-4 space-y-3">
-                <h4 className="font-bold text-xs text-ink-500">بيانات الاتصال والتواصل</h4>
-                
-                {/* Guardian contact */}
-                <div className="flex items-center justify-between bg-cream-50 p-2.5 rounded-lg border border-line">
-                  <div>
-                    <span className="text-xs text-ink-500 block">ولي الأمر</span>
-                    <span dir="ltr" className="font-mono text-xs text-ink-800">{student.guardianPhone}</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <a
-                      href={`tel:${student.guardianPhone}`}
-                      className="btn btn-secondary py-1 px-2.5 text-xs flex items-center gap-1 rounded-md"
-                    >
-                      <svg className="w-3.5 h-3.5 text-ink-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-                      </svg>
-                      <span>اتصال</span>
-                    </a>
-                    <a
-                      href={guardianWhatsappUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn text-white py-1.5 px-2.5 text-xs flex items-center gap-1 rounded-md"
-                      style={{ background: '#128C7E' }}
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-                      </svg>
-                      <span>واتساب</span>
-                    </a>
-                  </div>
-                </div>
-
-                {/* Student contact */}
-                {student.studentPhone && (
+              {isGlobal && (
+                <div className="border-t border-ink-200 pt-4 space-y-3">
+                  <h4 className="font-bold text-xs text-ink-500">بيانات الاتصال والتواصل</h4>
+                  
+                  {/* Guardian contact */}
                   <div className="flex items-center justify-between bg-cream-50 p-2.5 rounded-lg border border-line">
                     <div>
-                      <span className="text-xs text-ink-500 block">جوال الطالب</span>
-                      <span dir="ltr" className="font-mono text-xs text-ink-800">{student.studentPhone}</span>
+                      <span className="text-xs text-ink-500 block">ولي الأمر</span>
+                      <span dir="ltr" className="font-mono text-xs text-ink-800">{student.guardianPhone}</span>
                     </div>
                     <div className="flex gap-2">
                       <a
-                        href={`tel:${student.studentPhone}`}
+                        href={`tel:${student.guardianPhone}`}
                         className="btn btn-secondary py-1 px-2.5 text-xs flex items-center gap-1 rounded-md"
                       >
                         <svg className="w-3.5 h-3.5 text-ink-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1077,24 +1107,58 @@ function StudentModal({
                         </svg>
                         <span>اتصال</span>
                       </a>
-                      {studentWhatsappUrl && (
-                        <a
-                          href={studentWhatsappUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="btn text-white py-1.5 px-2.5 text-xs flex items-center gap-1 rounded-md"
-                          style={{ background: '#128C7E' }}
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-                          </svg>
-                          <span>واتساب</span>
-                        </a>
-                      )}
+                      <a
+                        href={guardianWhatsappUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn text-white py-1.5 px-2.5 text-xs flex items-center gap-1 rounded-md"
+                        style={{ background: '#128C7E' }}
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+                        </svg>
+                        <span>واتساب</span>
+                      </a>
                     </div>
                   </div>
-                )}
-              </div>
+
+                  {/* Student contact */}
+                  {student.studentPhone && (
+                    <div className="flex items-center justify-between bg-cream-50 p-2.5 rounded-lg border border-line">
+                      <div>
+                        <span className="text-xs text-ink-500 block">جوال الطالب</span>
+                        <span dir="ltr" className="font-mono text-xs text-ink-800">{student.studentPhone}</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <a
+                          href={`tel:${student.studentPhone}`}
+                          className="btn btn-secondary py-1 px-2.5 text-xs flex items-center gap-1 rounded-md"
+                        >
+                          <svg className="w-3.5 h-3.5 text-ink-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                          </svg>
+                          <span>اتصال</span>
+                        </a>
+                        {studentWhatsappUrl && (
+                          <a
+                            href={studentWhatsappUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn text-white py-1.5 px-2.5 text-xs flex items-center gap-1 rounded-md"
+                            style={{ background: '#128C7E' }}
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+                            </svg>
+                            <span>واتساب</span>
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
 
               {/* health */}
               {student.hasCondition && (
@@ -1130,75 +1194,78 @@ function StudentModal({
               </div>
 
               {/* payment */}
-              <div className="rounded-xl border border-ink-200 p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-semibold text-ink-900">تفاصيل الدفع</span>
-                  <span className="pill pill-gray">{student.paymentType === 'now' ? 'دفع فوري' : 'دفع آجل'}</span>
-                </div>
-
-                {student.paymentType === 'now' && (
-                  <div className="mb-3">
-                    <div className="label">إيصال التحويل</div>
-                    {student.paymentReceipt ? (
-                      <button onClick={openReceipt} className="btn btn-secondary text-sm w-full justify-center gap-2 flex items-center">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-                          <circle cx="12" cy="12" r="3" />
-                        </svg>
-                        <span>عرض إيصال التحويل في صفحة جديدة</span>
-                      </button>
-                    ) : (
-                      <span className="text-sm text-ink-400">لم يُرفق إيصال.</span>
-                    )}
+              {isGlobal && (
+                <div className="rounded-xl border border-ink-200 p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-semibold text-ink-900">تفاصيل الدفع</span>
+                    <span className="pill pill-gray">{student.paymentType === 'now' ? 'دفع فوري' : 'دفع آجل'}</span>
                   </div>
-                )}
 
-                {student.paymentStatus !== 'paid' && student.paymentStatus !== 'exempted' ? (
-                  <div className="rounded-lg p-3" style={{ background: '#FCF3DC' }}>
-                    <p className="text-sm mb-2" style={{ color: '#9A6B00' }}>لم يتم تأكيد السداد بعد.</p>
-                    {isAdmin && (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={confirmPayment}
-                          disabled={busy}
-                          className="btn text-white border-transparent text-xs py-1.5 px-3 flex-1 justify-center flex items-center gap-1"
-                          style={{ background: '#1B7A43' }}
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  {student.paymentType === 'now' && (
+                    <div className="mb-3">
+                      <div className="label">إيصال التحويل</div>
+                      {student.paymentReceipt ? (
+                        <button onClick={openReceipt} className="btn btn-secondary text-sm w-full justify-center gap-2 flex items-center">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                            <circle cx="12" cy="12" r="3" />
+                          </svg>
+                          <span>عرض إيصال التحويل في صفحة جديدة</span>
+                        </button>
+                      ) : (
+                        <span className="text-sm text-ink-400">لم يُرفق إيصال.</span>
+                      )}
+                    </div>
+                  )}
+
+                  {student.paymentStatus !== 'paid' && student.paymentStatus !== 'exempted' ? (
+                    <div className="rounded-lg p-3" style={{ background: '#FCF3DC' }}>
+                      <p className="text-sm mb-2" style={{ color: '#9A6B00' }}>لم يتم تأكيد السداد بعد.</p>
+                      {isAdmin && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={confirmPayment}
+                            disabled={busy}
+                            className="btn text-white border-transparent text-xs py-1.5 px-3 flex-1 justify-center flex items-center gap-1"
+                            style={{ background: '#1B7A43' }}
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            <span>تأكيد الدفع</span>
+                          </button>
+                          <button
+                            onClick={setExempted}
+                            disabled={busy}
+                            className="btn btn-secondary text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100 text-xs py-1.5 px-3 flex-1 justify-center"
+                          >
+                            إعفاء
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-sm font-semibold">
+                      {student.paymentStatus === 'exempted' ? (
+                        <span className="flex items-center gap-1.5 text-blue-600">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                             <polyline points="20 6 9 17 4 12" />
                           </svg>
-                          <span>تأكيد الدفع</span>
-                        </button>
-                        <button
-                          onClick={setExempted}
-                          disabled={busy}
-                          className="btn btn-secondary text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100 text-xs py-1.5 px-3 flex-1 justify-center"
-                        >
-                          إعفاء
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-sm font-semibold">
-                    {student.paymentStatus === 'exempted' ? (
-                      <span className="flex items-center gap-1.5 text-blue-600">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                        <span>تم إعفاء الطالب من الرسوم</span>
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1.5 text-green-700">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                        <span>تم تأكيد استلام الدفع</span>
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
+                          <span>تم إعفاء الطالب من الرسوم</span>
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1.5 text-green-700">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                          <span>تم تأكيد استلام الدفع</span>
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
 
               {/* registration status (auto-determined by payment) */}
               <div>

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { getPoints, addPointsRecord } from '@/lib/services';
+import { getPoints, addPointsRecord, getSupervisorByEmail } from '@/lib/services';
 
 export async function GET(req: NextRequest) {
   try {
@@ -9,10 +9,22 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'غير مصرح بالدخول' }, { status: 401 });
     }
 
+    const supervisor = await getSupervisorByEmail(session.email);
+    if (!supervisor) {
+      return NextResponse.json({ error: 'حساب غير موجود' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(req.url);
     const studentIdStr = searchParams.get('studentId') || '';
 
     let points = await getPoints();
+
+    const roles = supervisor.role.split(',').map(r => r.trim());
+    const isGlobal = roles.some(r =>
+      ['admin', 'finance', 'finance_supervisor', 'media_supervisor', 'cultural_supervisor', 'social_supervisor', 'general_supervisor', 'attendance_supervisor'].includes(r)
+    );
+
+
 
     if (studentIdStr) {
       const sId = parseInt(studentIdStr, 10);
@@ -32,6 +44,24 @@ export async function POST(req: NextRequest) {
     if (!session) {
       return NextResponse.json({ error: 'غير مصرح بالدخول' }, { status: 401 });
     }
+
+    const supervisor = await getSupervisorByEmail(session.email);
+    if (!supervisor) {
+      return NextResponse.json({ error: 'حساب غير موجود' }, { status: 401 });
+    }
+
+    const roles = supervisor.role.split(',').map(r => r.trim());
+    const isGlobal = roles.some(r =>
+      ['admin', 'finance', 'finance_supervisor', 'media_supervisor', 'cultural_supervisor', 'social_supervisor', 'general_supervisor', 'attendance_supervisor'].includes(r)
+    );
+
+    if (!isGlobal && req.method === 'POST') {
+      const bodyClone = await req.clone().json().catch(() => ({}));
+      if (bodyClone.groupId) {
+        return NextResponse.json({ error: 'غير مصرح لك برصد النقاط للمجموعات' }, { status: 403 });
+      }
+    }
+
 
     const body = await req.json();
     const { registrationId, groupId, delta, reason, category } = body;

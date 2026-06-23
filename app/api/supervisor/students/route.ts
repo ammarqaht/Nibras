@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
     const paymentStatus = searchParams.get('paymentStatus') || '';
     const registrationStatus = searchParams.get('registrationStatus') || '';
     const groupIdStr = searchParams.get('groupId') || '';
+    const scope = searchParams.get('scope') || '';
 
     let students = await getStudents();
 
@@ -31,14 +32,26 @@ export async function GET(req: NextRequest) {
       ['admin', 'finance', 'finance_supervisor', 'media_supervisor', 'cultural_supervisor', 'social_supervisor', 'general_supervisor', 'attendance_supervisor'].includes(r)
     );
 
-    if (!isGlobal) {
-      const allowedGroupIds = supervisor.groupIds
-        .split(',')
-        .map(id => parseInt(id.trim(), 10))
-        .filter(id => !isNaN(id));
+    if (scope === 'all') {
+      if (!isGlobal) {
+        students = students.map(s => ({
+          ...s,
+          guardianPhone: '',
+          studentPhone: '',
+          paymentStatus: ''
+        }));
+      }
+    } else {
+      if (!isGlobal) {
+        const allowedGroupIds = supervisor.groupIds
+          .split(',')
+          .map(id => parseInt(id.trim(), 10))
+          .filter(id => !isNaN(id));
 
-      students = students.filter(s => s.groupId !== null && allowedGroupIds.includes(s.groupId));
+        students = students.filter(s => s.groupId !== null && allowedGroupIds.includes(s.groupId));
+      }
     }
+
 
     // Apply search query
     if (search) {

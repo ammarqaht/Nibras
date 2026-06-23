@@ -135,12 +135,30 @@ export async function PUT(req: NextRequest) {
     const target = all.find((i) => i.id === id);
     if (!target) return NextResponse.json({ error: 'الفاتورة غير موجودة' }, { status: 404 });
 
+    // 1. If already settled, it is locked unless we are cancelling the settlement.
+    if (target.settlement === 'handed_over' && body.settlement !== 'unsettled') {
+      return NextResponse.json({ error: 'هذه الفاتورة مسددة ومغلقة تماماً، ولا يمكن تعديلها إلا لإلغاء التسليم' }, { status: 400 });
+    }
+
     const finance = isFinanceOrAdmin(supervisor.role);
     const owner = target.supervisorId === supervisor.id;
 
     // Finance/admin → review actions (status / settlement). Owner → edit own pending invoice.
     if (!finance && !(owner && target.status === 'pending')) {
       return NextResponse.json({ error: 'غير مصرح لك بتعديل هذه الفاتورة' }, { status: 403 });
+    }
+
+    // 2. If rejected, only allow resetting to pending.
+    if (target.status === 'rejected' && body.status !== undefined && body.status !== 'pending') {
+      return NextResponse.json({ error: 'يجب إرجاع الفاتورة المرفوضة قيد المراجعة أولاً قبل أي إجراء آخر' }, { status: 400 });
+    }
+
+    // 3. Prevent settling (handed_over) if status is not approved.
+    if (body.settlement === 'handed_over') {
+      const nextStatus = body.status !== undefined ? body.status : target.status;
+      if (nextStatus !== 'approved') {
+        return NextResponse.json({ error: 'لا يمكن تسليم مبلغ فاتورة لم يتم اعتمادها بعد' }, { status: 400 });
+      }
     }
 
     const patch: Record<string, unknown> = {};

@@ -215,8 +215,10 @@ function AddInvoiceModal({
   const [total, setTotal] = useState('');
 
   const itemsSum = items.reduce((s, it) => s + (Number(it.qty) || 0) * (Number(it.price) || 0), 0);
-  const totalNum = Number(total) || 0;
-  const mismatch = totalNum > 0 && Math.abs(itemsSum - totalNum) > 0.5 && items.some((i) => i.name);
+
+  useEffect(() => {
+    setTotal(String(itemsSum));
+  }, [itemsSum]);
 
   async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -244,11 +246,14 @@ function AddInvoiceModal({
         return;
       }
       const d = j.data || {};
+      const extractedTitle = d.title || title || 'فاتورة';
       if (d.title) setTitle(d.title);
       if (d.vendor) setVendor(d.vendor);
       if (d.invoiceDate) setInvoiceDate(d.invoiceDate);
       if (Array.isArray(d.items) && d.items.length) {
         setItems(d.items.map((it: any) => ({ name: it.name || '', qty: Number(it.qty) || 1, price: Number(it.price) || 0 })));
+      } else if (d.total != null) {
+        setItems([{ name: extractedTitle, qty: 1, price: Number(d.total) || 0 }]);
       }
       if (d.tax != null) setTax(String(d.tax));
       if (d.total != null) setTotal(String(d.total));
@@ -268,8 +273,8 @@ function AddInvoiceModal({
   async function submit() {
     if (!title.trim()) return pushToast('error', 'أدخل عنوان الفاتورة');
     if (!department) return pushToast('error', 'اختر القسم');
-    const finalTotal = totalNum > 0 ? totalNum : itemsSum;
-    if (finalTotal <= 0) return pushToast('error', 'أدخل الإجمالي أو المنتجات');
+    const finalTotal = itemsSum;
+    if (finalTotal <= 0) return pushToast('error', 'أدخل المنتجات بأسعار صحيحة');
 
     setBusy(true);
     const r = await fetch('/api/supervisor/invoices', {
@@ -392,21 +397,15 @@ function AddInvoiceModal({
           </div>
 
           <Field label="الإجمالي" required>
-            <input className="field" dir="ltr" inputMode="decimal" value={total} onChange={(e) => setTotal(e.target.value)} placeholder={String(itemsSum || '')} />
+            <input
+              className="field bg-cream-100/50 cursor-not-allowed font-semibold"
+              dir="ltr"
+              readOnly
+              disabled
+              value={itemsSum > 0 ? itemsSum.toFixed(2) : ''}
+              placeholder="0.00"
+            />
           </Field>
-          {mismatch && (
-            <div className="text-sm rounded-md p-2.5 flex items-start gap-2" style={{ background: '#FCF3DC', color: '#9A6B00' }}>
-               <svg className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                 <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
-                 <line x1="12" y1="9" x2="12" y2="13" />
-                 <line x1="12" y1="17" x2="12.01" y2="17" />
-               </svg>
-               <div>
-                 مجموع المنتجات ({money(itemsSum)}) لا يطابق الإجمالي ({money(totalNum)}).{' '}
-                 <button type="button" className="underline font-semibold" onClick={() => setTotal(String(itemsSum))}>استخدم مجموع المنتجات</button>
-               </div>
-            </div>
-          )}
         </div>
 
         <div className="flex items-center justify-end gap-2 p-4 border-t border-ink-200">

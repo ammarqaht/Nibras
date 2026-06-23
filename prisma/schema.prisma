@@ -169,3 +169,26 @@ model Schedule {
 
   @@index([date])
 }
+
+model GeneralExpense {
+  id             Int      @id @default(autoincrement())
+  title          String
+  amount         Float
+  date           String   // 'YYYY-MM-DD'
+  notes          String?
+  supervisorId   Int
+  supervisorName String
+  createdAt      DateTime @default(now())
+}
+
+model OtherRevenue {
+  id             Int      @id @default(autoincrement())
+  title          String
+  amount         Float
+  date           String   // 'YYYY-MM-DD'
+  notes          String?
+  supervisorId   Int
+  supervisorName String
+  createdAt      DateTime @default(now())
+}
+

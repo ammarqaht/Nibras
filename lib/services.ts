@@ -154,6 +154,8 @@ const FILE_INVOICES = path.join(DATA_DIR, 'invoices.json');
 const FILE_TASKS = path.join(DATA_DIR, 'tasks.json');
 const FILE_SUBMISSIONS = path.join(DATA_DIR, 'submissions.json');
 const FILE_SCHEDULES = path.join(DATA_DIR, 'schedules.json');
+const FILE_GENERAL_EXPENSES = path.join(DATA_DIR, 'general_expenses.json');
+const FILE_OTHER_REVENUES = path.join(DATA_DIR, 'other_revenues.json');
 
 async function readJsonFile<T>(filePath: string, defaultVal: T): Promise<T> {
   try {
@@ -1863,5 +1865,213 @@ export async function updateSchedule(
     list[idx] = updated;
     await writeJsonFile(FILE_SCHEDULES, list);
     return updated;
+  }
+}
+
+// ==================== GENERAL EXPENSES & OTHER REVENUES SERVICES ====================
+
+export type GeneralExpenseInfo = {
+  id: number;
+  title: string;
+  amount: number;
+  date: string; // 'YYYY-MM-DD'
+  notes: string | null;
+  supervisorId: number;
+  supervisorName: string;
+  createdAt: string;
+};
+
+export type OtherRevenueInfo = {
+  id: number;
+  title: string;
+  amount: number;
+  date: string; // 'YYYY-MM-DD'
+  notes: string | null;
+  supervisorId: number;
+  supervisorName: string;
+  createdAt: string;
+};
+
+export async function getGeneralExpenses(): Promise<GeneralExpenseInfo[]> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    const list = await prisma.generalExpense.findMany({ orderBy: { date: 'desc' } });
+    return list.map(x => ({
+      id: x.id,
+      title: x.title,
+      amount: x.amount,
+      date: x.date,
+      notes: x.notes,
+      supervisorId: x.supervisorId,
+      supervisorName: x.supervisorName,
+      createdAt: x.createdAt.toISOString()
+    }));
+  } else {
+    const list = await readJsonFile<any[]>(FILE_GENERAL_EXPENSES, []);
+    return list.map(x => ({
+      id: Number(x.id),
+      title: String(x.title),
+      amount: Number(x.amount),
+      date: String(x.date),
+      notes: x.notes ? String(x.notes) : null,
+      supervisorId: Number(x.supervisorId),
+      supervisorName: String(x.supervisorName),
+      createdAt: String(x.createdAt || new Date().toISOString())
+    })).sort((a, b) => b.date.localeCompare(a.date));
+  }
+}
+
+export async function createGeneralExpense(data: Omit<GeneralExpenseInfo, 'id' | 'createdAt'>): Promise<GeneralExpenseInfo> {
+  const createdAt = new Date().toISOString();
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    const created = await prisma.generalExpense.create({
+      data: {
+        title: data.title,
+        amount: data.amount,
+        date: data.date,
+        notes: data.notes,
+        supervisorId: data.supervisorId,
+        supervisorName: data.supervisorName,
+        createdAt: new Date(createdAt)
+      }
+    });
+    return {
+      id: created.id,
+      title: created.title,
+      amount: created.amount,
+      date: created.date,
+      notes: created.notes,
+      supervisorId: created.supervisorId,
+      supervisorName: created.supervisorName,
+      createdAt: created.createdAt.toISOString()
+    };
+  } else {
+    const list = await readJsonFile<any[]>(FILE_GENERAL_EXPENSES, []);
+    const id = list.length > 0 ? Math.max(...list.map(x => x.id || 0)) + 1 : 1;
+    const row: GeneralExpenseInfo = {
+      id,
+      title: data.title,
+      amount: data.amount,
+      date: data.date,
+      notes: data.notes,
+      supervisorId: data.supervisorId,
+      supervisorName: data.supervisorName,
+      createdAt
+    };
+    list.push(row);
+    await writeJsonFile(FILE_GENERAL_EXPENSES, list);
+    return row;
+  }
+}
+
+export async function deleteGeneralExpense(id: number): Promise<boolean> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    try {
+      await prisma.generalExpense.delete({ where: { id } });
+      return true;
+    } catch {
+      return false;
+    }
+  } else {
+    const list = await readJsonFile<any[]>(FILE_GENERAL_EXPENSES, []);
+    const index = list.findIndex(x => x.id === id);
+    if (index === -1) return false;
+    list.splice(index, 1);
+    await writeJsonFile(FILE_GENERAL_EXPENSES, list);
+    return true;
+  }
+}
+
+export async function getOtherRevenues(): Promise<OtherRevenueInfo[]> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    const list = await prisma.otherRevenue.findMany({ orderBy: { date: 'desc' } });
+    return list.map(x => ({
+      id: x.id,
+      title: x.title,
+      amount: x.amount,
+      date: x.date,
+      notes: x.notes,
+      supervisorId: x.supervisorId,
+      supervisorName: x.supervisorName,
+      createdAt: x.createdAt.toISOString()
+    }));
+  } else {
+    const list = await readJsonFile<any[]>(FILE_OTHER_REVENUES, []);
+    return list.map(x => ({
+      id: Number(x.id),
+      title: String(x.title),
+      amount: Number(x.amount),
+      date: String(x.date),
+      notes: x.notes ? String(x.notes) : null,
+      supervisorId: Number(x.supervisorId),
+      supervisorName: String(x.supervisorName),
+      createdAt: String(x.createdAt || new Date().toISOString())
+    })).sort((a, b) => b.date.localeCompare(a.date));
+  }
+}
+
+export async function createOtherRevenue(data: Omit<OtherRevenueInfo, 'id' | 'createdAt'>): Promise<OtherRevenueInfo> {
+  const createdAt = new Date().toISOString();
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    const created = await prisma.otherRevenue.create({
+      data: {
+        title: data.title,
+        amount: data.amount,
+        date: data.date,
+        notes: data.notes,
+        supervisorId: data.supervisorId,
+        supervisorName: data.supervisorName,
+        createdAt: new Date(createdAt)
+      }
+    });
+    return {
+      id: created.id,
+      title: created.title,
+      amount: created.amount,
+      date: created.date,
+      notes: created.notes,
+      supervisorId: created.supervisorId,
+      supervisorName: created.supervisorName,
+      createdAt: created.createdAt.toISOString()
+    };
+  } else {
+    const list = await readJsonFile<any[]>(FILE_OTHER_REVENUES, []);
+    const id = list.length > 0 ? Math.max(...list.map(x => x.id || 0)) + 1 : 1;
+    const row: OtherRevenueInfo = {
+      id,
+      title: data.title,
+      amount: data.amount,
+      date: data.date,
+      notes: data.notes,
+      supervisorId: data.supervisorId,
+      supervisorName: data.supervisorName,
+      createdAt
+    };
+    list.push(row);
+    await writeJsonFile(FILE_OTHER_REVENUES, list);
+    return row;
+  }
+}
+
+export async function deleteOtherRevenue(id: number): Promise<boolean> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    try {
+      await prisma.otherRevenue.delete({ where: { id } });
+      return true;
+    } catch {
+      return false;
+    }
+  } else {
+    const list = await readJsonFile<any[]>(FILE_OTHER_REVENUES, []);
+    const index = list.findIndex(x => x.id === id);
+    if (index === -1) return false;
+    list.splice(index, 1);
+    await writeJsonFile(FILE_OTHER_REVENUES, list);
+    return true;
   }
 }

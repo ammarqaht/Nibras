@@ -9,13 +9,36 @@ type Group = { id: number; name: string; stage: string };
 type Student = { id: number; studentName: string; stage: string; grade: string; groupId: number | null; registrationStatus: string; paymentStatus: string };
 type Supervisor = { id: number; name: string; groupIds: string };
 
+const CATEGORIES = [
+  { key: 'behavior', label: 'سلوك' },
+  { key: 'participation', label: 'مشاركة' },
+  { key: 'activity', label: 'نشاط' },
+  { key: 'other', label: 'أخرى' }
+];
+const catLabel = (k: string) => CATEGORIES.find((c) => c.key === k)?.label ?? k;
+
+function formatDate(dStr: string) {
+  try {
+    const d = new Date(dStr);
+    return d.toLocaleDateString('ar-EG', { month: 'short', day: 'numeric' });
+  } catch (e) {
+    return dStr;
+  }
+}
+
 export default function GroupsPage() {
   const { user } = useSupervisor();
   const isAdmin = user?.role === 'admin';
+  const roles = user?.role ? user.role.split(',').map((r) => r.trim()) : [];
+  const isGlobal = roles.some((r) =>
+    ['admin', 'finance', 'finance_supervisor', 'media_supervisor', 'cultural_supervisor', 'social_supervisor', 'general_supervisor', 'attendance_supervisor'].includes(r)
+  );
 
   const [groups, setGroups] = useState<Group[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [supervisors, setSupervisors] = useState<Supervisor[]>([]);
+  const [points, setPoints] = useState<any[]>([]);
+  const [expandedStudentId, setExpandedStudentId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
   const [stage, setStage] = useState<string>(stages[0].key);
@@ -32,19 +55,22 @@ export default function GroupsPage() {
   const [checkedAddStudentIds, setCheckedAddStudentIds] = useState<number[]>([]);
 
   async function load() {
-    const [gr, sr, su] = await Promise.all([
+    const [gr, sr, su, pr] = await Promise.all([
       fetch('/api/supervisor/groups', { cache: 'no-store' }),
       fetch('/api/supervisor/students', { cache: 'no-store' }),
-      fetch('/api/supervisor/supervisors', { cache: 'no-store' })
+      fetch('/api/supervisor/supervisors', { cache: 'no-store' }),
+      fetch('/api/supervisor/points', { cache: 'no-store' })
     ]);
     const grj = await gr.json().catch(() => ({ groups: [] }));
     const srj = await sr.json().catch(() => ({ students: [] }));
     const suj = await su.json().catch(() => ({ supervisors: [] }));
+    const prj = await pr.json().catch(() => ({ points: [] }));
     
     setGroups(grj.groups ?? []);
     setSupervisors(suj.supervisors ?? []);
+    setPoints(prj.points ?? []);
     const allSt: Student[] = srj.students ?? [];
-    setStudents(allSt.filter((s) => s.registrationStatus === 'approved' && (s.paymentStatus === 'paid' || s.paymentStatus === 'exempted')));
+    setStudents(allSt.filter((s) => s.registrationStatus === 'approved' && (s.paymentStatus === 'paid' || s.paymentStatus === 'exempted' || s.paymentStatus === '')));
     setLoading(false);
   }
   useEffect(() => { load(); }, []);
@@ -54,6 +80,20 @@ export default function GroupsPage() {
     students.forEach((s) => { if (s.groupId != null) m.set(s.groupId, (m.get(s.groupId) ?? 0) + 1); });
     return (id: number) => m.get(id) ?? 0;
   }, [students]);
+
+  const studentPointsMap = useMemo(() => {
+    const m = new Map<number, number>();
+    points.forEach((p) => m.set(p.registrationId, (m.get(p.registrationId) ?? 0) + p.delta));
+    return m;
+  }, [points]);
+
+  const getStudentPoints = (id: number) => studentPointsMap.get(id) ?? 0;
+
+  const getGroupPoints = (gId: number) => {
+    return students
+      .filter((s) => s.groupId === gId)
+      .reduce((sum, s) => sum + getStudentPoints(s.id), 0);
+  };
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
@@ -373,6 +413,29 @@ export default function GroupsPage() {
     reader.readAsBinaryString(file);
   }
 
+  const activeGroup = isGlobal ? selectedGroupModal : groups[0];
+
+  const activeGroupStudents = useMemo(() => {
+    if (!activeGroup) return [];
+    return students.filter(s => s.groupId === activeGroup.id);
+  }, [activeGroup, students]);
+
+  const activeTotalPoints = useMemo(() => {
+    return activeGroupStudents.reduce((sum, s) => sum + getStudentPoints(s.id), 0);
+  }, [activeGroupStudents, studentPointsMap]);
+
+  const activeAvgPoints = useMemo(() => {
+    return activeGroupStudents.length > 0 
+      ? (activeTotalPoints / activeGroupStudents.length).toFixed(1) 
+      : '0';
+  }, [activeGroupStudents.length, activeTotalPoints]);
+
+  const activeTopStudent = useMemo(() => {
+    if (activeGroupStudents.length === 0) return null;
+    const sorted = [...activeGroupStudents].sort((a, b) => getStudentPoints(b.id) - getStudentPoints(a.id));
+    return sorted[0];
+  }, [activeGroupStudents, studentPointsMap]);
+
   return (
     <div>
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-ink-100 pb-4">
@@ -423,112 +486,299 @@ export default function GroupsPage() {
         )}
       </div>
 
-      <div className="w-full">
-        <div className="card p-6">
-          <h2 className="text-lg font-bold text-ink-900 mb-4">المجموعات ({groups.length})</h2>
-          {loading ? (
-            <p className="text-center py-10 text-ink-400 text-sm">جارٍ التحميل…</p>
-          ) : groups.length === 0 ? (
-            <p className="text-center py-10 text-ink-400 text-sm">لا توجد مجموعات بعد.</p>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-              {groups.map((g) => (
-                <div key={g.id} 
-                     onClick={() => {
-                       setSelectedGroupModal(g);
-                       setShowAddStudents(false);
-                       setCheckedAddStudentIds([]);
-                     }}
-                     className="cursor-pointer hover:border-brand transition-colors rounded-xl border border-ink-200 p-4 flex items-center justify-between bg-white shadow-sm hover:shadow">
-                  <div>
-                    <div className="font-semibold text-ink-900">{g.name}</div>
-                    <div className="text-xs text-ink-400 mt-0.5">{g.stage}</div>
+      {isGlobal ? (
+        <div className="w-full">
+          <div className="card p-6">
+            <h2 className="text-lg font-bold text-ink-900 mb-4">المجموعات ({groups.length})</h2>
+            {loading ? (
+              <p className="text-center py-10 text-ink-400 text-sm">جارٍ التحميل…</p>
+            ) : groups.length === 0 ? (
+              <p className="text-center py-10 text-ink-400 text-sm">لا توجد مجموعات بعد.</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {groups.map((g) => (
+                  <div key={g.id} 
+                       onClick={() => {
+                         setSelectedGroupModal(g);
+                         setShowAddStudents(false);
+                         setCheckedAddStudentIds([]);
+                         setExpandedStudentId(null);
+                       }}
+                       className="cursor-pointer hover:border-brand transition-colors rounded-xl border border-ink-200 p-4 flex items-center justify-between bg-white shadow-sm hover:shadow">
+                    <div>
+                      <div className="font-semibold text-ink-900">{g.name}</div>
+                      <div className="text-xs text-ink-400 mt-0.5">{g.stage}</div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right flex flex-col items-end gap-1 shrink-0">
+                        <span className="pill pill-blue text-[11px] font-bold">{countOf(g.id)} طالب</span>
+                        <span className="pill pill-green font-bold text-[11px]">{getGroupPoints(g.id)} نقطة</span>
+                      </div>
+                      {isAdmin && (
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); deleteGroup(g.id); }}
+                          className="text-red-500 hover:text-red-750 p-1 flex items-center justify-center shrink-0"
+                          title="حذف المجموعة"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="pill pill-blue">{countOf(g.id)} طالب</span>
-                    {isAdmin && (
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); deleteGroup(g.id); }}
-                        className="text-red-500 hover:text-red-750 p-1 flex items-center justify-center"
-                        title="حذف المجموعة"
-                      >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                        </svg>
-                      </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        loading ? (
+          <p className="text-center py-10 text-ink-400 text-sm">جارٍ التحميل…</p>
+        ) : groups.length === 0 ? (
+          <div className="card p-6 text-center text-ink-500">
+            لم يتم إسنادك لأي مجموعة أو أسرة حالياً. يرجى التواصل مع الإدارة.
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <div className="card p-6 bg-gradient-to-l from-cream-100/40 to-brand-50/20 border border-ink-150 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-1.5 h-full bg-brand" />
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-right" dir="rtl">
+                <div className="space-y-1.5">
+                  <h2 className="text-2xl font-bold text-ink-900">{groups[0].name}</h2>
+                  <div className="flex flex-wrap items-center gap-2 text-sm text-ink-500">
+                    <span className="pill pill-gray text-xs">{groups[0].stage}</span>
+                    <span>•</span>
+                    <span className="font-semibold">المشرفون: </span>
+                    {supervisors.filter(sup => sup.groupIds && sup.groupIds.split(',').map(s => parseInt(s, 10)).includes(groups[0].id)).length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {supervisors.filter(sup => sup.groupIds && sup.groupIds.split(',').map(s => parseInt(s, 10)).includes(groups[0].id)).map(sup => (
+                          <span key={sup.id} className="bg-white border border-ink-200 text-ink-700 px-2 py-0.5 rounded-lg text-xs font-semibold">{sup.name}</span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-ink-400">لا يوجد مشرفون مسجلون</span>
                     )}
                   </div>
                 </div>
-              ))}
+                
+                <div className="flex gap-4 w-full md:w-auto text-center shrink-0 mt-3 md:mt-0 font-sans">
+                  <div className="bg-white border border-ink-200 rounded-xl px-4 py-2.5 flex-1 md:flex-none min-w-[100px] shadow-sm">
+                    <div className="text-[10px] text-ink-500 font-semibold mb-0.5">عدد الطلاب</div>
+                    <div className="text-lg font-bold text-blue-600 font-mono">{activeGroupStudents.length}</div>
+                  </div>
+                  <div className="bg-white border border-ink-200 rounded-xl px-4 py-2.5 flex-1 md:flex-none min-w-[100px] shadow-sm">
+                    <div className="text-[10px] text-ink-500 font-semibold mb-0.5">نقاط المجموعة</div>
+                    <div className="text-lg font-bold text-green-600 font-mono">{activeTotalPoints}</div>
+                  </div>
+                  <div className="bg-white border border-ink-200 rounded-xl px-4 py-2.5 flex-1 md:flex-none min-w-[100px] shadow-sm">
+                    <div className="text-[10px] text-ink-500 font-semibold mb-0.5">متوسط الطالب</div>
+                    <div className="text-lg font-bold text-brand-650 font-mono">{activeAvgPoints}</div>
+                  </div>
+                </div>
+              </div>
             </div>
-          )}
-        </div>
-      </div>
+
+            <div className="card p-6">
+              <div className="font-sans">
+                <h3 className="text-lg font-bold text-ink-900 flex items-center gap-2 border-b border-ink-100 pb-3 mb-4">
+                  <svg className="w-5 h-5 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                  </svg>
+                  <span>أعضاء المجموعة وأداؤهم ({activeGroupStudents.length} طلاب)</span>
+                </h3>
+
+                {activeGroupStudents.length > 0 ? (
+                  <div className="space-y-2.5">
+                    {activeGroupStudents.map(st => {
+                      const isExpanded = expandedStudentId === st.id;
+                      const studentLogs = points.filter(p => p.registrationId === st.id);
+                      const studentTotal = getStudentPoints(st.id);
+
+                      let performanceCls = "bg-ink-100 text-ink-700";
+                      let performanceLabel = "عادي";
+                      if (studentTotal > Number(activeAvgPoints) * 1.2 && studentTotal > 0) {
+                        performanceCls = "bg-green-155 text-green-700 font-bold";
+                        performanceLabel = "ممتاز 🔥";
+                      } else if (studentTotal < Number(activeAvgPoints) * 0.8 && Number(activeAvgPoints) > 0) {
+                        performanceCls = "bg-red-50 text-red-700 font-bold";
+                        performanceLabel = "يحتاج تشجيع ⚠️";
+                      }
+
+                      return (
+                        <div key={st.id} className="border border-ink-200 rounded-xl overflow-hidden bg-white shadow-sm hover:shadow transition-shadow">
+                          <div 
+                            onClick={() => setExpandedStudentId(isExpanded ? null : st.id)}
+                            className="text-sm px-4 py-3.5 flex justify-between items-center bg-white cursor-pointer hover:bg-cream-50/50 transition-colors select-none"
+                            dir="rtl"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <svg className={`w-3.5 h-3.5 text-ink-400 shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="6 9 12 15 18 9" />
+                              </svg>
+                              <span className="font-semibold text-ink-900 truncate">{st.studentName}</span>
+                              <span className="text-[10px] text-ink-500 bg-cream-100 px-2 py-0.5 rounded font-mono shrink-0">{st.grade}</span>
+                              <span className={`text-[9px] px-1.5 py-0.5 rounded-full shrink-0 ${performanceCls}`}>{performanceLabel}</span>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="pill pill-green font-bold text-xs">{studentTotal} نقطة</span>
+                            </div>
+                          </div>
+
+                          {isExpanded && (
+                            <div className="px-4 py-3.5 bg-ink-50/30 border-t border-ink-150 text-xs space-y-2 text-right" dir="rtl">
+                              <div className="text-[11px] font-bold text-ink-500 mb-1">تفاصيل ورصد النقاط:</div>
+                              {studentLogs.length === 0 ? (
+                                <p className="text-ink-400 text-center py-3 bg-white rounded-lg border border-ink-150">لا توجد نقاط مسجلة لهذا الطالب بعد.</p>
+                              ) : (
+                                <div className="divide-y divide-ink-150 max-h-56 overflow-y-auto scroll-soft bg-white rounded-lg border border-ink-150 px-3">
+                                  {studentLogs.map((log) => (
+                                    <div key={log.id} className="py-2.5 flex items-center justify-between gap-4">
+                                      <div className="min-w-0 flex-1">
+                                        <div className="font-semibold text-ink-800 truncate">{log.reason}</div>
+                                        <div className="text-[10px] text-ink-400 flex gap-2 mt-0.5">
+                                          <span>الفئة: {catLabel(log.category)}</span>
+                                          <span>•</span>
+                                          <span>بواسطة: {log.recordedBy || '—'}</span>
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-2 shrink-0">
+                                        <span className="text-[10px] text-ink-400">{formatDate(log.createdAt)}</span>
+                                        <span className={`font-bold font-mono px-2 py-0.5 rounded text-[11px] ${log.delta >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-750'}`}>
+                                          {log.delta >= 0 ? `+${log.delta}` : log.delta}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-sm text-ink-400 text-center py-6">لا يوجد طلاب مسجلين في هذه المجموعة حالياً.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      )}
 
       {/* قسم الطلاب غير المعينين في أسرة */}
-      <div className="card p-6 mt-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-          <div>
-            <h2 className="text-lg font-bold text-ink-900">طلاب غير مسجلين في أسرة ({unassignedStudents.length})</h2>
-            <p className="text-xs text-ink-500 mt-0.5">يمكنك إسناد الطلاب إلى الأسر المتاحة يدوياً.</p>
+      {isGlobal && (
+        <div className="card p-6 mt-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+            <div>
+              <h2 className="text-lg font-bold text-ink-900">طلاب غير مسجلين في أسرة ({unassignedStudents.length})</h2>
+              <p className="text-xs text-ink-500 mt-0.5">يمكنك إسناد الطلاب إلى الأسر المتاحة يدوياً.</p>
+            </div>
+
+            <div className="flex gap-2 w-full sm:w-auto">
+              <input
+                type="text"
+                className="field py-1.5 px-3 text-sm flex-1 sm:w-60"
+                placeholder="ابحث عن اسم الطالب..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <select
+                className="field py-1.5 px-3 text-sm sm:w-32"
+                value={stageFilter}
+                onChange={(e) => setStageFilter(e.target.value)}
+              >
+                <option value="">كل المراحل</option>
+                {stages.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+              </select>
+            </div>
           </div>
 
-          <div className="flex gap-2 w-full sm:w-auto">
-            <input
-              type="text"
-              className="field py-1.5 px-3 text-sm flex-1 sm:w-60"
-              placeholder="ابحث عن اسم الطالب..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            <select
-              className="field py-1.5 px-3 text-sm sm:w-32"
-              value={stageFilter}
-              onChange={(e) => setStageFilter(e.target.value)}
-            >
-              <option value="">كل المراحل</option>
-              {stages.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
-            </select>
-          </div>
-        </div>
+          {loading ? (
+            <p className="text-center py-10 text-ink-400 text-sm">جارٍ التحميل…</p>
+          ) : filteredUnassigned.length === 0 ? (
+            <p className="text-center py-10 text-brand-600 text-sm font-semibold">
+              {searchQuery || stageFilter ? 'لا يوجد طلاب يطابقون خيارات البحث.' : 'جميع الطلاب مسجلون في أسر حالياً! 🎉'}
+            </p>
+          ) : (
+            <>
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto scroll-soft">
+                <table className="tbl">
+                  <thead>
+                    <tr>
+                      <th>اسم الطالب</th>
+                      <th>المرحلة الدراسية</th>
+                      <th>الصف</th>
+                      <th className="w-64">الأسرة المناسبة</th>
+                      <th className="w-24"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredUnassigned.map((student) => {
+                      const studentGroups = groups.filter(g => g.stage === student.stage);
+                      const selectedGId = selectedGroups[student.id] || '';
+                      return (
+                        <tr key={student.id}>
+                          <td className="font-semibold text-ink-900">{student.studentName}</td>
+                          <td>
+                            <span className="pill pill-gray">{student.stage}</span>
+                          </td>
+                          <td className="text-ink-500 text-sm">{student.grade}</td>
+                          <td>
+                            {studentGroups.length === 0 ? (
+                              <span className="text-xs text-ink-400">لا توجد أسر لهذه المرحلة بعد</span>
+                            ) : (
+                              <select
+                                className="field py-1 px-2 text-xs"
+                                value={selectedGId}
+                                onChange={(e) => setSelectedGroups(prev => ({ ...prev, [student.id]: parseInt(e.target.value, 10) }))}
+                              >
+                                <option value="">اختر أسرة...</option>
+                                {studentGroups.map(g => (
+                                  <option key={g.id} value={g.id}>{g.name}</option>
+                                ))}
+                              </select>
+                            )}
+                          </td>
+                          <td>
+                            <button
+                              onClick={() => assignGroup(student.id, selectedGId as number)}
+                              disabled={!selectedGId || busy}
+                              className="btn btn-primary py-1 px-3 text-xs w-full text-center"
+                            >
+                              إسناد
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
 
-        {loading ? (
-          <p className="text-center py-10 text-ink-400 text-sm">جارٍ التحميل…</p>
-        ) : filteredUnassigned.length === 0 ? (
-          <p className="text-center py-10 text-brand-600 text-sm font-semibold">
-            {searchQuery || stageFilter ? 'لا يوجد طلاب يطابقون خيارات البحث.' : 'جميع الطلاب مسجلون في أسر حالياً! 🎉'}
-          </p>
-        ) : (
-          <>
-            {/* Desktop Table View */}
-            <div className="hidden md:block overflow-x-auto scroll-soft">
-              <table className="tbl">
-                <thead>
-                  <tr>
-                    <th>اسم الطالب</th>
-                    <th>المرحلة الدراسية</th>
-                    <th>الصف</th>
-                    <th className="w-64">الأسرة المناسبة</th>
-                    <th className="w-24"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredUnassigned.map((student) => {
-                    const studentGroups = groups.filter(g => g.stage === student.stage);
-                    const selectedGId = selectedGroups[student.id] || '';
-                    return (
-                      <tr key={student.id}>
-                        <td className="font-semibold text-ink-900">{student.studentName}</td>
-                        <td>
-                          <span className="pill pill-gray">{student.stage}</span>
-                        </td>
-                        <td className="text-ink-500 text-sm">{student.grade}</td>
-                        <td>
+              {/* Mobile Cards View */}
+              <ul className="md:hidden divide-y divide-ink-200">
+                {filteredUnassigned.map((student) => {
+                  const studentGroups = groups.filter(g => g.stage === student.stage);
+                  const selectedGId = selectedGroups[student.id] || '';
+                  return (
+                    <li key={student.id} className="py-3.5 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-ink-900">{student.studentName}</span>
+                        <span className="pill pill-gray text-xs">{student.stage}</span>
+                      </div>
+                      <div className="text-xs text-ink-500">الصف الدراسي: {student.grade}</div>
+                      
+                      <div className="flex gap-2">
+                        <div className="flex-1">
                           {studentGroups.length === 0 ? (
-                            <span className="text-xs text-ink-400">لا توجد أسر لهذه المرحلة بعد</span>
+                            <span className="text-xs text-ink-400 block pt-2">لا توجد أسر لهذه المرحلة بعد</span>
                           ) : (
                             <select
-                              className="field py-1 px-2 text-xs"
+                              className="field py-1.5 px-2 text-xs"
                               value={selectedGId}
                               onChange={(e) => setSelectedGroups(prev => ({ ...prev, [student.id]: parseInt(e.target.value, 10) }))}
                             >
@@ -538,68 +788,23 @@ export default function GroupsPage() {
                               ))}
                             </select>
                           )}
-                        </td>
-                        <td>
-                          <button
-                            onClick={() => assignGroup(student.id, selectedGId as number)}
-                            disabled={!selectedGId || busy}
-                            className="btn btn-primary py-1 px-3 text-xs w-full text-center"
-                          >
-                            إسناد
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile Cards View */}
-            <ul className="md:hidden divide-y divide-ink-200">
-              {filteredUnassigned.map((student) => {
-                const studentGroups = groups.filter(g => g.stage === student.stage);
-                const selectedGId = selectedGroups[student.id] || '';
-                return (
-                  <li key={student.id} className="py-3.5 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-ink-900">{student.studentName}</span>
-                      <span className="pill pill-gray text-xs">{student.stage}</span>
-                    </div>
-                    <div className="text-xs text-ink-500">الصف الدراسي: {student.grade}</div>
-                    
-                    <div className="flex gap-2">
-                      <div className="flex-1">
-                        {studentGroups.length === 0 ? (
-                          <span className="text-xs text-ink-400 block pt-2">لا توجد أسر لهذه المرحلة بعد</span>
-                        ) : (
-                          <select
-                            className="field py-1.5 px-2 text-xs"
-                            value={selectedGId}
-                            onChange={(e) => setSelectedGroups(prev => ({ ...prev, [student.id]: parseInt(e.target.value, 10) }))}
-                          >
-                            <option value="">اختر أسرة...</option>
-                            {studentGroups.map(g => (
-                              <option key={g.id} value={g.id}>{g.name}</option>
-                            ))}
-                          </select>
-                        )}
+                        </div>
+                        <button
+                          onClick={() => assignGroup(student.id, selectedGId as number)}
+                          disabled={!selectedGId || busy}
+                          className="btn btn-primary py-1.5 px-4 text-xs shrink-0"
+                        >
+                          إسناد
+                        </button>
                       </div>
-                      <button
-                        onClick={() => assignGroup(student.id, selectedGId as number)}
-                        disabled={!selectedGId || busy}
-                        className="btn btn-primary py-1.5 px-4 text-xs shrink-0"
-                      >
-                        إسناد
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </>
-        )}
-      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
+        </div>
+      )}
 
       {/* نافذة إنشاء مجموعة جديدة */}
       {showCreateGroupModal && (
@@ -665,74 +870,151 @@ export default function GroupsPage() {
       {selectedGroupModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden text-right" dir="rtl">
-            <div className="p-5 border-b border-ink-200 flex justify-between items-center bg-ink-50">
-              <div>
-                <h3 className="text-lg font-bold text-ink-900">{selectedGroupModal.name}</h3>
-                <p className="text-sm text-ink-500">المرحلة: {selectedGroupModal.stage}</p>
-              </div>
-              <button onClick={() => setSelectedGroupModal(null)} className="text-ink-400 hover:text-ink-900 font-bold p-1 flex items-center justify-center">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18 6 6 18M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="p-5 overflow-y-auto flex-1 space-y-6">
-              
-              <div>
-                <h4 className="font-bold text-ink-900 mb-3 flex items-center gap-2">
-                  <svg className="w-4 h-4 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                    <circle cx="9" cy="7" r="4" />
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            
+            {/* الجزء العلوي: اسم المجموعة وتفاصيلها بالكامل */}
+            <div className="p-5 border-b border-ink-200 bg-ink-50">
+              <div className="flex justify-between items-start">
+                <div className="space-y-1">
+                  <h3 className="text-xl font-bold text-ink-900">{selectedGroupModal.name}</h3>
+                  <div className="flex flex-wrap items-center gap-2 text-sm text-ink-500">
+                    <span className="pill pill-gray text-xs">{selectedGroupModal.stage}</span>
+                    <span>•</span>
+                    <span className="font-semibold">المشرفون: </span>
+                    {supervisors.filter(sup => sup.groupIds && sup.groupIds.split(',').map(s => parseInt(s, 10)).includes(selectedGroupModal.id)).length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {supervisors.filter(sup => sup.groupIds && sup.groupIds.split(',').map(s => parseInt(s, 10)).includes(selectedGroupModal.id)).map(sup => (
+                          <span key={sup.id} className="bg-cream-100 text-ink-700 px-2 py-0.5 rounded-lg text-xs font-semibold">{sup.name}</span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-ink-400">لا يوجد مشرفون معينون</span>
+                    )}
+                  </div>
+                </div>
+                <button onClick={() => setSelectedGroupModal(null)} className="text-ink-400 hover:text-ink-900 font-bold p-1 flex items-center justify-center rounded-lg hover:bg-ink-150 transition-colors">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 6 6 18M6 6l12 12" />
                   </svg>
-                  <span>المشرفون</span>
-                </h4>
-                {supervisors.filter(sup => sup.groupIds && sup.groupIds.split(',').map(s => parseInt(s, 10)).includes(selectedGroupModal.id)).length > 0 ? (
-                  <ul className="space-y-2">
-                    {supervisors.filter(sup => sup.groupIds && sup.groupIds.split(',').map(s => parseInt(s, 10)).includes(selectedGroupModal.id)).map(sup => (
-                      <li key={sup.id} className="text-sm bg-ink-50 px-3 py-2 rounded-lg text-ink-800 font-medium">{sup.name}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-sm text-ink-400">لا يوجد مشرفون معينون لهذه المجموعة.</p>
-                )}
+                </button>
               </div>
 
+              {/* ملخص نقاط المجموعة تفصيلياً */}
+              <div className="grid grid-cols-3 gap-3 bg-white p-4 rounded-xl border border-ink-200 text-center mt-4 shadow-sm">
+                <div className="space-y-1">
+                  <div className="text-[11px] text-ink-500 font-semibold">إجمالي نقاط الأسرة</div>
+                  <div className="text-lg font-extrabold text-green-600 font-mono">{activeTotalPoints}</div>
+                </div>
+                <div className="border-r border-ink-150 space-y-1">
+                  <div className="text-[11px] text-ink-500 font-semibold">متوسط نقاط الطالب</div>
+                  <div className="text-lg font-extrabold text-brand-650 font-mono">{activeAvgPoints}</div>
+                </div>
+                <div className="border-r border-ink-150 space-y-1">
+                  <div className="text-[11px] text-ink-500 font-semibold">الطالب المتصدر</div>
+                  <div className="text-xs font-bold text-ink-900 truncate px-1" title={activeTopStudent ? activeTopStudent.studentName : '—'}>
+                    {activeTopStudent ? activeTopStudent.studentName : '—'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* الجزء السفلي: طلاب المجموعة وتفاصيل نقاطهم */}
+            <div className="p-5 overflow-y-auto flex-1 space-y-4">
               <div className="font-sans">
-                <h4 className="font-bold text-ink-900 mb-3 flex items-center gap-2">
-                  <svg className="w-4 h-4 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                    <circle cx="9" cy="7" r="4" />
-                  </svg>
-                  <span>الطلاب ({countOf(selectedGroupModal.id)})</span>
-                </h4>
-                {students.filter(s => s.groupId === selectedGroupModal.id).length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {students.filter(s => s.groupId === selectedGroupModal.id).map(st => (
-                      <div key={st.id} className="text-sm border border-ink-200 px-3 py-2 rounded-lg text-ink-800 flex justify-between items-center bg-white shadow-sm hover:shadow transition-shadow">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-ink-900">{st.studentName}</span>
-                          <span className="text-[10px] text-ink-500 bg-cream-100 px-2 py-0.5 rounded font-mono">{st.grade}</span>
-                        </div>
-                        {isAdmin && (
-                          <button
-                            onClick={() => removeStudentFromGroup(st.id)}
-                            disabled={busy}
-                            className="text-red-500 hover:text-red-750 hover:bg-red-50 w-7 h-7 flex items-center justify-center rounded-full font-bold transition-all"
-                            title="إزالة من المجموعة"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M18 6 6 18M6 6l12 12" />
+                <h4 className="font-bold text-ink-900 flex items-center gap-2 border-b border-ink-100 pb-2">
+                <svg className="w-4 h-4 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                </svg>
+                <span>أعضاء المجموعة وأداؤهم ({activeGroupStudents.length} طلاب)</span>
+              </h4>
+
+              {activeGroupStudents.length > 0 ? (
+                <div className="space-y-2.5">
+                  {activeGroupStudents.map(st => {
+                    const isExpanded = expandedStudentId === st.id;
+                    const studentLogs = points.filter(p => p.registrationId === st.id);
+                    const studentTotal = getStudentPoints(st.id);
+
+                    // تصنيف الأداء مقارنة بمتوسط المجموعة
+                    let performanceCls = "bg-ink-100 text-ink-700";
+                    let performanceLabel = "عادي";
+                    if (studentTotal > Number(activeAvgPoints) * 1.2 && studentTotal > 0) {
+                      performanceCls = "bg-green-155 text-green-700 font-bold";
+                      performanceLabel = "ممتاز 🔥";
+                    } else if (studentTotal < Number(activeAvgPoints) * 0.8 && Number(activeAvgPoints) > 0) {
+                      performanceCls = "bg-red-50 text-red-700 font-bold";
+                      performanceLabel = "يحتاج تشجيع ⚠️";
+                    }
+
+                    return (
+                      <div key={st.id} className="border border-ink-200 rounded-xl overflow-hidden bg-white shadow-sm hover:shadow transition-shadow">
+                        {/* Row Header */}
+                        <div 
+                          onClick={() => setExpandedStudentId(isExpanded ? null : st.id)}
+                          className="text-sm px-4 py-3 flex justify-between items-center bg-white cursor-pointer hover:bg-cream-50/50 transition-colors select-none"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <svg className={`w-3.5 h-3.5 text-ink-400 shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="6 9 12 15 18 9" />
                             </svg>
-                          </button>
+                            <span className="font-semibold text-ink-900 truncate">{st.studentName}</span>
+                            <span className="text-[10px] text-ink-500 bg-cream-100 px-2 py-0.5 rounded font-mono shrink-0">{st.grade}</span>
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded-full shrink-0 ${performanceCls}`}>{performanceLabel}</span>
+                          </div>
+                          <div className="flex items-center gap-2.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                            <span className="pill pill-green font-bold text-xs">{studentTotal} نقطة</span>
+                            {isAdmin && (
+                              <button
+                                onClick={() => removeStudentFromGroup(st.id)}
+                                disabled={busy}
+                                className="text-red-500 hover:text-red-750 hover:bg-red-50 w-7 h-7 flex items-center justify-center rounded-full font-bold transition-all shrink-0"
+                                title="إزالة من المجموعة"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M18 6 6 18M6 6l12 12" />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Accordion Body */}
+                        {isExpanded && (
+                          <div className="px-4 py-3 bg-ink-50/40 border-t border-ink-150 text-xs space-y-2">
+                            <div className="text-[11px] font-bold text-ink-500 mb-1">تفاصيل ورصد النقاط:</div>
+                            {studentLogs.length === 0 ? (
+                              <p className="text-ink-400 text-center py-3 bg-white rounded-lg border border-ink-150">لا توجد نقاط مسجلة لهذا الطالب بعد.</p>
+                            ) : (
+                              <div className="divide-y divide-ink-150 max-h-48 overflow-y-auto scroll-soft bg-white rounded-lg border border-ink-150 px-3">
+                                {studentLogs.map((log) => (
+                                  <div key={log.id} className="py-2.5 flex items-center justify-between gap-4">
+                                    <div className="min-w-0 flex-1">
+                                      <div className="font-semibold text-ink-800 truncate">{log.reason}</div>
+                                      <div className="text-[10px] text-ink-400 flex gap-2 mt-0.5">
+                                        <span>الفئة: {catLabel(log.category)}</span>
+                                        <span>•</span>
+                                        <span>بواسطة: {log.recordedBy || '—'}</span>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      <span className="text-[10px] text-ink-400">{formatDate(log.createdAt)}</span>
+                                      <span className={`font-bold font-mono px-2 py-0.5 rounded text-[11px] ${log.delta >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-750'}`}>
+                                        {log.delta >= 0 ? `+${log.delta}` : log.delta}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-ink-400">لا يوجد طلاب في هذه المجموعة.</p>
-                )}
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-ink-400 text-center py-6">لا يوجد طلاب مسجلين في هذه المجموعة حالياً.</p>
+              )}
 
                 {/* Checklist to add new students to group */}
                 {isAdmin && (

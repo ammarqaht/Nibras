@@ -183,12 +183,12 @@ export default function PaymentsPage() {
               <table className="tbl">
                 <thead>
                   <tr>
-                    <th className="w-[25%]">الطالب</th>
+                    <th className="w-[20%]">الطالب</th>
                     <th className="w-[10%]">العضوية</th>
                     <th className="w-[10%]">نوع الدفع</th>
                     <th className="w-[10%]">الإيصال</th>
                     <th className="w-[10%]">الحالة</th>
-                    <th className="!text-center pl-6 w-[35%]">الإجراءات</th>
+                    <th className="!text-center pl-6 w-[40%]">الإجراءات</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -227,34 +227,13 @@ export default function PaymentsPage() {
                         </span>
                       </td>
                       <td>
-                        <div className="flex items-center gap-2 justify-end pl-6">
-                          <button
-                            onClick={() => setSelectedStudent(s)}
-                            className="btn btn-secondary py-1 px-3 text-xs flex items-center gap-1"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-                              <circle cx="12" cy="12" r="3" />
-                            </svg>
-                            <span>بيانات الطالب</span>
-                          </button>
-                          {s.paymentStatus === 'paid' || s.paymentStatus === 'exempted' ? (
-                            <button
-                              onClick={() => cancelConfirm(s.id)}
-                              disabled={busyId === s.id}
-                              className="btn btn-danger py-1 px-3 text-xs flex items-center gap-1"
-                            >
-                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M18 6 6 18M6 6l12 12" />
-                              </svg>
-                              <span>إلغاء الدفع</span>
-                            </button>
-                          ) : (
+                        <div className="flex items-center gap-1.5 justify-end pl-6 whitespace-nowrap">
+                          {s.paymentStatus !== 'paid' && s.paymentStatus !== 'exempted' && (
                             <>
                               <button
                                 onClick={() => confirm(s.id)}
                                 disabled={busyId === s.id}
-                                className="btn text-white border-transparent py-1 px-3 text-xs flex items-center gap-1"
+                                className="btn text-white border-transparent py-1.5 px-3 text-xs flex items-center gap-1 whitespace-nowrap active:scale-95 transition-all"
                                 style={{ background: '#1B7A43' }}
                               >
                                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -265,12 +244,25 @@ export default function PaymentsPage() {
                               <button
                                 onClick={() => setExempted(s.id)}
                                 disabled={busyId === s.id}
-                                className="btn btn-secondary py-1 px-3 text-xs flex items-center gap-1 text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100"
+                                className="btn btn-secondary py-1.5 px-3 text-xs flex items-center gap-1 text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100 whitespace-nowrap active:scale-95 transition-all"
                               >
-                                إعفاء
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                                </svg>
+                                <span>إعفاء</span>
                               </button>
                             </>
                           )}
+                          <button
+                            onClick={() => setSelectedStudent(s)}
+                            className="btn btn-secondary py-1.5 px-2.5 text-xs flex items-center justify-center whitespace-nowrap active:scale-95 transition-all"
+                            title="بيانات الطالب"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                              <circle cx="12" cy="12" r="3" />
+                            </svg>
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -699,7 +691,7 @@ function StudentDetailsModal({
               </button>
             </div>
 
-            {student.paymentReceipt ? (
+            {student.paymentReceipt && (
               <div className="bg-cream-50 p-3 rounded-lg border border-line flex flex-col gap-2">
                 <span className="text-xs text-ink-500 font-semibold">تم رفع الإيصال بنجاح</span>
                 <button
@@ -712,15 +704,6 @@ function StudentDetailsModal({
                   </svg>
                   <span>عرض الإيصال المرفق بكامل الحجم</span>
                 </button>
-              </div>
-            ) : (
-              <div className="p-3 bg-red-50 border border-red-100 text-red-700 rounded-lg text-xs flex items-start gap-1.5">
-                <svg className="w-4 h-4 text-red-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
-                  <line x1="12" y1="9" x2="12" y2="13" />
-                  <line x1="12" y1="17" x2="12.01" y2="17" />
-                </svg>
-                <span>لم يقم الطالب بإرفاق إيصال التحويل بعد. يمكنك إرفاق صورة الإيصال يدوياً بالضغط على زر الرفع أعلاه.</span>
               </div>
             )}
           </div>

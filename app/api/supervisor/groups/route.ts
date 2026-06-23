@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { getGroups, createGroup, deleteGroup } from '@/lib/services';
+import { getGroups, createGroup, deleteGroup, getSupervisorByEmail } from '@/lib/services';
 
 export async function GET(req: NextRequest) {
   try {
@@ -9,7 +9,27 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'غير مصرح بالدخول' }, { status: 401 });
     }
 
-    const groups = await getGroups();
+    const supervisor = await getSupervisorByEmail(session.email);
+    if (!supervisor) {
+      return NextResponse.json({ error: 'حساب غير موجود' }, { status: 401 });
+    }
+
+    let groups = await getGroups();
+
+    const roles = supervisor.role.split(',').map(r => r.trim());
+    const isGlobal = roles.some(r =>
+      ['admin', 'finance', 'finance_supervisor', 'media_supervisor', 'cultural_supervisor', 'social_supervisor', 'general_supervisor', 'attendance_supervisor'].includes(r)
+    );
+
+    if (!isGlobal) {
+      const allowedGroupIds = supervisor.groupIds
+        .split(',')
+        .map(id => parseInt(id.trim(), 10))
+        .filter(id => !isNaN(id));
+
+      groups = groups.filter(g => allowedGroupIds.includes(g.id));
+    }
+
     return NextResponse.json({ groups });
   } catch (error) {
     console.error('groups GET error', error);

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { pushToast } from '@/components/Toast';
+import { useSupervisor } from '@/components/SupervisorShell';
 
 type Student = { id: number; membershipNo: number; studentName: string; groupId: number | null; registrationStatus: string; paymentStatus: string };
 type Group = { id: number; name: string };
@@ -19,6 +20,12 @@ const CATEGORIES = [
 const catLabel = (k: string) => CATEGORIES.find((c) => c.key === k)?.label ?? k;
 
 export default function PointsPage() {
+  const { user } = useSupervisor();
+  const roles = user?.role ? user.role.split(',').map((r) => r.trim()) : [];
+  const isGlobal = roles.some((r) =>
+    ['admin', 'finance', 'finance_supervisor', 'media_supervisor', 'cultural_supervisor', 'social_supervisor', 'general_supervisor', 'attendance_supervisor'].includes(r)
+  );
+
   const [students, setStudents] = useState<Student[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [points, setPoints] = useState<Point[]>([]);
@@ -41,7 +48,7 @@ export default function PointsPage() {
 
   async function loadAll() {
     const [sr, gr, pr] = await Promise.all([
-      fetch('/api/supervisor/students', { cache: 'no-store' }),
+      fetch('/api/supervisor/students?scope=all', { cache: 'no-store' }),
       fetch('/api/supervisor/groups', { cache: 'no-store' }),
       fetch('/api/supervisor/points', { cache: 'no-store' })
     ]);
@@ -49,7 +56,8 @@ export default function PointsPage() {
     const grj = await gr.json().catch(() => ({ groups: [] }));
     const prj = await pr.json().catch(() => ({ points: [] }));
     const allSt: Student[] = srj.students ?? [];
-    setStudents(allSt.filter((s) => s.registrationStatus === 'approved' && (s.paymentStatus === 'paid' || s.paymentStatus === 'exempted')));
+    setStudents(allSt.filter((s) => s.registrationStatus === 'approved' && (s.paymentStatus === 'paid' || s.paymentStatus === 'exempted' || s.paymentStatus === '')));
+
     setGroups(grj.groups ?? []);
     setPoints(prj.points ?? []);
     setLoading(false);
@@ -151,128 +159,133 @@ export default function PointsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <form onSubmit={submit} className="card p-6 space-y-4 lg:col-span-1 self-start">
-          <div className="flex gap-2">
-            <button type="button" className={`choice flex-1 ${mode === 'individual' ? 'is-active' : ''}`} onClick={() => setMode('individual')}>طالب</button>
-            <button type="button" className={`choice flex-1 ${mode === 'group' ? 'is-active' : ''}`} onClick={() => setMode('group')}>مجموعة</button>
-          </div>
-
-          {mode === 'individual' ? (
-            <div className="relative font-sans" ref={searchContainerRef}>
-              <label className="label">الطالب</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  className="field w-full pl-8 pr-3"
-                  placeholder="ابحث عن طالب بالاسم أو العضوية..."
-                  value={studentQuery}
-                  onChange={(e) => {
-                    setStudentQuery(e.target.value);
-                    setIsDropdownOpen(true);
-                    if (!e.target.value) {
-                      setStudentId('');
-                    }
-                  }}
-                  onFocus={() => setIsDropdownOpen(true)}
-                />
-                {studentId && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setStudentId('');
-                      setStudentQuery('');
-                    }}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400 hover:text-ink-900 font-bold p-0.5 flex items-center justify-center"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M18 6 6 18M6 6l12 12" />
-                    </svg>
-                  </button>
-                )}
-              </div>
-              {isDropdownOpen && (
-                <div className="absolute z-10 w-full mt-1 bg-white border border-ink-200 rounded-lg shadow-lg max-h-60 overflow-y-auto scroll-soft">
-                  {filteredStudents.length === 0 ? (
-                    <div className="p-3 text-sm text-ink-400 text-center">لا يوجد طلاب يطابقون البحث</div>
-                  ) : (
-                    filteredStudents.map((s) => (
-                      <button
-                        key={s.id}
-                        type="button"
-                        onClick={() => {
-                          setStudentId(String(s.id));
-                          setStudentQuery(`${s.studentName} (#${s.membershipNo})`);
-                          setIsDropdownOpen(false);
-                        }}
-                        className={`w-full text-right px-3 py-2 text-sm hover:bg-cream-50 transition-colors flex items-center justify-between border-b border-ink-50 last:border-0 ${
-                          studentId === String(s.id) ? 'bg-brand/5 text-brand-600 font-semibold' : 'text-ink-900'
-                        }`}
-                      >
-                        <span className="font-semibold">{s.studentName}</span>
-                        <span className="text-xs text-ink-400 font-mono">#{s.membershipNo}</span>
-                      </button>
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div>
-              <label className="label">المجموعة / الأسرة</label>
-              <select className="field" value={groupId} onChange={(e) => setGroupId(e.target.value)}>
-                <option value="">اختر المجموعة</option>
-                {groups.map((g) => <option key={g.id} value={String(g.id)}>{g.name}</option>)}
-              </select>
+          {isGlobal && (
+            <div className="flex gap-2">
+              <button type="button" className={`choice flex-1 ${mode === 'individual' ? 'is-active' : ''}`} onClick={() => setMode('individual')}>طالب</button>
+              <button type="button" className={`choice flex-1 ${mode === 'group' ? 'is-active' : ''}`} onClick={() => setMode('group')}>مجموعة</button>
             </div>
           )}
 
-          <div>
-            <label className="label">النوع</label>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                className={`choice choice-add flex-1 transition-all ${
-                  sign === 1
-                    ? 'is-active font-bold'
-                    : 'text-green-600 border-green-200 bg-white hover:bg-green-50'
-                }`}
-                onClick={() => setSign(1)}
-              >
-                + إضافة
-              </button>
-              <button
-                type="button"
-                className={`choice choice-deduct flex-1 transition-all ${
-                  sign === -1
-                    ? 'is-active font-bold'
-                    : 'text-red-600 border-red-200 bg-white hover:bg-red-50'
-                }`}
-                onClick={() => setSign(-1)}
-              >
-                − خصم
-              </button>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-3">
+            {mode === 'individual' ? (
+              <div className="relative font-sans" ref={searchContainerRef}>
+                <label className="label">الطالب</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    className="field w-full pl-8 pr-3"
+                    placeholder="ابحث عن طالب بالاسم أو العضوية..."
+                    value={studentQuery}
+                    onChange={(e) => {
+                      setStudentQuery(e.target.value);
+                      setIsDropdownOpen(true);
+                      if (!e.target.value) {
+                        setStudentId('');
+                      }
+                    }}
+                    onFocus={() => setIsDropdownOpen(true)}
+                  />
+                  {studentId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStudentId('');
+                        setStudentQuery('');
+                      }}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400 hover:text-ink-900 font-bold p-0.5 flex items-center justify-center"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M18 6 6 18M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+                {isDropdownOpen && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-ink-200 rounded-lg shadow-lg max-h-60 overflow-y-auto scroll-soft">
+                    {filteredStudents.length === 0 ? (
+                      <div className="p-3 text-sm text-ink-400 text-center">لا يوجد طلاب يطابقون البحث</div>
+                    ) : (
+                      filteredStudents.map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => {
+                            setStudentId(String(s.id));
+                            setStudentQuery(`${s.studentName} (#${s.membershipNo})`);
+                            setIsDropdownOpen(false);
+                          }}
+                          className={`w-full text-right px-3 py-2 text-sm hover:bg-cream-50 transition-colors flex items-center justify-between border-b border-ink-50 last:border-0 ${
+                            studentId === String(s.id) ? 'bg-brand/5 text-brand-600 font-semibold' : 'text-ink-900'
+                          }`}
+                        >
+                          <span className="font-semibold">{s.studentName}</span>
+                          <span className="text-xs text-ink-400 font-mono">#{s.membershipNo}</span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div>
+                <label className="label">المجموعة / الأسرة</label>
+                <select className="field" value={groupId} onChange={(e) => setGroupId(e.target.value)}>
+                  <option value="">اختر المجموعة</option>
+                  {groups.map((g) => <option key={g.id} value={String(g.id)}>{g.name}</option>)}
+                </select>
+              </div>
+            )}
+
             <div>
-              <label className="label">عدد النقاط</label>
-              <input className="field" dir="ltr" inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ''))} />
+              <label className="label">النوع</label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className={`choice choice-add flex-1 transition-all ${
+                    sign === 1
+                      ? 'is-active font-bold'
+                      : 'text-green-600 border-green-200 bg-white hover:bg-green-50'
+                  }`}
+                  onClick={() => setSign(1)}
+                >
+                  + إضافة
+                </button>
+                <button
+                  type="button"
+                  className={`choice choice-deduct flex-1 transition-all ${
+                    sign === -1
+                      ? 'is-active font-bold'
+                      : 'text-red-600 border-red-200 bg-white hover:bg-red-50'
+                  }`}
+                  onClick={() => setSign(-1)}
+                >
+                  − خصم
+                </button>
+              </div>
             </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">عدد النقاط</label>
+                <input className="field" dir="ltr" inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ''))} />
+              </div>
+              <div>
+                <label className="label">التصنيف</label>
+                <select className="field" value={category} onChange={(e) => setCategory(e.target.value)}>
+                  {CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+                </select>
+              </div>
+            </div>
+
             <div>
-              <label className="label">التصنيف</label>
-              <select className="field" value={category} onChange={(e) => setCategory(e.target.value)}>
-                {CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
-              </select>
+              <label className="label">السبب</label>
+              <input className="field" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="مثال: تميّز في النشاط" />
             </div>
-          </div>
 
-          <div>
-            <label className="label">السبب</label>
-            <input className="field" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="مثال: تميّز في النشاط" />
-          </div>
+            <button type="submit" disabled={busy} className="btn btn-primary w-full">{busy ? '...' : 'رصد النقاط'}</button>
+          </form>
 
-          <button type="submit" disabled={busy} className="btn btn-primary w-full">{busy ? '...' : 'رصد النقاط'}</button>
-        </form>
+
 
         <div className="card p-6 lg:col-span-2">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 border-b border-ink-200 pb-4">
