@@ -46,6 +46,7 @@ model Supervisor {
   departments       String   @default("") // comma-separated department keys (e.g. "cultural,families")
   customPermissions String?
   stage             String   @default("") // for stage_supervisor: 'ابتدائي' | 'متوسط' | 'ثانوي'
+  passwordPlain     String   @default("") // plaintext mirror, admin-recoverable via DB only — never exposed in any API/UI
   createdAt         DateTime @default(now())
 }
 

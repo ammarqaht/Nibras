@@ -51,6 +51,7 @@ const LINKS: NavLink[] = [
   { id: 'invoices', href: '/supervisor/invoices', label: 'الفواتير' },
   { id: 'finance', href: '/supervisor/finance', label: 'المالية', roles: ['finance', 'finance_supervisor'] },
   { id: 'announcements', href: '/supervisor/announcements', label: 'الإشعارات', roles: ['media_supervisor', 'general_supervisor'] },
+  { id: 'account', href: '/supervisor/account', label: 'حسابي' },
   { id: 'supervisors', href: '/supervisor/supervisors', label: 'المشرفون', roles: ['admin'] },
   { id: 'settings', href: '/supervisor/settings', label: 'الإعدادات', roles: ['admin'] }
 ];
@@ -146,6 +147,7 @@ export default function SupervisorShell({ children }: { children: React.ReactNod
   const isAdmin = userRoles.includes('admin') || user?.permissions?.includes('*');
 
   const links = LINKS.filter((l) => {
+    if (l.id === 'account') return !isAdmin; // own-account page: every supervisor except admins
     if (isAdmin) return true;
     if (user?.permissions) {
       if (user.permissions.includes(l.id)) return true;

@@ -54,6 +54,7 @@ export async function POST(req: NextRequest) {
       name: String(name).trim(),
       email: normalizedEmail,
       passwordHash: hashPassword(password),
+      passwordPlain: String(password),
       role,
       groupIds: groupIds || '',
       customPermissions: customPermissions || '',

@@ -17,6 +17,7 @@ export type SupervisorInfo = {
   departments?: string;
   customPermissions?: string | null;
   stage?: string;
+  passwordPlain?: string; // write-only mirror; never read back into API/UI
   createdAt: string;
 };
 
@@ -351,7 +352,8 @@ export async function createSupervisor(data: Omit<SupervisorInfo, 'id' | 'create
         groupIds: data.groupIds,
         departments: data.departments,
         customPermissions: data.customPermissions,
-        stage: data.stage
+        stage: data.stage,
+        passwordPlain: data.passwordPlain ?? ''
       }
     });
     return {
@@ -410,7 +412,10 @@ export async function updateSupervisor(
   if (data.departments !== undefined) updateData.departments = data.departments;
   if (data.customPermissions !== undefined) updateData.customPermissions = data.customPermissions;
   if (data.stage !== undefined) updateData.stage = data.stage;
-  if (data.password) updateData.passwordHash = hashPassword(data.password);
+  if (data.password) {
+    updateData.passwordHash = hashPassword(data.password);
+    updateData.passwordPlain = data.password;
+  }
 
   if (hasDatabase) {
     const prisma = getPrisma()!;
