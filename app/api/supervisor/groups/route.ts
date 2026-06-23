@@ -40,8 +40,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'غير مصرح بالدخول' }, { status: 401 });
     }
 
-    // Creating groups is restricted to admin
-    if (session.role !== 'admin') {
+    const supervisor = await getSupervisorByEmail(session.email);
+    if (!supervisor) {
+      return NextResponse.json({ error: 'حساب غير موجود' }, { status: 401 });
+    }
+
+    const roles = supervisor.role.split(',').map(r => r.trim());
+    const canManageGroups = roles.includes('stage_supervisor') || roles.includes('admin');
+    if (!canManageGroups) {
       return NextResponse.json({ error: 'غير مصرح لك بإدارة المجموعات' }, { status: 403 });
     }
 
@@ -66,7 +72,14 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'غير مصرح بالدخول' }, { status: 401 });
     }
 
-    if (session.role !== 'admin') {
+    const supervisor = await getSupervisorByEmail(session.email);
+    if (!supervisor) {
+      return NextResponse.json({ error: 'حساب غير موجود' }, { status: 401 });
+    }
+
+    const roles = supervisor.role.split(',').map(r => r.trim());
+    const canManageGroups = roles.includes('stage_supervisor') || roles.includes('admin');
+    if (!canManageGroups) {
       return NextResponse.json({ error: 'غير مصرح لك بإدارة المجموعات' }, { status: 403 });
     }
 

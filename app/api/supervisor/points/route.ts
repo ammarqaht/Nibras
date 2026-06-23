@@ -55,16 +55,16 @@ export async function POST(req: NextRequest) {
       ['admin', 'finance', 'finance_supervisor', 'media_supervisor', 'cultural_supervisor', 'social_supervisor', 'general_supervisor', 'attendance_supervisor'].includes(r)
     );
 
-    if (!isGlobal && req.method === 'POST') {
-      const bodyClone = await req.clone().json().catch(() => ({}));
-      if (bodyClone.groupId) {
+    const body = await req.json();
+    const { registrationId, groupId, delta, reason, category } = body;
+
+    if (groupId) {
+      const groupAllowedRoles = ['admin', 'cultural_supervisor', 'sports_supervisor', 'general_supervisor', 'social_supervisor'];
+      const canAddGroupPoints = roles.some(r => groupAllowedRoles.includes(r));
+      if (!canAddGroupPoints) {
         return NextResponse.json({ error: 'غير مصرح لك برصد النقاط للمجموعات' }, { status: 403 });
       }
     }
-
-
-    const body = await req.json();
-    const { registrationId, groupId, delta, reason, category } = body;
 
     const dVal = parseInt(delta, 10);
     if (isNaN(dVal) || !reason || !category) {

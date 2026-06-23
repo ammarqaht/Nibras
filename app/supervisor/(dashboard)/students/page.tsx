@@ -222,6 +222,9 @@ export default function StudentsPage() {
   const isGlobal = roles.some((r) =>
     ['admin', 'finance', 'finance_supervisor', 'media_supervisor', 'cultural_supervisor', 'social_supervisor', 'general_supervisor', 'attendance_supervisor'].includes(r)
   );
+  const canSeeFullStudentDetails = roles.some((r) =>
+    ['admin', 'general_supervisor', 'finance', 'finance_supervisor', 'administrative_supervisor', 'media_supervisor'].includes(r)
+  );
 
   const [students, setStudents] = useState<Student[]>([]);
 
@@ -251,6 +254,23 @@ export default function StudentsPage() {
   const [showColSettings, setShowColSettings] = useState(false);
 
   useEffect(() => {
+    if (!canSeeFullStudentDetails) {
+      setVisibleCols({
+        index: true,
+        studentName: true,
+        guardianPhone: false,
+        membershipNo: true,
+        stage: true,
+        group: true,
+        nationalId: false,
+        studentPhone: false,
+        neighborhood: false,
+        paymentStatus: false,
+        hasCondition: true,
+      });
+      return;
+    }
+
     const saved = localStorage.getItem('nibras_student_cols');
     if (saved) {
       try {
@@ -272,9 +292,10 @@ export default function StudentsPage() {
         paymentStatus: false
       }));
     }
-  }, [isGlobal]);
+  }, [isGlobal, canSeeFullStudentDetails]);
 
   useEffect(() => {
+    if (!canSeeFullStudentDetails) return;
     if (!isGlobal) {
       setVisibleCols((prev) => ({
         ...prev,
@@ -283,10 +304,11 @@ export default function StudentsPage() {
         paymentStatus: false
       }));
     }
-  }, [isGlobal]);
+  }, [isGlobal, canSeeFullStudentDetails]);
 
 
   const setVisibleCol = (key: keyof typeof visibleCols, val: boolean) => {
+    if (!canSeeFullStudentDetails) return;
     setVisibleCols((prev) => {
       const next = { ...prev, [key]: val };
       localStorage.setItem('nibras_student_cols', JSON.stringify(next));
@@ -349,31 +371,42 @@ export default function StudentsPage() {
   }
 
   function exportCsv() {
-    const headers = isGlobal ? [
-      'رقم العضوية', 'اسم الطالب', 'رقم الهوية', 'جوال ولي الأمر', 'جوال الطالب',
-      'المرحلة', 'الصف', 'الحي', 'حالة الدفع', 'نوع الدفع', 'حالة التسجيل', 'حالة صحية'
-    ] : [
-      'رقم العضوية', 'اسم الطالب', 'رقم الهوية',
-      'المرحلة', 'الصف', 'الحي', 'نوع الدفع', 'حالة التسجيل', 'حالة صحية'
-    ];
+    let headers: string[];
+    let rows: any[][];
+
+    if (!canSeeFullStudentDetails) {
+      headers = ['رقم العضوية', 'اسم الطالب', 'المرحلة', 'الصف', 'الحالة الصحية'];
+      rows = filtered.map((s) => [
+        s.membershipNo, s.studentName, s.stage, s.grade, s.hasCondition ? 'نعم' : 'لا'
+      ]);
+    } else {
+      headers = isGlobal ? [
+        'رقم العضوية', 'اسم الطالب', 'رقم الهوية', 'جوال ولي الأمر', 'جوال الطالب',
+        'المرحلة', 'الصف', 'الحي', 'حالة الدفع', 'نوع الدفع', 'حالة التسجيل', 'حالة صحية'
+      ] : [
+        'رقم العضوية', 'اسم الطالب', 'رقم الهوية',
+        'المرحلة', 'الصف', 'الحي', 'نوع الدفع', 'حالة التسجيل', 'حالة صحية'
+      ];
+      rows = filtered.map((s) => isGlobal ? [
+        s.membershipNo, s.studentName, s.nationalId, s.guardianPhone, s.studentPhone ?? '',
+        s.stage, s.grade, s.neighborhood,
+        s.paymentStatus === 'paid' ? 'مدفوع' : 'غير مدفوع',
+        s.paymentType === 'now' ? 'فوري' : 'آجل',
+        s.registrationStatus === 'approved' ? 'مقبول' : s.registrationStatus === 'rejected' ? 'مرفوض' : 'قيد المراجعة',
+        s.hasCondition ? 'نعم' : 'لا'
+      ] : [
+        s.membershipNo, s.studentName, s.nationalId,
+        s.stage, s.grade, s.neighborhood,
+        s.paymentType === 'now' ? 'فوري' : 'آجل',
+        s.registrationStatus === 'approved' ? 'مقبول' : s.registrationStatus === 'rejected' ? 'مرفوض' : 'قيد المراجعة',
+        s.hasCondition ? 'نعم' : 'لا'
+      ]);
+    }
+
     const esc = (v: unknown) => {
       const str = String(v ?? '');
       return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
     };
-    const rows = filtered.map((s) => isGlobal ? [
-      s.membershipNo, s.studentName, s.nationalId, s.guardianPhone, s.studentPhone ?? '',
-      s.stage, s.grade, s.neighborhood,
-      s.paymentStatus === 'paid' ? 'مدفوع' : 'غير مدفوع',
-      s.paymentType === 'now' ? 'فوري' : 'آجل',
-      s.registrationStatus === 'approved' ? 'مقبول' : s.registrationStatus === 'rejected' ? 'مرفوض' : 'قيد المراجعة',
-      s.hasCondition ? 'نعم' : 'لا'
-    ] : [
-      s.membershipNo, s.studentName, s.nationalId,
-      s.stage, s.grade, s.neighborhood,
-      s.paymentType === 'now' ? 'فوري' : 'آجل',
-      s.registrationStatus === 'approved' ? 'مقبول' : s.registrationStatus === 'rejected' ? 'مرفوض' : 'قيد المراجعة',
-      s.hasCondition ? 'نعم' : 'لا'
-    ]);
 
     const csv = '﻿' + [headers.join(','), ...rows.map((r) => r.map(esc).join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -393,18 +426,20 @@ export default function StudentsPage() {
           <p className="text-sm text-ink-500">{filtered.length} طالب من أصل {approvedStudents.length}</p>
         </div>
         <div className="flex gap-2 items-center relative">
-          <button
-            onClick={() => setShowColSettings(!showColSettings)}
-            className="btn btn-secondary text-sm flex items-center gap-1.5"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-            </svg>
-            <span>تخصيص الأعمدة</span>
-          </button>
+          {canSeeFullStudentDetails && (
+            <button
+              onClick={() => setShowColSettings(!showColSettings)}
+              className="btn btn-secondary text-sm flex items-center gap-1.5"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+              <span>تخصيص الأعمدة</span>
+            </button>
+          )}
           
-          {showColSettings && (
+          {canSeeFullStudentDetails && showColSettings && (
             <div className="absolute left-0 top-full mt-2 w-64 bg-white border border-ink-200 rounded-xl shadow-xl z-50 p-4 font-sans text-right" dir="rtl">
               <h3 className="font-bold text-ink-900 mb-3 text-sm border-b border-ink-100 pb-2">تخصيص الأعمدة المعروضة</h3>
               <div className="space-y-2 max-h-60 overflow-y-auto scroll-soft">
@@ -837,6 +872,7 @@ export default function StudentsPage() {
           groups={groups}
           isAdmin={isAdmin}
           isGlobal={isGlobal}
+          canSeeFullDetails={canSeeFullStudentDetails}
           onClose={() => setSelected(null)}
           onUpdated={applyUpdate}
           onDeleted={(id) => {
@@ -857,6 +893,7 @@ function StudentModal({
   groups,
   isAdmin,
   isGlobal,
+  canSeeFullDetails,
   onClose,
   onUpdated,
   onDeleted
@@ -865,6 +902,7 @@ function StudentModal({
   groups: Group[];
   isAdmin: boolean;
   isGlobal: boolean;
+  canSeeFullDetails: boolean;
   onClose: () => void;
   onUpdated: (s: Student) => void;
   onDeleted: (id: number) => void;
@@ -945,11 +983,26 @@ function StudentModal({
 
   async function openReceipt() {
     if (!student.paymentReceipt) return;
-    try {
-      const res = await fetch(student.paymentReceipt);
-      const blob = await res.blob();
-      window.open(URL.createObjectURL(blob), '_blank');
-    } catch {
+    if (student.paymentReceipt.startsWith('data:')) {
+      const w = window.open();
+      if (w) {
+        w.document.write(`
+          <html>
+            <head>
+              <title>إيصال التحويل</title>
+              <style>
+                body { margin: 0; display: flex; align-items: center; justify-content: center; background: #000; min-height: 100vh; }
+                img { max-width: 100%; max-height: 100vh; object-fit: contain; }
+              </style>
+            </head>
+            <body>
+              <img src="${student.paymentReceipt}" alt="Receipt" />
+            </body>
+          </html>
+        `);
+        w.document.close();
+      }
+    } else {
       window.open(student.paymentReceipt, '_blank');
     }
   }
@@ -1001,7 +1054,7 @@ function StudentModal({
   const studentWhatsappUrl = formattedStudentPhone ? `https://wa.me/${formattedStudentPhone}` : null;
 
   return (
-    <div className="modal-backdrop flex items-start md:items-center justify-center p-2 sm:p-6 overflow-y-auto" onClick={onClose}>
+    <div className="modal-backdrop flex items-center justify-center p-2 sm:p-6 overflow-y-auto" onClick={onClose}>
       <div className="modal-panel w-full max-w-2xl my-4" onClick={(e) => e.stopPropagation()}>
         {/* header */}
         <div className="flex items-start justify-between p-4 sm:p-5 border-b border-ink-200">
@@ -1009,8 +1062,12 @@ function StudentModal({
             <h2 className="text-lg sm:text-xl font-bold text-ink-900">{student.studentName}</h2>
             <div className="flex items-center gap-2 mt-1.5">
               <span dir="ltr" className="text-xs sm:text-sm font-mono text-ink-500">#{student.membershipNo}</span>
-              <span className={`pill ${pp.cls}`}>{pp.label}</span>
-              <span className={`pill ${rp.cls}`}>{rp.label}</span>
+              {canSeeFullDetails && (
+                <>
+                  <span className={`pill ${pp.cls}`}>{pp.label}</span>
+                  <span className={`pill ${rp.cls}`}>{rp.label}</span>
+                </>
+              )}
             </div>
           </div>
           <button onClick={onClose} className="text-ink-400 hover:text-ink-900 text-2xl leading-none px-2">×</button>
@@ -1080,14 +1137,14 @@ function StudentModal({
             /* ---------- VIEW MODE ---------- */
             <>
               <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:gap-x-6">
-                <Info label="رقم الهوية" value={student.nationalId} ltr />
+                {canSeeFullDetails && <Info label="رقم الهوية" value={student.nationalId} ltr />}
                 <Info label="المرحلة / الصف" value={`${student.stage} — ${student.grade}`} />
-                <Info label="الحي السكني" value={student.neighborhood} />
+                {canSeeFullDetails && <Info label="الحي السكني" value={student.neighborhood} />}
                 <Info label="المجموعة" value={groups.find((g) => g.id === student.groupId)?.name || 'غير محدد'} />
               </div>
 
               {/* Contact Actions */}
-              {isGlobal && (
+              {isGlobal && canSeeFullDetails && (
                 <div className="border-t border-ink-200 pt-4 space-y-3">
                   <h4 className="font-bold text-xs text-ink-500">بيانات الاتصال والتواصل</h4>
                   
@@ -1175,30 +1232,34 @@ function StudentModal({
               )}
 
               {/* location */}
-              <div>
-                <div className="label">الموقع</div>
-                {mapsHref ? (
-                  <a href={mapsHref} target="_blank" rel="noopener noreferrer" className="btn btn-secondary text-sm flex items-center gap-1.5">
-                    <svg className="w-4 h-4 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0Z" />
-                      <circle cx="12" cy="10" r="3" />
-                    </svg>
-                    <span>فتح الموقع في خرائط Google</span>
-                    <svg className="w-3.5 h-3.5 text-ink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3" />
-                    </svg>
-                  </a>
-                ) : (
-                  <span className="text-sm text-ink-400">لم يحدّد الطالب موقعاً.</span>
-                )}
-              </div>
+              {canSeeFullDetails && (
+                <div className="bg-cream-50/60 border border-ink-200/60 rounded-xl p-3.5 shadow-sm">
+                  <div className="text-[11px] font-bold text-ink-500 mb-2">الموقع الجغرافي</div>
+                  {mapsHref ? (
+                    <a href={mapsHref} target="_blank" rel="noopener noreferrer" className="btn btn-secondary text-sm flex items-center justify-between w-full hover:bg-cream-200 transition-colors duration-150">
+                      <div className="flex items-center gap-1.5">
+                        <svg className="w-4 h-4 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0Z" />
+                          <circle cx="12" cy="10" r="3" />
+                        </svg>
+                        <span>فتح الموقع في خرائط Google</span>
+                      </div>
+                      <svg className="w-3.5 h-3.5 text-ink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3" />
+                      </svg>
+                    </a>
+                  ) : (
+                    <span className="text-sm text-ink-400">لم يحدّد الطالب موقعاً.</span>
+                  )}
+                </div>
+              )}
 
               {/* payment */}
-              {isGlobal && (
-                <div className="rounded-xl border border-ink-200 p-4">
+              {isGlobal && canSeeFullDetails && (
+                <div className="bg-cream-50/60 border border-ink-200/60 rounded-xl p-3.5 shadow-sm">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-semibold text-ink-900">تفاصيل الدفع</span>
-                    <span className="pill pill-gray">{student.paymentType === 'now' ? 'دفع فوري' : 'دفع آجل'}</span>
+                    <span className="font-semibold text-ink-900 text-sm">تفاصيل الدفع</span>
+                    <span className="pill pill-gray text-xs">{student.paymentType === 'now' ? 'دفع فوري' : 'دفع آجل'}</span>
                   </div>
 
                   {student.paymentType === 'now' && (
@@ -1268,28 +1329,30 @@ function StudentModal({
 
 
               {/* registration status (auto-determined by payment) */}
-              <div>
-                <div className="label">حالة التسجيل</div>
-                <div className="flex items-center gap-2">
-                  {student.paymentStatus === 'paid' || student.paymentStatus === 'exempted' ? (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium" style={{ background: '#DEF7E5', color: '#1B7A43' }}>
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                      <span>مقبول</span>
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium" style={{ background: '#FEF3CD', color: '#856404' }}>
-                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.25" />
-                        <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" />
-                      </svg>
-                      <span>قيد المراجعة</span>
-                    </span>
-                  )}
-                  <span className="text-xs text-ink-400">(يتحدد تلقائياً حسب حالة الدفع)</span>
+              {canSeeFullDetails && (
+                <div className="bg-cream-50/60 border border-ink-200/60 rounded-xl p-3.5 shadow-sm">
+                  <div className="text-[11px] font-bold text-ink-500 mb-2">حالة التسجيل</div>
+                  <div className="flex items-center gap-2">
+                    {student.paymentStatus === 'paid' || student.paymentStatus === 'exempted' ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold" style={{ background: '#DEF7E5', color: '#1B7A43' }}>
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                        <span>مقبول</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold" style={{ background: '#FEF3CD', color: '#856404' }}>
+                        <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.25" />
+                          <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" />
+                        </svg>
+                        <span>قيد المراجعة</span>
+                      </span>
+                    )}
+                    <span className="text-xs text-ink-400">(يتحدد تلقائياً حسب حالة الدفع)</span>
+                  </div>
                 </div>
-              </div>
+              )}
             </>
           )}
         </div>
@@ -1304,7 +1367,7 @@ function StudentModal({
               </>
             ) : (
               <>
-                {isAdmin && (
+                {isAdmin && canSeeFullDetails && (
                   <button onClick={() => setEdit(true)} className="btn btn-secondary text-sm flex items-center gap-1">
                     <svg className="w-3.5 h-3.5 text-ink-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
@@ -1316,7 +1379,7 @@ function StudentModal({
               </>
             )}
           </div>
-          {isAdmin && !edit && (
+          {isAdmin && !edit && canSeeFullDetails && (
             <button onClick={del} disabled={busy} className="btn btn-danger text-sm">حذف الطالب</button>
           )}
         </div>
@@ -1327,9 +1390,9 @@ function StudentModal({
 
 function Info({ label, value, ltr }: { label: string; value: string; ltr?: boolean }) {
   return (
-    <div>
-      <div className="label !mb-0.5">{label}</div>
-      <div className="text-ink-900 text-sm" dir={ltr ? 'ltr' : undefined} style={ltr ? { textAlign: 'right' } : undefined}>
+    <div className="bg-cream-50/60 border border-ink-200/60 rounded-xl p-3.5 shadow-sm transition-all hover:bg-cream-100/50 duration-200">
+      <div className="text-[11px] font-bold text-ink-500 mb-1">{label}</div>
+      <div className="text-ink-900 font-semibold text-sm" dir={ltr ? 'ltr' : undefined} style={ltr ? { textAlign: 'right' } : undefined}>
         {value}
       </div>
     </div>

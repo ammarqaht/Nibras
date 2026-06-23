@@ -31,9 +31,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'البيانات غير كاملة' }, { status: 400 });
     }
 
-    // Verify supervisor has the role or is admin
+    const userRoles = session.role.split(',').map(r => r.trim());
+    const allowedRoles = [
+      'admin', 'cultural_supervisor', 'sports_supervisor', 'social_supervisor', 'scientific_supervisor',
+      'media_supervisor', 'groups_supervisor', 'attendance_supervisor', 'general_supervisor', 'administrative_supervisor'
+    ];
+    const canManage = userRoles.some(r => allowedRoles.includes(r));
+    if (!canManage) {
+      return NextResponse.json({ error: 'غير مصرح لك بإضافة برامج للجدول' }, { status: 403 });
+    }
+
     if (session.role !== 'admin') {
-      const userRoles = session.role.split(',').map(r => r.trim());
       if (!userRoles.includes(role)) {
         return NextResponse.json({ error: 'لا تملك الصلاحية للإضافة بهذا الدور' }, { status: 403 });
       }
@@ -69,16 +77,21 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'معرف البرنامج مطلوب' }, { status: 400 });
     }
 
-    // Optional: add authorization to check if this user owns the schedule or is admin
-    // For now we trust the client or only allow admin/owner.
-    // If we wanted to be strict, we'd fetch the schedule by ID first.
-    // Given the simple system, let's allow it but we could restrict it.
-    // Let's do a quick check:
+    const userRoles = session.role.split(',').map(r => r.trim());
+    const allowedRoles = [
+      'admin', 'cultural_supervisor', 'sports_supervisor', 'social_supervisor', 'scientific_supervisor',
+      'media_supervisor', 'groups_supervisor', 'attendance_supervisor', 'general_supervisor', 'administrative_supervisor'
+    ];
+    const canManage = userRoles.some(r => allowedRoles.includes(r));
+    if (!canManage) {
+      return NextResponse.json({ error: 'غير مصرح لك بحذف برامج الجدول' }, { status: 403 });
+    }
+
     if (session.role !== 'admin') {
       const all = await getSchedules();
       const target = all.find(s => s.id === id);
-      if (target && target.supervisorId !== session.id) {
-        return NextResponse.json({ error: 'لا يمكنك حذف برنامج لم تقم بإنشائه' }, { status: 403 });
+      if (target && !userRoles.includes(target.role)) {
+        return NextResponse.json({ error: 'لا يمكنك حذف برامج اللجان الأخرى' }, { status: 403 });
       }
     }
 
@@ -107,18 +120,26 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'البيانات غير كاملة' }, { status: 400 });
     }
 
-    // Verify supervisor has the role or is admin
+    const userRoles = session.role.split(',').map(r => r.trim());
+    const allowedRoles = [
+      'admin', 'cultural_supervisor', 'sports_supervisor', 'social_supervisor', 'scientific_supervisor',
+      'media_supervisor', 'groups_supervisor', 'attendance_supervisor', 'general_supervisor', 'administrative_supervisor'
+    ];
+    const canManage = userRoles.some(r => allowedRoles.includes(r));
+    if (!canManage) {
+      return NextResponse.json({ error: 'غير مصرح لك بتعديل برامج الجدول' }, { status: 403 });
+    }
+
     if (session.role !== 'admin') {
-      const userRoles = session.role.split(',').map(r => r.trim());
       if (!userRoles.includes(role)) {
         return NextResponse.json({ error: 'لا تملك الصلاحية للتعديل بهذا الدور' }, { status: 403 });
       }
 
-      // Check if they are the owner of the schedule
+      // Check if they are allowed to modify this schedule (must belong to their committee)
       const all = await getSchedules();
       const target = all.find(s => s.id === id);
-      if (target && target.supervisorId !== session.id) {
-        return NextResponse.json({ error: 'لا يمكنك تعديل برنامج لم تقم بإنشائه' }, { status: 403 });
+      if (target && !userRoles.includes(target.role)) {
+        return NextResponse.json({ error: 'لا يمكنك تعديل برامج اللجان الأخرى' }, { status: 403 });
       }
     }
 

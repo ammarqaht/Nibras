@@ -129,10 +129,26 @@ export default function PaymentsPage() {
   }
 
   async function openReceipt(receipt: string) {
-    try {
-      const res = await fetch(receipt);
-      window.open(URL.createObjectURL(await res.blob()), '_blank');
-    } catch {
+    if (receipt.startsWith('data:')) {
+      const w = window.open();
+      if (w) {
+        w.document.write(`
+          <html>
+            <head>
+              <title>إيصال التحويل</title>
+              <style>
+                body { margin: 0; display: flex; align-items: center; justify-content: center; background: #000; min-height: 100vh; }
+                img { max-width: 100%; max-height: 100vh; object-fit: contain; }
+              </style>
+            </head>
+            <body>
+              <img src="${receipt}" alt="Receipt" />
+            </body>
+          </html>
+        `);
+        w.document.close();
+      }
+    } else {
       window.open(receipt, '_blank');
     }
   }
@@ -476,10 +492,26 @@ function StudentDetailsModal({
   const studentWhatsappUrl = formattedStudentPhone ? `https://wa.me/${formattedStudentPhone}` : null;
 
   async function openReceipt(receipt: string) {
-    try {
-      const res = await fetch(receipt);
-      window.open(URL.createObjectURL(await res.blob()), '_blank');
-    } catch {
+    if (receipt.startsWith('data:')) {
+      const w = window.open();
+      if (w) {
+        w.document.write(`
+          <html>
+            <head>
+              <title>إيصال التحويل</title>
+              <style>
+                body { margin: 0; display: flex; align-items: center; justify-content: center; background: #000; min-height: 100vh; }
+                img { max-width: 100%; max-height: 100vh; object-fit: contain; }
+              </style>
+            </head>
+            <body>
+              <img src="${receipt}" alt="Receipt" />
+            </body>
+          </html>
+        `);
+        w.document.close();
+      }
+    } else {
       window.open(receipt, '_blank');
     }
   }

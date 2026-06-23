@@ -21,9 +21,12 @@ const ROLES = [
   { key: 'social_supervisor', label: 'اللجنة الاجتماعية', color: 'bg-red-100 text-red-800 border-red-200' },
   { key: 'cultural_supervisor', label: 'اللجنة الثقافية', color: 'bg-green-100 text-green-800 border-green-200' },
   { key: 'media_supervisor', label: 'اللجنة الإعلامية', color: 'bg-cyan-100 text-cyan-800 border-cyan-200' },
-  { key: 'groups_supervisor', label: 'لجنة الأسر', color: 'bg-cyan-100 text-cyan-800 border-cyan-200' },
+  { key: 'groups_supervisor', label: 'لجنة الأسر', color: 'bg-blue-100 text-blue-800 border-blue-200' },
   { key: 'attendance_supervisor', label: 'لجنة التحضير', color: 'bg-gray-100 text-gray-800 border-gray-200' },
   { key: 'general_supervisor', label: 'الإدارة', color: 'bg-slate-100 text-slate-800 border-slate-300' },
+  { key: 'scientific_supervisor', label: 'اللجنة العلمية', color: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
+  { key: 'sports_supervisor', label: 'اللجنة الرياضية', color: 'bg-orange-100 text-orange-800 border-orange-200' },
+  { key: 'administrative_supervisor', label: 'اللجنة الإدارية', color: 'bg-teal-100 text-teal-800 border-teal-200' }
 ];
 
 const DEFAULT_SLOTS = [
@@ -80,6 +83,10 @@ export default function SchedulePage() {
     setSelectedDetailsSchedule(s);
     setIsDetailsOpen(true);
   }
+
+  const perms = useMemo(() => user?.permissions || [], [user]);
+  const hasPerm = (p: string) => perms.includes('*') || perms.includes(p);
+  const canManageSchedule = hasPerm('schedule');
 
   const userRoles = useMemo(() => {
     if (!user) return [];
@@ -292,7 +299,7 @@ export default function SchedulePage() {
                     </span>
                   </div>
                   
-                  {availableRoles.length > 0 && (
+                  {canManageSchedule && availableRoles.length > 0 && (
                     <button 
                       onClick={() => openAddModal(day.dateStr)} 
                       className="btn btn-secondary py-1 px-2 md:py-1.5 md:px-3 text-[10px] md:text-xs flex items-center gap-1 hover:bg-cream-100/80 border border-ink-200 shadow-sm font-semibold rounded-lg cursor-pointer"
@@ -339,7 +346,7 @@ export default function SchedulePage() {
 
                                 {stageSchedules.length > 0 ? (
                                   stageSchedules.map(s => {
-                                    const canEdit = user?.role === 'admin' || user?.id === s.supervisorId;
+                                    const canEdit = canManageSchedule && (user?.role === 'admin' || userRoles.includes(s.role));
                                     const programSlots = getProgramSlots(s);
                                     
                                     const startCol = programSlots.length > 0 ? (Math.min(...programSlots) + 1) : 1;
@@ -557,15 +564,24 @@ export default function SchedulePage() {
                 />
               </div>
               
-              <div>
-                <label className="label">اللجنة / الدور <span className="text-xs text-ink-400 font-normal">(الأدوار المتاحة لك فقط)</span></label>
-                <select className="field" value={role} onChange={e => setRole(e.target.value)} required>
-                  <option value="" disabled>اختر اللجنة المنظمة...</option>
-                  {availableRoles.map(r => (
-                    <option key={r.key} value={r.key}>{r.label}</option>
-                  ))}
-                </select>
-              </div>
+              {availableRoles.length > 1 ? (
+                <div>
+                  <label className="label">اللجنة / الدور <span className="text-xs text-ink-400 font-normal">(الأدوار المتاحة لك فقط)</span></label>
+                  <select className="field" value={role} onChange={e => setRole(e.target.value)} required>
+                    <option value="" disabled>اختر اللجنة المنظمة...</option>
+                    {availableRoles.map(r => (
+                      <option key={r.key} value={r.key}>{r.label}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : availableRoles.length === 1 ? (
+                <div>
+                  <span className="text-xs font-semibold text-ink-400 block mb-1">اللجنة المنظمة</span>
+                  <div className="bg-ink-50 p-3 rounded-lg border border-ink-100 text-sm font-bold text-ink-800">
+                    {availableRoles[0].label}
+                  </div>
+                </div>
+              ) : null}
               
               <div className="pt-2 flex gap-2">
                 <button type="submit" disabled={busy} className="btn btn-primary flex-1">

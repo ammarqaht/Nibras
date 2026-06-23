@@ -25,6 +25,9 @@ export default function PointsPage() {
   const isGlobal = roles.some((r) =>
     ['admin', 'finance', 'finance_supervisor', 'media_supervisor', 'cultural_supervisor', 'social_supervisor', 'general_supervisor', 'attendance_supervisor'].includes(r)
   );
+  const canAddGroupPoints = roles.some((r) =>
+    ['admin', 'cultural_supervisor', 'sports_supervisor', 'general_supervisor', 'social_supervisor'].includes(r)
+  );
 
   const [students, setStudents] = useState<Student[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -159,7 +162,7 @@ export default function PointsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <form onSubmit={submit} className="card p-6 space-y-4 lg:col-span-1 self-start">
-          {isGlobal && (
+          {canAddGroupPoints && (
             <div className="flex gap-2">
               <button type="button" className={`choice flex-1 ${mode === 'individual' ? 'is-active' : ''}`} onClick={() => setMode('individual')}>طالب</button>
               <button type="button" className={`choice flex-1 ${mode === 'group' ? 'is-active' : ''}`} onClick={() => setMode('group')}>مجموعة</button>
@@ -375,7 +378,7 @@ export default function PointsPage() {
                   </table>
                 </div>
 
-                <ul className="lg:hidden divide-y divide-ink-200">
+                <ul className="lg:hidden divide-y divide-ink-100">
                   {filteredLeaderboard.map((item) => {
                     const rank = leaderboard.findIndex((x) => x.id === item.id) + 1;
                     let rankBadge;
@@ -385,15 +388,15 @@ export default function PointsPage() {
                     else rankBadge = <span className="text-ink-400 font-mono text-xs">#{rank}</span>;
 
                     return (
-                      <li key={item.id} className="py-3 flex items-center justify-between gap-3">
+                      <li key={item.id} className="py-3.5 flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3 min-w-0">
                           <div className="shrink-0 w-8 text-center">{rankBadge}</div>
                           <div className="min-w-0">
-                            <div className="font-semibold text-ink-900 truncate">{item.studentName}</div>
-                            <div className="text-xs text-ink-400 mt-0.5">العضوية: #{item.membershipNo} · الأسرة: {item.groupName}</div>
+                            <div className="text-sm font-bold text-ink-900 truncate leading-snug">{item.studentName}</div>
+                            <div className="text-[11px] text-ink-500 mt-0.5">العضوية: #{item.membershipNo} · الأسرة: {item.groupName}</div>
                           </div>
                         </div>
-                        <span className={`pill shrink-0 ${item.totalPoints >= 0 ? 'pill-green' : 'pill-red'} font-bold`}>
+                        <span className={`pill shrink-0 text-xs py-1 px-2.5 ${item.totalPoints >= 0 ? 'pill-green' : 'pill-red'} font-bold`}>
                           {item.totalPoints} ن
                         </span>
                       </li>
@@ -429,15 +432,15 @@ export default function PointsPage() {
                 </table>
               </div>
 
-              <ul className="lg:hidden divide-y divide-ink-200">
+              <ul className="lg:hidden divide-y divide-ink-100">
                 {points.map((p) => (
-                  <li key={p.id} className="py-3 flex items-start justify-between gap-3">
+                  <li key={p.id} className="py-3.5 flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="font-medium text-ink-900 truncate">{nameOf(p.registrationId)}</div>
-                      <div className="text-sm text-ink-700 mt-0.5">{p.reason}</div>
-                      <div className="text-xs text-ink-400 mt-0.5">{catLabel(p.category)} · {p.recordedBy || '—'}</div>
+                      <div className="text-sm font-bold text-ink-900 truncate leading-snug">{nameOf(p.registrationId)}</div>
+                      <div className="text-xs text-ink-700 mt-1">{p.reason}</div>
+                      <div className="text-[11px] text-ink-400 mt-0.5">{catLabel(p.category)} · {p.recordedBy || '—'}</div>
                     </div>
-                    <span className={`pill shrink-0 ${p.delta >= 0 ? 'pill-green' : 'pill-red'}`} dir="ltr">
+                    <span className={`pill shrink-0 text-xs py-1 px-2.5 ${p.delta >= 0 ? 'pill-green' : 'pill-red'}`} dir="ltr">
                       {p.delta >= 0 ? `+${p.delta}` : p.delta}
                     </span>
                   </li>

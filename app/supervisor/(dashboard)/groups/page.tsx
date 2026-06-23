@@ -28,8 +28,9 @@ function formatDate(dStr: string) {
 
 export default function GroupsPage() {
   const { user } = useSupervisor();
-  const isAdmin = user?.role === 'admin';
   const roles = user?.role ? user.role.split(',').map((r) => r.trim()) : [];
+  const isAdmin = roles.includes('admin');
+  const canManageGroups = roles.includes('stage_supervisor') || roles.includes('admin');
   const isGlobal = roles.some((r) =>
     ['admin', 'finance', 'finance_supervisor', 'media_supervisor', 'cultural_supervisor', 'social_supervisor', 'general_supervisor', 'attendance_supervisor'].includes(r)
   );
@@ -90,9 +91,18 @@ export default function GroupsPage() {
   const getStudentPoints = (id: number) => studentPointsMap.get(id) ?? 0;
 
   const getGroupPoints = (gId: number) => {
-    return students
-      .filter((s) => s.groupId === gId)
-      .reduce((sum, s) => sum + getStudentPoints(s.id), 0);
+    const groupStudents = students.filter((s) => s.groupId === gId);
+    if (groupStudents.length === 0) return 0;
+    const groupPoints = points.filter(p =>
+      p.reason.endsWith('(رصد جماعي للأسرة)') &&
+      groupStudents.some(s => s.id === p.registrationId)
+    );
+    const uniqueEvents = new Map<string, number>();
+    groupPoints.forEach(p => {
+      const key = `${p.reason}-${p.delta}-${p.createdAt}`;
+      uniqueEvents.set(key, p.delta);
+    });
+    return Array.from(uniqueEvents.values()).reduce((sum, d) => sum + d, 0);
   };
 
   async function create(e: React.FormEvent) {
@@ -132,10 +142,10 @@ export default function GroupsPage() {
   async function removeStudentFromGroup(studentId: number) {
     if (!window.confirm('هل أنت متأكد من إزالة هذا الطالب من المجموعة؟')) return;
     setBusy(true);
-    const r = await fetch('/api/supervisor/students', {
-      method: 'PUT',
+    const r = await fetch('/api/supervisor/students/bulk-group', {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: studentId, groupId: null })
+      body: JSON.stringify({ assignments: [{ studentId, groupId: null }] })
     });
     setBusy(false);
     const j = await r.json().catch(() => ({}));
@@ -421,14 +431,22 @@ export default function GroupsPage() {
   }, [activeGroup, students]);
 
   const activeTotalPoints = useMemo(() => {
-    return activeGroupStudents.reduce((sum, s) => sum + getStudentPoints(s.id), 0);
-  }, [activeGroupStudents, studentPointsMap]);
+    if (!activeGroup) return 0;
+    return getGroupPoints(activeGroup.id);
+  }, [activeGroup, students, points]);
 
   const activeAvgPoints = useMemo(() => {
     return activeGroupStudents.length > 0 
-      ? (activeTotalPoints / activeGroupStudents.length).toFixed(1) 
+      ? (activeGroupStudents.reduce((sum, s) => sum + getStudentPoints(s.id), 0) / activeGroupStudents.length).toFixed(1) 
       : '0';
-  }, [activeGroupStudents.length, activeTotalPoints]);
+  }, [activeGroupStudents, studentPointsMap]);
+
+  const studentAvgPoints = useMemo(() => {
+    const sumPoints = activeGroupStudents.reduce((sum, s) => sum + getStudentPoints(s.id), 0);
+    return activeGroupStudents.length > 0 
+      ? sumPoints / activeGroupStudents.length 
+      : 0;
+  }, [activeGroupStudents, studentPointsMap]);
 
   const activeTopStudent = useMemo(() => {
     if (activeGroupStudents.length === 0) return null;
@@ -443,7 +461,7 @@ export default function GroupsPage() {
           <h1 className="text-2xl font-bold text-ink-900 mb-1">المجموعات والأسر</h1>
           <p className="text-sm text-ink-500">تنظيم الطلاب في مجموعات لتسهيل الحضور ورصد النقاط.</p>
         </div>
-        {isAdmin && (
+        {canManageGroups && (
           <div className="flex flex-wrap gap-2.5">
             <button
               onClick={() => {
@@ -486,7 +504,92 @@ export default function GroupsPage() {
         )}
       </div>
 
-      {isGlobal ? (
+      {!canManageGroups ? (
+        /* Read-only view for non-stage-supervisors, grouped by stage */
+        <div className="space-y-6">
+          {stages.map((stDef) => {
+            const stageGroups = groups.filter((g) => g.stage === stDef.key);
+            if (stageGroups.length === 0) return null;
+
+            return (
+              <div key={stDef.key} className="card p-6">
+                <h2 className="text-lg font-bold text-ink-900 border-b border-ink-100 pb-3 mb-4 flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-brand" />
+                  <span>المرحلة {stDef.label} ({stageGroups.length} مجموعات)</span>
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  {stageGroups.map((g) => {
+                    const studentCount = countOf(g.id);
+                    const totalPoints = getGroupPoints(g.id);
+                    const groupSups = supervisors.filter((sup) =>
+                      sup.groupIds &&
+                      sup.groupIds.split(',').map((s) => parseInt(s, 10)).includes(g.id)
+                    );
+
+                    return (
+                      <div key={g.id} className="rounded-xl border border-ink-200 p-4 bg-white shadow-sm flex flex-col justify-between hover:shadow hover:border-brand/40 transition-all duration-200">
+                        <div>
+                          <div className="flex justify-between items-start gap-2 mb-2.5">
+                            <h3 className="font-bold text-base text-ink-900 leading-snug">{g.name}</h3>
+                            <span className="pill pill-gray text-[10px] whitespace-nowrap shrink-0">{g.stage}</span>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-2 mb-3 bg-cream-50/60 p-2.5 rounded-lg border border-ink-100/60 text-center font-body">
+                            <div>
+                              <div className="text-[9px] text-ink-500 font-semibold mb-0.5">الطلاب</div>
+                              <div className="text-sm font-bold text-blue-600 font-mono">{studentCount} طالب</div>
+                            </div>
+                            <div className="border-r border-ink-100/60">
+                              <div className="text-[9px] text-ink-500 font-semibold mb-0.5">نقاط المجموعة</div>
+                              <div className="text-sm font-bold text-green-600 font-mono">{totalPoints} ن</div>
+                            </div>
+                          </div>
+
+                          <div className="text-xs text-ink-600 space-y-1 mb-4">
+                            <span className="font-semibold block text-ink-500 text-[10px]">المشرفون:</span>
+                            {groupSups.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {groupSups.map((sup) => (
+                                  <span key={sup.id} className="bg-cream-100 border border-ink-200/50 text-ink-700 px-2 py-0.5 rounded-lg text-[10px] font-semibold">
+                                    {sup.name}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-ink-400 text-[10px]">لا يوجد مشرفون مسجلون</span>
+                            )}
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => {
+                            setSelectedGroupModal(g);
+                            setShowAddStudents(false);
+                            setCheckedAddStudentIds([]);
+                            setExpandedStudentId(null);
+                          }}
+                          className="btn btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5 w-full justify-center mt-auto hover:bg-cream-200 transition-colors"
+                        >
+                          <svg className="w-3.5 h-3.5 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                            <circle cx="12" cy="12" r="3" />
+                          </svg>
+                          <span>عرض الأعضاء والتفاصيل</span>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+          {groups.length === 0 && (
+            <div className="card p-6 text-center text-ink-500">
+              لا توجد مجموعات أو أسر حالياً لعرضها.
+            </div>
+          )}
+        </div>
+      ) : isGlobal ? (
         <div className="w-full">
           <div className="card p-6">
             <h2 className="text-lg font-bold text-ink-900 mb-4">المجموعات ({groups.length})</h2>
@@ -514,7 +617,7 @@ export default function GroupsPage() {
                         <span className="pill pill-blue text-[11px] font-bold">{countOf(g.id)} طالب</span>
                         <span className="pill pill-green font-bold text-[11px]">{getGroupPoints(g.id)} نقطة</span>
                       </div>
-                      {isAdmin && (
+                      {canManageGroups && (
                         <button 
                           onClick={(e) => { e.stopPropagation(); deleteGroup(g.id); }}
                           className="text-red-500 hover:text-red-750 p-1 flex items-center justify-center shrink-0"
@@ -562,7 +665,7 @@ export default function GroupsPage() {
                   </div>
                 </div>
                 
-                <div className="flex gap-4 w-full md:w-auto text-center shrink-0 mt-3 md:mt-0 font-sans">
+                <div className="flex gap-4 w-full md:w-auto text-center shrink-0 mt-3 md:mt-0 font-body">
                   <div className="bg-white border border-ink-200 rounded-xl px-4 py-2.5 flex-1 md:flex-none min-w-[100px] shadow-sm">
                     <div className="text-[10px] text-ink-500 font-semibold mb-0.5">عدد الطلاب</div>
                     <div className="text-lg font-bold text-blue-600 font-mono">{activeGroupStudents.length}</div>
@@ -571,16 +674,12 @@ export default function GroupsPage() {
                     <div className="text-[10px] text-ink-500 font-semibold mb-0.5">نقاط المجموعة</div>
                     <div className="text-lg font-bold text-green-600 font-mono">{activeTotalPoints}</div>
                   </div>
-                  <div className="bg-white border border-ink-200 rounded-xl px-4 py-2.5 flex-1 md:flex-none min-w-[100px] shadow-sm">
-                    <div className="text-[10px] text-ink-500 font-semibold mb-0.5">متوسط الطالب</div>
-                    <div className="text-lg font-bold text-brand-650 font-mono">{activeAvgPoints}</div>
-                  </div>
                 </div>
               </div>
             </div>
 
             <div className="card p-6">
-              <div className="font-sans">
+              <div className="font-body">
                 <h3 className="text-lg font-bold text-ink-900 flex items-center gap-2 border-b border-ink-100 pb-3 mb-4">
                   <svg className="w-5 h-5 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -598,10 +697,10 @@ export default function GroupsPage() {
 
                       let performanceCls = "bg-ink-100 text-ink-700";
                       let performanceLabel = "عادي";
-                      if (studentTotal > Number(activeAvgPoints) * 1.2 && studentTotal > 0) {
+                      if (studentTotal > studentAvgPoints * 1.2 && studentTotal > 0) {
                         performanceCls = "bg-green-155 text-green-700 font-bold";
                         performanceLabel = "ممتاز 🔥";
-                      } else if (studentTotal < Number(activeAvgPoints) * 0.8 && Number(activeAvgPoints) > 0) {
+                      } else if (studentTotal < studentAvgPoints * 0.8 && studentAvgPoints > 0) {
                         performanceCls = "bg-red-50 text-red-700 font-bold";
                         performanceLabel = "يحتاج تشجيع ⚠️";
                       }
@@ -613,11 +712,11 @@ export default function GroupsPage() {
                             className="text-sm px-4 py-3.5 flex justify-between items-center bg-white cursor-pointer hover:bg-cream-50/50 transition-colors select-none"
                             dir="rtl"
                           >
-                            <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="flex items-center gap-2.5 flex-1 min-w-0">
                               <svg className={`w-3.5 h-3.5 text-ink-400 shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                 <polyline points="6 9 12 15 18 9" />
                               </svg>
-                              <span className="font-semibold text-ink-900 truncate">{st.studentName}</span>
+                              <span className="font-semibold text-ink-900 flex-1">{st.studentName}</span>
                               <span className="text-[10px] text-ink-500 bg-cream-100 px-2 py-0.5 rounded font-mono shrink-0">{st.grade}</span>
                               <span className={`text-[9px] px-1.5 py-0.5 rounded-full shrink-0 ${performanceCls}`}>{performanceLabel}</span>
                             </div>
@@ -669,7 +768,7 @@ export default function GroupsPage() {
       )}
 
       {/* قسم الطلاب غير المعينين في أسرة */}
-      {isGlobal && (
+      {canManageGroups && (
         <div className="card p-6 mt-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
             <div>
@@ -809,7 +908,7 @@ export default function GroupsPage() {
       {/* نافذة إنشاء مجموعة جديدة */}
       {showCreateGroupModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden font-sans text-right" dir="rtl">
+          <div className="bg-white rounded-2xl w-full max-w-xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden font-body text-right" dir="rtl">
             <div className="p-5 border-b border-ink-200 flex justify-between items-center bg-ink-50">
               <h3 className="text-lg font-bold text-ink-900">إنشاء مجموعة جديدة</h3>
               <button onClick={() => setShowCreateGroupModal(false)} className="text-ink-400 hover:text-ink-900 text-xl font-bold">&times;</button>
@@ -899,14 +998,10 @@ export default function GroupsPage() {
               </div>
 
               {/* ملخص نقاط المجموعة تفصيلياً */}
-              <div className="grid grid-cols-3 gap-3 bg-white p-4 rounded-xl border border-ink-200 text-center mt-4 shadow-sm">
+              <div className="grid grid-cols-2 gap-3 bg-white p-4 rounded-xl border border-ink-200 text-center mt-4 shadow-sm">
                 <div className="space-y-1">
                   <div className="text-[11px] text-ink-500 font-semibold">إجمالي نقاط الأسرة</div>
                   <div className="text-lg font-extrabold text-green-600 font-mono">{activeTotalPoints}</div>
-                </div>
-                <div className="border-r border-ink-150 space-y-1">
-                  <div className="text-[11px] text-ink-500 font-semibold">متوسط نقاط الطالب</div>
-                  <div className="text-lg font-extrabold text-brand-650 font-mono">{activeAvgPoints}</div>
                 </div>
                 <div className="border-r border-ink-150 space-y-1">
                   <div className="text-[11px] text-ink-500 font-semibold">الطالب المتصدر</div>
@@ -919,8 +1014,8 @@ export default function GroupsPage() {
 
             {/* الجزء السفلي: طلاب المجموعة وتفاصيل نقاطهم */}
             <div className="p-5 overflow-y-auto flex-1 space-y-4">
-              <div className="font-sans">
-                <h4 className="font-bold text-ink-900 flex items-center gap-2 border-b border-ink-100 pb-2">
+              <div className="font-body">
+              <h4 className="font-bold text-ink-900 flex items-center gap-2 border-b border-ink-100 pb-2">
                 <svg className="w-4 h-4 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                   <circle cx="9" cy="7" r="4" />
@@ -938,10 +1033,10 @@ export default function GroupsPage() {
                     // تصنيف الأداء مقارنة بمتوسط المجموعة
                     let performanceCls = "bg-ink-100 text-ink-700";
                     let performanceLabel = "عادي";
-                    if (studentTotal > Number(activeAvgPoints) * 1.2 && studentTotal > 0) {
+                    if (studentTotal > studentAvgPoints * 1.2 && studentTotal > 0) {
                       performanceCls = "bg-green-155 text-green-700 font-bold";
                       performanceLabel = "ممتاز 🔥";
-                    } else if (studentTotal < Number(activeAvgPoints) * 0.8 && Number(activeAvgPoints) > 0) {
+                    } else if (studentTotal < studentAvgPoints * 0.8 && studentAvgPoints > 0) {
                       performanceCls = "bg-red-50 text-red-700 font-bold";
                       performanceLabel = "يحتاج تشجيع ⚠️";
                     }
@@ -953,17 +1048,17 @@ export default function GroupsPage() {
                           onClick={() => setExpandedStudentId(isExpanded ? null : st.id)}
                           className="text-sm px-4 py-3 flex justify-between items-center bg-white cursor-pointer hover:bg-cream-50/50 transition-colors select-none"
                         >
-                          <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="flex items-center gap-2.5 flex-1 min-w-0">
                             <svg className={`w-3.5 h-3.5 text-ink-400 shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                               <polyline points="6 9 12 15 18 9" />
                             </svg>
-                            <span className="font-semibold text-ink-900 truncate">{st.studentName}</span>
+                            <span className="font-semibold text-ink-900 flex-1">{st.studentName}</span>
                             <span className="text-[10px] text-ink-500 bg-cream-100 px-2 py-0.5 rounded font-mono shrink-0">{st.grade}</span>
                             <span className={`text-[9px] px-1.5 py-0.5 rounded-full shrink-0 ${performanceCls}`}>{performanceLabel}</span>
                           </div>
                           <div className="flex items-center gap-2.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                             <span className="pill pill-green font-bold text-xs">{studentTotal} نقطة</span>
-                            {isAdmin && (
+                            {canManageGroups && (
                               <button
                                 onClick={() => removeStudentFromGroup(st.id)}
                                 disabled={busy}
@@ -1017,7 +1112,7 @@ export default function GroupsPage() {
               )}
 
                 {/* Checklist to add new students to group */}
-                {isAdmin && (
+                {canManageGroups && (
                   <div className="border-t border-ink-100 pt-4 mt-5">
                     {!showAddStudents ? (
                       <button

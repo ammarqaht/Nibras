@@ -79,7 +79,8 @@ export async function GET(req: NextRequest) {
     let myStudentsList: any[] = [];
     let presentCount = presentCountAll;
     let absentCount = absentCountAll;
-    let activeBase = Math.max(paidStudents + exemptedStudents, 1);
+    const activeBaseAll = Math.max(paidStudents + exemptedStudents, 1);
+    let activeBase = activeBaseAll;
     let activeTasksCount = tasks.filter(t => t.isActive).length;
     let pendingSubmissionsCount = submissions.filter(s => s.status === 'pending').length;
 
@@ -141,8 +142,9 @@ export async function GET(req: NextRequest) {
     const todaySchedules = schedules.filter(s => s.date === today);
     const todayScheduleCount = todaySchedules.length;
     let nextProgramTitle = null;
+    const sortedTodaySchedules = todaySchedules.sort((a, b) => a.startTime.localeCompare(b.startTime));
     if (todayScheduleCount > 0) {
-      nextProgramTitle = todaySchedules.sort((a, b) => a.startTime.localeCompare(b.startTime))[0]?.title;
+      nextProgramTitle = sortedTodaySchedules[0]?.title;
     }
 
     // 6. Groups
@@ -155,6 +157,13 @@ export async function GET(req: NextRequest) {
 
     // 8. Announcements
     const recentAnnouncements = announcements.length;
+    const announcementsList = announcements.slice(0, 5).map(a => ({
+      id: a.id,
+      title: a.title,
+      body: a.body,
+      imageUrl: a.imageUrl,
+      createdAt: a.createdAt
+    }));
 
     return NextResponse.json({
       isGlobal,
@@ -163,12 +172,13 @@ export async function GET(req: NextRequest) {
         students: { total: totalStudents, approved: approvedStudents, pending: pendingStudents, conditions: conditionStudents },
         payments: { paid: paidStudents, exempted: exemptedStudents, pendingReview: pendingReviewPayments },
         attendance: { presentToday: presentCount, absentToday: absentCount, activeBase },
+        attendanceOverall: { presentToday: presentCountAll, absentToday: absentCountAll, activeBase: activeBaseAll },
         points: { today: pointsToday, topGroup: topGroup, topGroupPoints: maxPoints },
         tasks: { active: activeTasksCount, pendingReview: pendingSubmissionsCount },
-        schedule: { todayCount: todayScheduleCount, nextProgramTitle },
+        schedule: { todayCount: todayScheduleCount, nextProgramTitle, todayPrograms: sortedTodaySchedules },
         groups: { total: totalGroups },
         invoices: { pendingReview: pendingInvoices, totalSpent },
-        announcements: { total: recentAnnouncements }
+        announcements: { total: recentAnnouncements, announcementsList }
       }
     });
 

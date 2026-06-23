@@ -78,7 +78,8 @@ export default function SettingsPage() {
     })();
   }, []);
 
-  if (user && user.role !== 'admin') {
+  const isAdmin = user?.role ? user.role.split(',').map((r) => r.trim()).includes('admin') : false;
+  if (user && !isAdmin) {
     return <div className="card p-10 text-center text-ink-500">هذه الصفحة متاحة للمدير العام فقط.</div>;
   }
 

@@ -46,14 +46,14 @@ const LINKS: NavLink[] = [
   { id: 'points', href: '/supervisor/points', label: 'النقاط', roles: ['social_supervisor', 'cultural_supervisor', 'general_supervisor'] },
   { id: 'tasks', href: '/supervisor/tasks', label: 'المهام', roles: ['general_supervisor'] },
   { id: 'schedule', href: '/supervisor/schedule', label: 'الجدول' },
-  { id: 'groups', href: '/supervisor/groups', label: 'المجموعات', roles: ['groups_supervisor', 'general_supervisor'] },
+  { id: 'groups', href: '/supervisor/groups', label: 'المجموعات', roles: ['groups_supervisor', 'general_supervisor', 'stage_supervisor'] },
   { id: 'payments', href: '/supervisor/payments', label: 'المدفوعات', roles: ['finance', 'finance_supervisor'] },
   { id: 'invoices', href: '/supervisor/invoices', label: 'الفواتير' },
   { id: 'finance', href: '/supervisor/finance', label: 'المالية', roles: ['finance', 'finance_supervisor'] },
   { id: 'announcements', href: '/supervisor/announcements', label: 'الإشعارات', roles: ['media_supervisor', 'general_supervisor'] },
   { id: 'account', href: '/supervisor/account', label: 'حسابي' },
   { id: 'supervisors', href: '/supervisor/supervisors', label: 'المشرفون', roles: ['admin'] },
-  { id: 'settings', href: '/supervisor/settings', label: 'الإعدادات', roles: ['admin'] }
+  { id: 'settings', href: '/supervisor/settings', label: 'الإعدادات' }
 ];
 
 export default function SupervisorShell({ children }: { children: React.ReactNode }) {
@@ -147,11 +147,12 @@ export default function SupervisorShell({ children }: { children: React.ReactNod
   const isAdmin = userRoles.includes('admin') || user?.permissions?.includes('*');
 
   const links = LINKS.filter((l) => {
+    if (l.id === 'settings') return isAdmin; // Settings is strictly for admin
     if (l.id === 'account') return !isAdmin; // own-account page: every supervisor except admins
     if (isAdmin) return true;
     if (user?.permissions) {
       if (user.permissions.includes(l.id)) return true;
-      if (l.id === 'home') return true; // الرئيسية only — every other page is gated by the role matrix
+      if (['home', 'students', 'schedule', 'invoices'].includes(l.id)) return true;
       return false;
     }
     // Fallback if permissions aren't loaded yet
