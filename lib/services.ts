@@ -120,9 +120,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
   groups_supervisor: ['groups', 'students', 'points', 'attendance', 'tasks'],
   general_supervisor: ['students', 'attendance', 'points', 'tasks', 'schedule', 'groups', 'announcements'],
   media_supervisor: ['announcements', 'schedule'],
-  scientific_supervisor: ['students', 'attendance', 'points', 'tasks', 'schedule', 'groups', 'announcements'],
-  sports_supervisor: ['students', 'attendance', 'points', 'tasks', 'schedule', 'groups', 'announcements'],
-  administrative_supervisor: ['students', 'attendance', 'points', 'tasks', 'schedule', 'groups', 'announcements']
+  scientific_supervisor: ['students', 'points', 'tasks', 'schedule', 'groups'],
+  sports_supervisor: ['students', 'points', 'attendance', 'schedule', 'groups'],
+  administrative_supervisor: ['students', 'attendance', 'schedule', 'groups', 'announcements']
 };
 
 export type ScheduleInfo = {

@@ -148,7 +148,7 @@ export default function SupervisorShell({ children }: { children: React.ReactNod
     if (isAdmin) return true;
     if (user?.permissions) {
       if (user.permissions.includes(l.id)) return true;
-      if (['home', 'students', 'schedule', 'invoices'].includes(l.id)) return true; // Defaults everyone can see unless explicitly revoked (handled later if needed)
+      if (l.id === 'home') return true; // الرئيسية only — every other page is gated by the role matrix
       return false;
     }
     // Fallback if permissions aren't loaded yet
