@@ -188,7 +188,7 @@ export default function PaymentsPage() {
                     <th>نوع الدفع</th>
                     <th>الإيصال</th>
                     <th>الحالة</th>
-                    <th className="text-left pl-6">الإجراءات</th>
+                    <th className="text-center pl-6">الإجراءات</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -227,7 +227,7 @@ export default function PaymentsPage() {
                         </span>
                       </td>
                       <td>
-                        <div className="flex items-center gap-2 justify-end pl-6">
+                        <div className="flex items-center gap-2 justify-center pl-6">
                           <button
                             onClick={() => setSelectedStudent(s)}
                             className="btn btn-secondary py-1 px-3 text-xs flex items-center gap-1"
