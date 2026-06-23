@@ -430,8 +430,8 @@ export default function SchedulePage() {
       {/* نافذة الإضافة / التعديل */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden pop-in">
-            <div className="p-4 border-b border-ink-200 flex justify-between items-center bg-ink-50">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden pop-in max-h-[90vh] flex flex-col">
+            <div className="p-4 border-b border-ink-200 flex justify-between items-center bg-ink-50 shrink-0">
               <h3 className="text-lg font-bold text-ink-900">
                 {editingScheduleId ? 'تعديل البرنامج' : 'إضافة برنامج للجدول'}
               </h3>
@@ -443,7 +443,7 @@ export default function SchedulePage() {
               </button>
             </div>
             
-            <form onSubmit={submit} className="p-5 space-y-4">
+            <form onSubmit={submit} className="p-5 space-y-4 overflow-y-auto scroll-soft flex-1">
               <div>
                 <label className="label">اسم البرنامج</label>
                 <input className="field" value={title} onChange={e => setTitle(e.target.value)} placeholder="مثال: دوري البلايستيشن" required />
@@ -582,10 +582,10 @@ export default function SchedulePage() {
       {isDetailsOpen && selectedDetailsSchedule && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setIsDetailsOpen(false)}>
           <div 
-            className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden pop-in border border-ink-200"
+            className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden pop-in border border-ink-200 max-h-[90vh] flex flex-col"
             onClick={e => e.stopPropagation()}
           >
-            <div className="p-4 border-b border-ink-200 flex justify-between items-center bg-ink-50">
+            <div className="p-4 border-b border-ink-200 flex justify-between items-center bg-ink-50 shrink-0">
               <h3 className="text-lg font-bold text-ink-900">تفاصيل البرنامج</h3>
               <button 
                 onClick={() => setIsDetailsOpen(false)} 
@@ -599,7 +599,7 @@ export default function SchedulePage() {
               </button>
             </div>
             
-            <div className="p-6 space-y-4 text-right">
+            <div className="p-6 space-y-4 text-right overflow-y-auto scroll-soft flex-1">
               <div>
                 <span className="text-xs font-semibold text-ink-400 block mb-0.5">اسم البرنامج</span>
                 <div className="text-base font-bold text-ink-900 bg-cream-50 p-3 rounded-lg border border-ink-100">
@@ -651,7 +651,7 @@ export default function SchedulePage() {
               )}
             </div>
 
-            <div className="p-4 bg-ink-50 border-t border-ink-200 flex justify-end">
+            <div className="p-4 bg-ink-50 border-t border-ink-200 flex justify-end shrink-0">
               <button 
                 onClick={() => setIsDetailsOpen(false)} 
                 className="btn btn-secondary px-6 w-full text-sm font-bold"
