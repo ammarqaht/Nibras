@@ -180,8 +180,23 @@ body::after {
 }
 
 /* Table (supervisor dashboard) */
-.tbl { width: 100%; border-collapse: collapse; }
+.tbl {
+  display: table !important;
+  width: 100% !important;
+  border-collapse: collapse !important;
+}
+.tbl thead {
+  display: table-header-group !important;
+}
+.tbl tbody {
+  display: table-row-group !important;
+}
+.tbl tr {
+  display: table-row !important;
+}
 .tbl th {
+  display: table-cell !important;
+  vertical-align: middle !important;
   font-weight: 600;
   font-size: 0.82rem;
   text-align: right;
@@ -192,6 +207,8 @@ body::after {
   white-space: nowrap;
 }
 .tbl td {
+  display: table-cell !important;
+  vertical-align: middle !important;
   padding: 0.85rem 1rem;
   font-size: 0.92rem;
   color: var(--ink);
