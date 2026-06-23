@@ -22,7 +22,10 @@ const ROLES = [
   { id: 'cultural_supervisor', label: 'مشرف ثقافية' },
   { id: 'groups_supervisor', label: 'مشرف أسر' },
   { id: 'general_supervisor', label: 'مشرف عام' },
-  { id: 'media_supervisor', label: 'مسؤول الإعلامية' }
+  { id: 'media_supervisor', label: 'مشرف الإعلامية' },
+  { id: 'scientific_supervisor', label: 'مشرف العلمية' },
+  { id: 'sports_supervisor', label: 'مشرف الرياضية' },
+  { id: 'administrative_supervisor', label: 'مشرف الإدارية' }
 ];
 
 export default function RoleCustomizer() {

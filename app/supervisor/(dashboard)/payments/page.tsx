@@ -38,7 +38,7 @@ function isReview(s: Student) {
 
 export default function PaymentsPage() {
   const { user } = useSupervisor();
-  const allowed = user?.role === 'admin' || user?.role === 'finance';
+  const allowed = (user?.role ?? '').split(',').map((r) => r.trim()).some((r) => r === 'admin' || r === 'finance' || r === 'finance_supervisor');
 
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);

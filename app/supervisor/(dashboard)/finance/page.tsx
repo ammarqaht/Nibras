@@ -54,7 +54,7 @@ export default function FinancePage() {
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [showAddRevenue, setShowAddRevenue] = useState(false);
 
-  const allowed = !user || user.role === 'admin' || user.role === 'finance';
+  const allowed = !user || user.role.split(',').map((r) => r.trim()).some((r) => r === 'admin' || r === 'finance' || r === 'finance_supervisor');
 
   async function load() {
     const [ir, sr, setr, ger, orr] = await Promise.all([
