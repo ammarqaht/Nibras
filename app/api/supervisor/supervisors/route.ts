@@ -17,6 +17,8 @@ export async function GET(req: NextRequest) {
       email: s.email,
       role: s.role,
       groupIds: s.groupIds,
+      customPermissions: s.customPermissions ?? '',
+      stage: s.stage ?? '',
       createdAt: s.createdAt
     }));
 
@@ -35,7 +37,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { name, email, password, role, groupIds } = body;
+    const { name, email, password, role, groupIds, customPermissions, stage } = body;
 
     if (!name || !email || !password || !role) {
       return NextResponse.json({ error: 'يرجى إكمال الحقول الإلزامية' }, { status: 400 });
@@ -53,7 +55,9 @@ export async function POST(req: NextRequest) {
       email: normalizedEmail,
       passwordHash: hashPassword(password),
       role,
-      groupIds: groupIds || ''
+      groupIds: groupIds || '',
+      customPermissions: customPermissions || '',
+      stage: stage || ''
     });
 
     return NextResponse.json({ success: true, supervisor: created });
@@ -113,7 +117,7 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'معرّف المشرف غير صحيح' }, { status: 400 });
     }
 
-    const { name, email, password, role, groupIds } = body;
+    const { name, email, password, role, groupIds, customPermissions, stage } = body;
 
     // Check email uniqueness if email is changed
     if (email) {
@@ -139,7 +143,9 @@ export async function PUT(req: NextRequest) {
       email: email ? String(email).trim().toLowerCase() : undefined,
       password: password || undefined,
       role: role || undefined,
-      groupIds: groupIds !== undefined ? groupIds : undefined
+      groupIds: groupIds !== undefined ? groupIds : undefined,
+      customPermissions: customPermissions !== undefined ? customPermissions : undefined,
+      stage: stage !== undefined ? stage : undefined
     });
 
     if (!updated) {

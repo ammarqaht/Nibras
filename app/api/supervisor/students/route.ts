@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { getStudents, updateStudent, getSupervisorByEmail, createStudentManually, deleteStudent } from '@/lib/services';
+import { getStudents, updateStudent, getSupervisorByEmail, createStudentManually, deleteStudent, getGroups, getAccessibleGroupIds } from '@/lib/services';
 
 export async function GET(req: NextRequest) {
   try {
@@ -43,11 +43,8 @@ export async function GET(req: NextRequest) {
       }
     } else {
       if (!isGlobal) {
-        const allowedGroupIds = supervisor.groupIds
-          .split(',')
-          .map(id => parseInt(id.trim(), 10))
-          .filter(id => !isNaN(id));
-
+        const groups = await getGroups();
+        const allowedGroupIds = getAccessibleGroupIds(supervisor, groups);
         students = students.filter(s => s.groupId !== null && allowedGroupIds.includes(s.groupId));
       }
     }

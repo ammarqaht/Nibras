@@ -5,8 +5,9 @@ import { pushToast } from '@/components/Toast';
 import { useSupervisor } from '@/components/SupervisorShell';
 
 import RoleCustomizer from './RoleCustomizer';
+import { stages } from '@/content';
 
-type Sup = { id: number; name: string; email: string; role: string; groupIds: string; customPermissions?: string; createdAt: string };
+type Sup = { id: number; name: string; email: string; role: string; groupIds: string; customPermissions?: string; stage?: string; createdAt: string };
 type Group = { id: number; name: string };
 
 const MODULES = [
@@ -34,7 +35,8 @@ const ROLE_MAP: Record<string, string> = {
   media_supervisor: 'مشرف الإعلامية',
   scientific_supervisor: 'مشرف العلمية',
   sports_supervisor: 'مشرف الرياضية',
-  administrative_supervisor: 'مشرف الإدارية'
+  administrative_supervisor: 'مشرف الإدارية',
+  stage_supervisor: 'مشرف مرحلة'
 };
 
 const getRoleLabel = (roleStr: string) => {
@@ -60,6 +62,7 @@ export default function SupervisorsPage() {
   const [accountType, setAccountType] = useState<'admin' | 'supervisor' | 'finance'>('supervisor');
   const [selectedRoles, setSelectedRoles] = useState<string[]>(['general_supervisor']);
   const [groupIds, setGroupIds] = useState<number[]>([]);
+  const [stage, setStage] = useState('');
   const [customPermissions, setCustomPermissions] = useState<string[]>([]);
   const [rolePermissionsMap, setRolePermissionsMap] = useState<Record<string, string[]>>({});
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -97,6 +100,7 @@ export default function SupervisorsPage() {
     setAccountType('supervisor');
     setSelectedRoles(['general_supervisor']);
     setGroupIds([]);
+    setStage('');
     setCustomPermissions([]);
     setEditingId(null);
     setIsEditingPrimary(false);
@@ -122,6 +126,7 @@ export default function SupervisorsPage() {
       setSelectedRoles(s.role.split(',').map((r) => r.trim()).filter(Boolean));
       setGroupIds(s.groupIds.split(',').map((id) => parseInt(id.trim(), 10)).filter((id) => !isNaN(id)));
     }
+    setStage(s.stage ?? '');
     setCustomPermissions(s.customPermissions ? s.customPermissions.split(',').map(p => p.trim()).filter(Boolean) : []);
   }
 
@@ -140,9 +145,14 @@ export default function SupervisorsPage() {
       if (selectedRoles.includes('groups_supervisor') && groupIds.length === 0) {
         return pushToast('error', 'يجب تحديد المجموعات/الأسر المسؤول عنها مشرف الأسر');
       }
+      if (selectedRoles.includes('stage_supervisor') && !stage) {
+        return pushToast('error', 'يجب اختيار المرحلة المسؤول عنها مشرف المرحلة');
+      }
       finalRole = selectedRoles.join(',');
       finalGroupIds = selectedRoles.includes('groups_supervisor') ? groupIds.join(',') : '';
     }
+
+    const finalStage = accountType === 'supervisor' && selectedRoles.includes('stage_supervisor') ? stage : '';
 
     setBusy(true);
 
@@ -151,6 +161,7 @@ export default function SupervisorsPage() {
       email: email.trim(),
       role: finalRole,
       groupIds: finalGroupIds,
+      stage: finalStage,
       customPermissions: customPermissions.join(',')
     };
 
@@ -279,7 +290,8 @@ export default function SupervisorsPage() {
                   { key: 'media_supervisor', label: 'مشرف الإعلامية' },
                   { key: 'scientific_supervisor', label: 'مشرف العلمية' },
                   { key: 'sports_supervisor', label: 'مشرف الرياضية' },
-                  { key: 'administrative_supervisor', label: 'مشرف الإدارية' }
+                  { key: 'administrative_supervisor', label: 'مشرف الإدارية' },
+                  { key: 'stage_supervisor', label: 'مشرف مرحلة' }
                 ].map((r) => {
                   const active = selectedRoles.includes(r.key);
                   return (
@@ -298,6 +310,25 @@ export default function SupervisorsPage() {
                     </label>
                   );
                 })}
+              </div>
+            </div>
+          )}
+
+          {accountType === 'supervisor' && selectedRoles.includes('stage_supervisor') && (
+            <div>
+              <label className="label font-semibold text-brand-600">المرحلة المسؤول عنها (إجباري لمشرف المرحلة) <span className="text-red-500">*</span></label>
+              <p className="text-xs text-ink-500 mb-2">يحصل مشرف المرحلة على وصول لكل أسر/مجموعات هذه المرحلة تلقائياً.</p>
+              <div className="flex flex-wrap gap-2">
+                {stages.map((st) => (
+                  <button
+                    type="button"
+                    key={st.key}
+                    onClick={() => setStage(st.key)}
+                    className={`choice py-1.5 px-4 text-xs ${stage === st.key ? 'is-active' : ''}`}
+                  >
+                    {st.label}
+                  </button>
+                ))}
               </div>
             </div>
           )}

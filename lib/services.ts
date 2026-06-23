@@ -16,6 +16,7 @@ export type SupervisorInfo = {
   groupIds: string;
   departments?: string;
   customPermissions?: string | null;
+  stage?: string;
   createdAt: string;
 };
 
@@ -122,8 +123,31 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
   media_supervisor: ['announcements', 'schedule'],
   scientific_supervisor: ['students', 'points', 'tasks', 'schedule', 'groups'],
   sports_supervisor: ['students', 'points', 'attendance', 'schedule', 'groups'],
-  administrative_supervisor: ['students', 'attendance', 'schedule', 'groups', 'announcements']
+  administrative_supervisor: ['students', 'attendance', 'schedule', 'groups', 'announcements'],
+  stage_supervisor: ['groups', 'students', 'points', 'attendance', 'tasks']
 };
+
+/**
+ * Resolves the set of group IDs a supervisor may access.
+ * - Explicit groupIds (used by مشرف أسر / groups_supervisor).
+ * - For مشرف مرحلة / stage_supervisor: every group whose stage matches the
+ *   supervisor's stage (resolved dynamically so groups added later are included).
+ */
+export function getAccessibleGroupIds(
+  supervisor: { role: string; groupIds: string; stage?: string | null },
+  groups: { id: number; stage: string }[]
+): number[] {
+  const roles = supervisor.role.split(',').map((r) => r.trim());
+  const ids = new Set<number>(
+    supervisor.groupIds.split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n))
+  );
+  if (roles.includes('stage_supervisor') && supervisor.stage) {
+    for (const g of groups) {
+      if (g.stage === supervisor.stage) ids.add(g.id);
+    }
+  }
+  return Array.from(ids);
+}
 
 export type ScheduleInfo = {
   id: string;
@@ -276,6 +300,8 @@ export async function getSupervisorByEmail(email: string): Promise<SupervisorInf
         role: sup.role,
         groupIds: sup.groupIds,
         departments: sup.departments,
+        customPermissions: sup.customPermissions,
+        stage: sup.stage,
         createdAt: sup.createdAt.toISOString()
       };
     } catch (err) {
@@ -305,6 +331,7 @@ export async function getAllSupervisors(): Promise<SupervisorInfo[]> {
       groupIds: sup.groupIds,
       departments: sup.departments,
       customPermissions: sup.customPermissions,
+      stage: sup.stage,
       createdAt: sup.createdAt.toISOString()
     }));
   } else {
@@ -323,7 +350,8 @@ export async function createSupervisor(data: Omit<SupervisorInfo, 'id' | 'create
         role: data.role,
         groupIds: data.groupIds,
         departments: data.departments,
-        customPermissions: data.customPermissions
+        customPermissions: data.customPermissions,
+        stage: data.stage
       }
     });
     return {
@@ -335,6 +363,7 @@ export async function createSupervisor(data: Omit<SupervisorInfo, 'id' | 'create
       groupIds: sup.groupIds,
       departments: sup.departments,
       customPermissions: sup.customPermissions,
+      stage: sup.stage,
       createdAt: sup.createdAt.toISOString()
     };
   } else {
@@ -380,6 +409,7 @@ export async function updateSupervisor(
   if (data.groupIds !== undefined) updateData.groupIds = data.groupIds;
   if (data.departments !== undefined) updateData.departments = data.departments;
   if (data.customPermissions !== undefined) updateData.customPermissions = data.customPermissions;
+  if (data.stage !== undefined) updateData.stage = data.stage;
   if (data.password) updateData.passwordHash = hashPassword(data.password);
 
   if (hasDatabase) {
@@ -398,6 +428,7 @@ export async function updateSupervisor(
         groupIds: updated.groupIds,
         departments: updated.departments,
         customPermissions: updated.customPermissions,
+        stage: updated.stage,
         createdAt: updated.createdAt.toISOString()
       };
     } catch {

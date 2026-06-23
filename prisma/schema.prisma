@@ -45,6 +45,7 @@ model Supervisor {
   groupIds     String   @default("") // comma-separated group IDs (e.g. "1,2")
   departments       String   @default("") // comma-separated department keys (e.g. "cultural,families")
   customPermissions String?
+  stage             String   @default("") // for stage_supervisor: 'ابتدائي' | 'متوسط' | 'ثانوي'
   createdAt         DateTime @default(now())
 }
 

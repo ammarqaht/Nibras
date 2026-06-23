@@ -25,7 +25,8 @@ const ROLE_MAP: Record<string, string> = {
   media_supervisor: 'مشرف الإعلامية',
   scientific_supervisor: 'مشرف العلمية',
   sports_supervisor: 'مشرف الرياضية',
-  administrative_supervisor: 'مشرف الإدارية'
+  administrative_supervisor: 'مشرف الإدارية',
+  stage_supervisor: 'مشرف مرحلة'
 };
 
 const getRoleLabel = (roleStr: string) => {

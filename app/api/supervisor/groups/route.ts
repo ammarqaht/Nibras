@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { getGroups, createGroup, deleteGroup, getSupervisorByEmail } from '@/lib/services';
+import { getGroups, createGroup, deleteGroup, getSupervisorByEmail, getAccessibleGroupIds } from '@/lib/services';
 
 export async function GET(req: NextRequest) {
   try {
@@ -22,11 +22,7 @@ export async function GET(req: NextRequest) {
     );
 
     if (!isGlobal) {
-      const allowedGroupIds = supervisor.groupIds
-        .split(',')
-        .map(id => parseInt(id.trim(), 10))
-        .filter(id => !isNaN(id));
-
+      const allowedGroupIds = getAccessibleGroupIds(supervisor, groups);
       groups = groups.filter(g => allowedGroupIds.includes(g.id));
     }
 
