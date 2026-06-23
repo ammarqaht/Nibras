@@ -89,3 +89,30 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: 'حدث خطأ أثناء حفظ التغييرات' }, { status: 500 });
   }
 }
+
+export async function GET(req: NextRequest) {
+  try {
+    const session = getSession(req);
+    if (!session) {
+      return NextResponse.json({ error: 'غير مصرح بالدخول' }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const usernameToCheck = searchParams.get('username')?.trim().toLowerCase();
+    if (!usernameToCheck) {
+      return NextResponse.json({ error: 'اسم المستخدم مطلوب' }, { status: 400 });
+    }
+
+    if (/\s/.test(usernameToCheck)) {
+      return NextResponse.json({ available: false, reason: 'يحتوي على مسافات' });
+    }
+
+    const supervisors = await getAllSupervisors();
+    const taken = supervisors.some((s) => s.id !== session.id && s.email.toLowerCase() === usernameToCheck);
+
+    return NextResponse.json({ available: !taken });
+  } catch (error) {
+    console.error('Account GET error', error);
+    return NextResponse.json({ error: 'حدث خطأ أثناء فحص اسم المستخدم' }, { status: 500 });
+  }
+}
