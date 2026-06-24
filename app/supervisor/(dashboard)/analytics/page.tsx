@@ -362,7 +362,7 @@ export default function AnalyticsPage() {
             <Kpi label="إجمالي المسجّلين" value={reg.total} color="#103F91" icon="🎓" />
             <Kpi label="المقبولون" value={reg.approved} sub={`${reg.pending} قيد المراجعة`} color="#22c55e" icon="✅" />
             {isPrivileged && <Kpi label="الدفع المكتمل" value={reg.paid} sub={`${reg.exempted} معفى`} color="#FF9F1C" icon="💳" />}
-            {isPrivileged && <Kpi label="بحالات صحية" value={reg.withCondition} sub={reg.withCondition>0 ? 'اضغط للتفاصيل' : undefined} color="#E52E25" icon="🏥" />}
+            <Kpi label="بحالات صحية" value={reg.withCondition} sub={reg.withCondition>0 ? 'اضغط للتفاصيل' : undefined} color="#E52E25" icon="🏥" />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -375,21 +375,23 @@ export default function AnalyticsPage() {
               </div>
             </Card>
 
-            {isPrivileged && (
-              <Card>
-                <p className="text-sm font-semibold text-gray-700 mb-3">حالة الدفع</p>
-                <div className="space-y-3">
-                  <StatRow label="مدفوع"            value={reg.paid}           total={reg.total} color="#22c55e" />
-                  <StatRow label="معفى"             value={reg.exempted}       total={reg.total} color="#12B3D5" />
-                  <StatRow label="بانتظار المراجعة" value={reg.pendingPayment} total={reg.total} color="#FF9F1C" />
-                  <StatRow label="لم يدفع"          value={reg.unpaid}         total={reg.total} color="#E52E25" />
-                </div>
-                <button onClick={() => setModal('conditions')} className="w-full mt-4 rounded-xl p-3 text-center transition hover:opacity-80" style={{ backgroundColor:'#E52E2511' }}>
-                  <p className="text-lg font-bold text-red-600">{reg.withCondition}</p>
-                  <p className="text-xs text-red-400">حالات صحية — اضغط للتفاصيل ←</p>
-                </button>
-              </Card>
-            )}
+            <Card>
+              {isPrivileged && (
+                <>
+                  <p className="text-sm font-semibold text-gray-700 mb-3">حالة الدفع</p>
+                  <div className="space-y-3 mb-4">
+                    <StatRow label="مدفوع"            value={reg.paid}           total={reg.total} color="#22c55e" />
+                    <StatRow label="معفى"             value={reg.exempted}       total={reg.total} color="#12B3D5" />
+                    <StatRow label="بانتظار المراجعة" value={reg.pendingPayment} total={reg.total} color="#FF9F1C" />
+                    <StatRow label="لم يدفع"          value={reg.unpaid}         total={reg.total} color="#E52E25" />
+                  </div>
+                </>
+              )}
+              <button onClick={() => setModal('conditions')} className="w-full rounded-xl p-3 text-center transition hover:opacity-80" style={{ backgroundColor:'#E52E2511' }}>
+                <p className="text-lg font-bold text-red-600">{reg.withCondition}</p>
+                <p className="text-xs text-red-400">حالات صحية — اضغط للتفاصيل ←</p>
+              </button>
+            </Card>
 
             {isPrivileged && (
               <Card>

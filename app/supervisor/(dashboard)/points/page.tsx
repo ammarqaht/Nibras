@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { pushToast } from '@/components/Toast';
 import { useSupervisor } from '@/components/SupervisorShell';
 
-type Student = { id: number; membershipNo: number; studentName: string; groupId: number | null; registrationStatus: string; paymentStatus: string };
+type Student = { id: number; membershipNo: number; studentName: string; groupId: number | null; registrationStatus: string; paymentStatus: string; stage: string; grade: string };
 type Group = { id: number; name: string };
 type Point = {
   id: number; registrationId: number; delta: number; reason: string;
@@ -47,7 +47,10 @@ export default function PointsPage() {
   const [busy, setBusy] = useState(false);
 
   const [activeTab, setActiveTab] = useState<'leaderboard' | 'history'>('leaderboard');
+  const [historySubTab, setHistorySubTab] = useState<'students' | 'groups'>('students');
   const [leaderboardSearch, setLeaderboardSearch] = useState('');
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyStageFilter, setHistoryStageFilter] = useState('');
 
   async function loadAll() {
     const [sr, gr, pr] = await Promise.all([
@@ -333,6 +336,49 @@ export default function PointsPage() {
             )}
           </div>
 
+          {/* History sub-tabs */}
+          {activeTab === 'history' && (
+            <div className="flex gap-2 mb-4 border-b border-ink-100 pb-3">
+              <button
+                type="button"
+                className={`choice py-1 px-3 text-xs ${historySubTab === 'students' ? 'is-active' : ''}`}
+                onClick={() => setHistorySubTab('students')}
+              >
+                سجل الطلاب
+              </button>
+              <button
+                type="button"
+                className={`choice py-1 px-3 text-xs ${historySubTab === 'groups' ? 'is-active' : ''}`}
+                onClick={() => setHistorySubTab('groups')}
+              >
+                سجل المجموعات
+              </button>
+              <div className="flex gap-2 mr-auto">
+                {historySubTab === 'students' && (
+                  <>
+                    <input
+                      type="text"
+                      placeholder="بحث باسم الطالب..."
+                      className="field py-1 px-2 text-xs w-32"
+                      value={historySearch}
+                      onChange={e => setHistorySearch(e.target.value)}
+                    />
+                    <select
+                      className="field py-1 px-2 text-xs w-28"
+                      value={historyStageFilter}
+                      onChange={e => setHistoryStageFilter(e.target.value)}
+                    >
+                      <option value="">كل المراحل</option>
+                      <option value="ابتدائي">ابتدائي</option>
+                      <option value="متوسط">متوسط</option>
+                      <option value="ثانوي">ثانوي</option>
+                    </select>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
           {loading ? (
             <p className="text-center py-10 text-ink-400 text-sm">جارٍ التحميل…</p>
           ) : activeTab === 'leaderboard' ? (
@@ -405,49 +451,112 @@ export default function PointsPage() {
                 </ul>
               </>
             )
-          ) : points.length === 0 ? (
-            <p className="text-center py-10 text-ink-400 text-sm">لا توجد نقاط مرصودة بعد.</p>
-          ) : (
-            <>
-              <div className="hidden lg:block overflow-x-auto scroll-soft">
-                <table className="tbl">
-                  <thead>
-                    <tr><th>الطالب</th><th>النقاط</th><th>التصنيف</th><th>السبب</th><th>بواسطة</th></tr>
-                  </thead>
-                  <tbody>
-                    {points.map((p) => (
-                      <tr key={p.id}>
-                        <td className="font-medium">{nameOf(p.registrationId)}</td>
-                        <td>
-                          <span className={`pill ${p.delta >= 0 ? 'pill-green' : 'pill-red'}`} dir="ltr">
-                            {p.delta >= 0 ? `+${p.delta}` : p.delta}
-                          </span>
-                        </td>
-                        <td className="text-ink-500 text-sm">{catLabel(p.category)}</td>
-                        <td className="text-ink-700 text-sm">{p.reason}</td>
-                        <td className="text-ink-400 text-sm">{p.recordedBy || '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <ul className="lg:hidden divide-y divide-ink-100">
-                {points.map((p) => (
-                  <li key={p.id} className="py-3.5 flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-sm font-bold text-ink-900 truncate leading-snug">{nameOf(p.registrationId)}</div>
-                      <div className="text-xs text-ink-700 mt-1">{p.reason}</div>
-                      <div className="text-[11px] text-ink-400 mt-0.5">{catLabel(p.category)} · {p.recordedBy || '—'}</div>
-                    </div>
-                    <span className={`pill shrink-0 text-xs py-1 px-2.5 ${p.delta >= 0 ? 'pill-green' : 'pill-red'}`} dir="ltr">
-                      {p.delta >= 0 ? `+${p.delta}` : p.delta}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
+          ) : historySubTab === 'students' ? (() => {
+            const studentPoints = points.filter(p => !p.reason.endsWith('(رصد جماعي للأسرة)'));
+            const filtered = studentPoints.filter(p => {
+              const st = students.find(s => s.id === p.registrationId);
+              if (!st) return !historySearch && !historyStageFilter;
+              const matchName = !historySearch || st.studentName.toLowerCase().includes(historySearch.toLowerCase());
+              const matchStage = !historyStageFilter || st.stage === historyStageFilter;
+              return matchName && matchStage;
+            });
+            const groupMap = new Map(groups.map(g => [g.id, g.name]));
+            if (filtered.length === 0) return <p className="text-center py-10 text-ink-400 text-sm">لا توجد سجلات.</p>;
+            return (
+              <>
+                <div className="hidden lg:block overflow-x-auto scroll-soft">
+                  <table className="tbl">
+                    <thead>
+                      <tr><th>الطالب</th><th>المرحلة</th><th>الأسرة</th><th>النقاط</th><th>التصنيف</th><th>السبب</th><th>بواسطة</th></tr>
+                    </thead>
+                    <tbody>
+                      {filtered.map((p) => {
+                        const st = students.find(s => s.id === p.registrationId);
+                        return (
+                          <tr key={p.id}>
+                            <td className="font-medium">{st?.studentName ?? `#${p.registrationId}`}</td>
+                            <td className="text-ink-500 text-sm">{st?.stage ?? '—'}</td>
+                            <td className="text-ink-500 text-sm">{st?.groupId ? (groupMap.get(st.groupId) ?? '—') : '—'}</td>
+                            <td><span className={`pill ${p.delta >= 0 ? 'pill-green' : 'pill-red'}`} dir="ltr">{p.delta >= 0 ? `+${p.delta}` : p.delta}</span></td>
+                            <td className="text-ink-500 text-sm">{catLabel(p.category)}</td>
+                            <td className="text-ink-700 text-sm">{p.reason}</td>
+                            <td className="text-ink-400 text-sm">{p.recordedBy || '—'}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <ul className="lg:hidden divide-y divide-ink-100">
+                  {filtered.map((p) => {
+                    const st = students.find(s => s.id === p.registrationId);
+                    return (
+                      <li key={p.id} className="py-3.5 flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-sm font-bold text-ink-900 truncate">{st?.studentName ?? `#${p.registrationId}`}</div>
+                          <div className="text-[11px] text-ink-500 mt-0.5">{st?.stage ?? ''} · {st?.groupId ? (groupMap.get(st.groupId) ?? '—') : '—'}</div>
+                          <div className="text-xs text-ink-700 mt-1">{p.reason}</div>
+                          <div className="text-[11px] text-ink-400 mt-0.5">{catLabel(p.category)} · {p.recordedBy || '—'}</div>
+                        </div>
+                        <span className={`pill shrink-0 text-xs py-1 px-2.5 ${p.delta >= 0 ? 'pill-green' : 'pill-red'}`} dir="ltr">{p.delta >= 0 ? `+${p.delta}` : p.delta}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            );
+          })() : (() => {
+            // Groups log: only bulk group records, deduplicated per event
+            const groupPoints = points.filter(p => p.reason.endsWith('(رصد جماعي للأسرة)'));
+            // Deduplicate by reason+delta+createdAt+recordedBy
+            const seen = new Set<string>();
+            const events: typeof groupPoints = [];
+            for (const p of groupPoints) {
+              const key = `${p.reason}|${p.delta}|${p.createdAt}|${p.recordedBy}`;
+              if (!seen.has(key)) { seen.add(key); events.push(p); }
+            }
+            // Find group name for each event from student
+            const groupMap = new Map(groups.map(g => [g.id, g.name]));
+            const getGroupName = (p: typeof groupPoints[0]) => {
+              const st = students.find(s => s.id === p.registrationId);
+              return st?.groupId ? (groupMap.get(st.groupId) ?? '—') : '—';
+            };
+            if (events.length === 0) return <p className="text-center py-10 text-ink-400 text-sm">لا توجد سجلات مجموعات.</p>;
+            return (
+              <>
+                <div className="hidden lg:block overflow-x-auto scroll-soft">
+                  <table className="tbl">
+                    <thead>
+                      <tr><th>الأسرة / المجموعة</th><th>النقاط</th><th>السبب</th><th>بواسطة</th><th>التاريخ</th></tr>
+                    </thead>
+                    <tbody>
+                      {events.map((p) => (
+                        <tr key={p.id}>
+                          <td className="font-medium">{getGroupName(p)}</td>
+                          <td><span className={`pill ${p.delta >= 0 ? 'pill-green' : 'pill-red'}`} dir="ltr">{p.delta >= 0 ? `+${p.delta}` : p.delta}</span></td>
+                          <td className="text-ink-700 text-sm">{p.reason.replace(' (رصد جماعي للأسرة)', '')}</td>
+                          <td className="text-ink-400 text-sm">{p.recordedBy || '—'}</td>
+                          <td className="text-ink-400 text-xs">{new Date(p.createdAt).toLocaleDateString('ar-SA', { month: 'short', day: 'numeric' })}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <ul className="lg:hidden divide-y divide-ink-100">
+                  {events.map((p) => (
+                    <li key={p.id} className="py-3.5 flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-bold text-ink-900">{getGroupName(p)}</div>
+                        <div className="text-xs text-ink-700 mt-1">{p.reason.replace(' (رصد جماعي للأسرة)', '')}</div>
+                        <div className="text-[11px] text-ink-400 mt-0.5">{p.recordedBy || '—'} · {new Date(p.createdAt).toLocaleDateString('ar-SA', { month: 'short', day: 'numeric' })}</div>
+                      </div>
+                      <span className={`pill shrink-0 text-xs py-1 px-2.5 ${p.delta >= 0 ? 'pill-green' : 'pill-red'}`} dir="ltr">{p.delta >= 0 ? `+${p.delta}` : p.delta}</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            );
+          })()}
         </div>
       </div>
     </div>

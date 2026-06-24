@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useSupervisor } from '@/components/SupervisorShell';
 import { pushToast } from '@/components/Toast';
@@ -454,42 +454,117 @@ function QuickInfoCards({ roles, isAdmin, isFinanceRole, isAttendanceRole, isPoi
 }
 
 // ─── Quick Nav ────────────────────────────────────────────────────────────────
+const IcoAnalytics  = () => <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" /></svg>;
+const IcoSchedule   = () => <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>;
+const IcoAttendance = () => <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 0 2-2h2a2 2 0 0 0 2 2m-6 9 2 2 4-4" /></svg>;
+const IcoPoints     = () => <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>;
+const IcoTasks      = () => <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2Z" /></svg>;
+const IcoGroups     = () => <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 20h5v-2a3 3 0 0 0-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 0 1 5.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 0 1 9.288 0M15 7a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>;
+const IcoPayments   = () => <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" /></svg>;
+const IcoInvoices   = () => <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25Z" /></svg>;
+const IcoFinance    = () => <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>;
+const IcoAnn        = () => <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" /></svg>;
+const IcoStudents   = () => <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.72m0 0-.003-.031a6.062 6.062 0 0 1 3.518-5.563 3 3 0 1 1 4.966 0 6.062 6.062 0 0 1 3.518 5.563" /></svg>;
+const IcoSupervisors= () => <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" /></svg>;
+
 const NAV_ITEMS = [
-  { id:'analytics',     href:'/supervisor/analytics',     label:'الإحصائيات',  icon:'📊', always: true },
-  { id:'schedule',      href:'/supervisor/schedule',      label:'الجدول',       icon:'📅', always: true },
-  { id:'attendance',    href:'/supervisor/attendance',    label:'الحضور',       icon:'✅', perm:'attendance' },
-  { id:'points',        href:'/supervisor/points',        label:'النقاط',       icon:'⭐', perm:'points' },
-  { id:'tasks',         href:'/supervisor/tasks',         label:'المهام',       icon:'📌', perm:'tasks' },
-  { id:'groups',        href:'/supervisor/groups',        label:'المجموعات',    icon:'👥', perm:'groups' },
-  { id:'payments',      href:'/supervisor/payments',      label:'المدفوعات',    icon:'💳', perm:'payments' },
-  { id:'invoices',      href:'/supervisor/invoices',      label:'الفواتير',     icon:'🧾', perm:'invoices' },
-  { id:'finance',       href:'/supervisor/finance',       label:'المالية',      icon:'💰', perm:'finance' },
-  { id:'announcements', href:'/supervisor/announcements', label:'الإعلانات',    icon:'📢', perm:'announcements' },
-  { id:'students',      href:'/supervisor/students',      label:'الطلاب',       icon:'🎓', adminOnly: true },
-  { id:'supervisors',   href:'/supervisor/supervisors',   label:'المشرفون',     icon:'👤', adminOnly: true },
+  { id:'analytics',     href:'/supervisor/analytics',     label:'الإحصائيات',  Icon: IcoAnalytics,  always: true },
+  { id:'schedule',      href:'/supervisor/schedule',      label:'الجدول',       Icon: IcoSchedule,   always: true },
+  { id:'attendance',    href:'/supervisor/attendance',    label:'الحضور',       Icon: IcoAttendance, perm:'attendance' },
+  { id:'points',        href:'/supervisor/points',        label:'النقاط',       Icon: IcoPoints,     perm:'points' },
+  { id:'tasks',         href:'/supervisor/tasks',         label:'المهام',       Icon: IcoTasks,      perm:'tasks' },
+  { id:'groups',        href:'/supervisor/groups',        label:'المجموعات',    Icon: IcoGroups,     perm:'groups' },
+  { id:'payments',      href:'/supervisor/payments',      label:'المدفوعات',    Icon: IcoPayments,   perm:'payments' },
+  { id:'invoices',      href:'/supervisor/invoices',      label:'الفواتير',     Icon: IcoInvoices,   perm:'invoices' },
+  { id:'finance',       href:'/supervisor/finance',       label:'المالية',      Icon: IcoFinance,    perm:'finance' },
+  { id:'announcements', href:'/supervisor/announcements', label:'الإعلانات',    Icon: IcoAnn,        perm:'announcements' },
+  { id:'students',      href:'/supervisor/students',      label:'الطلاب',       Icon: IcoStudents,   adminOnly: true },
+  { id:'supervisors',   href:'/supervisor/supervisors',   label:'المشرفون',     Icon: IcoSupervisors,adminOnly: true },
 ];
 
 function QuickNav({ roles, hasPerm, isAdmin }: { roles: string[]; hasPerm: (p: string) => boolean; isAdmin: boolean }) {
-  const visible = NAV_ITEMS.filter(item => {
+  const allowed = NAV_ITEMS.filter(item => {
     if (item.always) return true;
     if (item.adminOnly) return isAdmin;
     if (item.perm) return hasPerm(item.perm);
     return false;
   });
-  if (visible.length === 0) return null;
+
+  const storageKey = 'quicknav_hidden';
+  const [hiddenIds, setHiddenIds] = React.useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem(storageKey) || '[]'); } catch { return []; }
+  });
+  const [customizing, setCustomizing] = React.useState(false);
+
+  const toggleHidden = (id: string) => {
+    setHiddenIds(prev => {
+      const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
+      localStorage.setItem(storageKey, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const visible = allowed.filter(item => !hiddenIds.includes(item.id));
+  if (allowed.length === 0) return null;
+
   return (
-    <div className="card p-4">
-      <p className="text-[10px] font-bold text-ink-400 mb-3 tracking-wide">الوصول السريع</p>
-      <div className="flex flex-wrap gap-2">
-        {visible.map(item => (
-          <Link key={item.id} href={item.href}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cream-50 border border-ink-150 hover:bg-brand/5 hover:border-brand/30 hover:text-brand-700 transition-all text-xs font-semibold text-ink-700">
-            <span>{item.icon}</span>
-            <span>{item.label}</span>
-          </Link>
-        ))}
+    <>
+      <div className="card p-4">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-[10px] font-bold text-ink-400 tracking-wide">الوصول السريع</p>
+          <button
+            onClick={() => setCustomizing(true)}
+            className="flex items-center gap-1 text-[10px] text-ink-400 hover:text-brand-600 transition-colors"
+          >
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065Z" /><circle cx="12" cy="12" r="3" />
+            </svg>
+            تخصيص
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {visible.map(item => (
+            <Link key={item.id} href={item.href}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cream-50 border border-ink-150 hover:bg-brand/5 hover:border-brand/30 hover:text-brand-700 transition-all text-xs font-semibold text-ink-700">
+              <item.Icon />
+              <span>{item.label}</span>
+            </Link>
+          ))}
+          {visible.length === 0 && <p className="text-xs text-ink-400 py-1">كل الاختصارات مخفية — اضغط تخصيص لإظهارها</p>}
+        </div>
       </div>
-    </div>
+
+      {customizing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden pop-in" dir="rtl">
+            <div className="p-4 border-b border-ink-200 flex justify-between items-center bg-ink-50">
+              <h3 className="font-bold text-ink-900 text-sm">تخصيص الوصول السريع</h3>
+              <button onClick={() => setCustomizing(false)} className="text-ink-400 hover:text-ink-900 p-1 rounded">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="p-4 space-y-2 max-h-80 overflow-y-auto">
+              <p className="text-[11px] text-ink-400 mb-3">حدّد الاختصارات التي تريد إخفاءها من الشريط:</p>
+              {allowed.map(item => (
+                <label key={item.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-cream-50 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    className="accent-brand w-4 h-4"
+                    checked={!hiddenIds.includes(item.id)}
+                    onChange={() => toggleHidden(item.id)}
+                  />
+                  <item.Icon />
+                  <span className="text-sm font-semibold text-ink-800">{item.label}</span>
+                </label>
+              ))}
+            </div>
+            <div className="p-4 border-t border-ink-100">
+              <button onClick={() => setCustomizing(false)} className="btn btn-primary w-full text-sm">تم</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
