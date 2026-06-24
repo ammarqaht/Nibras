@@ -52,11 +52,15 @@ function getProgramSlots(s: ScheduleInfo): number[] {
   return slots;
 }
 
+// Only these committees can add/edit programs
+const COMMITTEE_ROLES = ['social_supervisor','cultural_supervisor','scientific_supervisor','sports_supervisor'];
+
 export default function SchedulePage() {
   const { user } = useSupervisor();
   const [schedules, setSchedules] = useState<ScheduleInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [selectedStage, setSelectedStage] = useState<string>('ابتدائي');
 
   // Daily View Date State
   const [selectedDate, setSelectedDate] = useState<string>(() => {
@@ -86,7 +90,6 @@ export default function SchedulePage() {
 
   const perms = useMemo(() => user?.permissions || [], [user]);
   const hasPerm = (p: string) => perms.includes('*') || perms.includes(p);
-  const canManageSchedule = hasPerm('schedule');
 
   const userRoles = useMemo(() => {
     if (!user) return [];
@@ -94,7 +97,12 @@ export default function SchedulePage() {
     return user.role.split(',').map(r => r.trim());
   }, [user]);
 
-  const availableRoles = ROLES.filter(r => userRoles.includes(r.key));
+  const isAdmin = userRoles.includes('admin');
+  // Only committee supervisors (social/cultural/scientific/sports) can add/edit programs
+  const canManageSchedule = isAdmin || userRoles.some(r => COMMITTEE_ROLES.includes(r));
+  const availableRoles = isAdmin
+    ? ROLES.filter(r => COMMITTEE_ROLES.includes(r.key))
+    : ROLES.filter(r => userRoles.includes(r.key) && COMMITTEE_ROLES.includes(r.key));
 
   const weekDays = useMemo(() => {
     const [y, m, d] = selectedDate.split('-').map(Number);
@@ -280,6 +288,23 @@ export default function SchedulePage() {
         </div>
       </div>
 
+      {/* Stage Tabs */}
+      <div className="flex gap-2 mb-4">
+        {STAGES_LIST.map(stage => (
+          <button
+            key={stage}
+            onClick={() => setSelectedStage(stage)}
+            className="flex-1 py-2 rounded-xl text-sm font-semibold transition"
+            style={selectedStage === stage
+              ? { backgroundColor: stage==='ابتدائي' ? '#12B3D5' : stage==='متوسط' ? '#103F91' : '#E52E25', color: '#fff' }
+              : { backgroundColor: '#f5f5f3', color: '#555' }
+            }
+          >
+            {stage}
+          </button>
+        ))}
+      </div>
+
       {loading ? (
         <div className="text-center py-10 text-ink-400">جارٍ تحميل الجدول...</div>
       ) : (
@@ -315,26 +340,24 @@ export default function SchedulePage() {
                 </div>
                 
                 <div className="overflow-x-auto scroll-soft rounded-lg border border-ink-100">
-                  <table className="w-full border-collapse text-right min-w-[700px] md:min-w-[850px] table-fixed">
+                  <table className="w-full border-collapse text-right min-w-[500px] table-fixed">
                     <thead>
                       <tr className="bg-cream-50/50 border-b border-ink-200">
-                        <th className="p-2 md:p-3 text-ink-900 font-bold border-l border-ink-200 w-[90px] md:w-[120px] text-center text-xs md:text-sm">المرحلة</th>
-                        <th className="p-2 md:p-3 text-ink-900 font-bold border-l border-ink-200 text-center w-[200px] md:w-[250px] text-xs md:text-sm">الفقرة الأولى<br/><span className="text-[9px] md:text-[11px] font-normal text-ink-500">04:30 م - 05:30 م</span></th>
-                        <th className="p-2 md:p-3 text-ink-900 font-bold border-l border-ink-200 text-center w-[200px] md:w-[250px] text-xs md:text-sm">الفقرة الثانية<br/><span className="text-[9px] md:text-[11px] font-normal text-ink-500">05:30 م - 06:30 م</span></th>
-                        <th className="p-2 md:p-3 text-ink-900 font-bold text-center w-[200px] md:w-[250px] text-xs md:text-sm">الفقرة الثالثة<br/><span className="text-[9px] md:text-[11px] font-normal text-ink-500">07:30 م - 08:45 م</span></th>
+                        <th className="p-2 md:p-3 text-ink-900 font-bold border-l border-ink-200 text-center text-xs md:text-sm">الفقرة الأولى<br/><span className="text-[9px] md:text-[11px] font-normal text-ink-500">04:30 م - 05:30 م</span></th>
+                        <th className="p-2 md:p-3 text-ink-900 font-bold border-l border-ink-200 text-center text-xs md:text-sm">الفقرة الثانية<br/><span className="text-[9px] md:text-[11px] font-normal text-ink-500">05:30 م - 06:30 م</span></th>
+                        <th className="p-2 md:p-3 text-ink-900 font-bold text-center text-xs md:text-sm">الفقرة الثالثة<br/><span className="text-[9px] md:text-[11px] font-normal text-ink-500">07:30 م - 08:45 م</span></th>
                       </tr>
                     </thead>
                     <tbody>
-                      {STAGES_LIST.map(stage => {
+                      {(() => {
+                        const stage = selectedStage;
                         const stageSchedules = daySchedules.filter(s => {
                           const programStagesList = (s.stage || 'الكل').split(',').map(x => x.trim());
                           return programStagesList.includes('الكل') || programStagesList.includes(stage);
                         });
 
                         return (
-                          <tr key={stage} className="border-b border-ink-100 last:border-0 hover:bg-cream-50/10">
-                            <td className="p-2 md:p-3 font-bold text-ink-900 border-l border-ink-200 bg-cream-50/30 w-[90px] md:w-[120px] text-center align-middle text-xs md:text-sm">{stage}</td>
-                            
+                          <tr className="border-b border-ink-100 last:border-0">
                             <td colSpan={3} className="p-1 md:p-2 align-top">
                               <div className="grid grid-cols-3 gap-2 md:gap-2.5 relative min-h-[75px] md:min-h-[80px] w-full">
                                 {/* خطوط تقسيم الفقرات الخلفية */}
@@ -424,7 +447,7 @@ export default function SchedulePage() {
                             </td>
                           </tr>
                         );
-                      })}
+                      })()}
                     </tbody>
                   </table>
                 </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useSupervisor } from '@/components/SupervisorShell';
 
 // ─── types ────────────────────────────────────────────────────────────────────
 type DayRow  = { date: string; label: string; present: number; absent: number; rate: number };
@@ -261,7 +262,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 }
 
 // ─── Tab nav ──────────────────────────────────────────────────────────────────
-const TABS = [
+const ALL_TABS = [
   { id:'registration', label:'التسجيل',   icon:'📋' },
   { id:'finance',      label:'المالية',    icon:'💰' },
   { id:'attendance',   label:'الحضور',    icon:'✅' },
@@ -273,9 +274,10 @@ const TABS = [
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function AnalyticsPage() {
+  const { user } = useSupervisor();
   const [data, setData]         = useState<Analytics | null>(null);
   const [loading, setLoading]   = useState(true);
-  const [activeTab, setActiveTab] = useState('registration');
+  const [activeTab, setActiveTab] = useState('');
   const [refreshed, setRefreshed] = useState('');
   const [modal, setModal]       = useState<null|'conditions'|'consecutive'>(null);
 
@@ -285,6 +287,20 @@ export default function AnalyticsPage() {
 
   const sectionRefs = useRef<Record<string, HTMLElement|null>>({});
 
+  // Role-based section visibility
+  const roles = user?.role ? user.role.split(',').map(r => r.trim()) : [];
+  const canSeeRegistration = roles.some(r => ['admin','finance','finance_supervisor','general_supervisor','administrative_supervisor'].includes(r));
+  const canSeeFinance      = roles.some(r => ['finance','finance_supervisor'].includes(r));
+  const canSeeTasks        = roles.some(r => ['admin','general_supervisor','social_supervisor','cultural_supervisor','scientific_supervisor','sports_supervisor'].includes(r));
+  // attendance, points, groups, schedule: all supervisors
+
+  const TABS = ALL_TABS.filter(t => {
+    if (t.id === 'registration') return canSeeRegistration;
+    if (t.id === 'finance')      return canSeeFinance;
+    if (t.id === 'tasks')        return canSeeTasks;
+    return true;
+  });
+
   async function load() {
     setLoading(true);
     try {
@@ -293,6 +309,11 @@ export default function AnalyticsPage() {
     } finally { setLoading(false); }
   }
   useEffect(() => { load(); }, []);
+
+  // Set default tab to first visible tab once user is known
+  useEffect(() => {
+    if (user && TABS.length > 0 && !activeTab) setActiveTab(TABS[0].id);
+  }, [user]);
 
   function scrollTo(id: string) {
     setActiveTab(id);
@@ -337,7 +358,7 @@ export default function AnalyticsPage() {
         {/* ══════════════════════════════════════════════════════════
             1. التسجيل
         ══════════════════════════════════════════════════════════ */}
-        <section ref={el => { sectionRefs.current['registration'] = el; }}>
+        {canSeeRegistration && <section ref={el => { sectionRefs.current['registration'] = el; }}>
           <SectionTitle emoji="📋" title="إحصائيات التسجيل" />
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
@@ -413,12 +434,12 @@ export default function AnalyticsPage() {
               })}
             </div>
           </Card>
-        </section>
+        </section>}
 
         {/* ══════════════════════════════════════════════════════════
             2. المالية
         ══════════════════════════════════════════════════════════ */}
-        <section ref={el => { sectionRefs.current['finance'] = el; }}>
+        {canSeeFinance && <section ref={el => { sectionRefs.current['finance'] = el; }}>
           <SectionTitle emoji="💰" title="المالية" />
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
@@ -496,7 +517,7 @@ export default function AnalyticsPage() {
               }
             </Card>
           </div>
-        </section>
+        </section>}
 
         {/* ══════════════════════════════════════════════════════════
             3. الحضور
@@ -696,7 +717,7 @@ export default function AnalyticsPage() {
         {/* ══════════════════════════════════════════════════════════
             6. المهام
         ══════════════════════════════════════════════════════════ */}
-        <section ref={el => { sectionRefs.current['tasks'] = el; }}>
+        {canSeeTasks && <section ref={el => { sectionRefs.current['tasks'] = el; }}>
           <SectionTitle emoji="📌" title="المهام والتسليمات" />
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
@@ -745,7 +766,7 @@ export default function AnalyticsPage() {
               }
             </Card>
           </div>
-        </section>
+        </section>}
 
         {/* ══════════════════════════════════════════════════════════
             7. البرامج

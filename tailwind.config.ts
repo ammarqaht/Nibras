@@ -11,8 +11,9 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
+        sans:    ['var(--font-body)', '-apple-system', 'system-ui', 'sans-serif'],
         display: ['var(--font-display)', 'serif'],
-        body: ['var(--font-body)', 'sans-serif']
+        body:    ['var(--font-body)', 'sans-serif']
       },
       colors: {
         cream: {
