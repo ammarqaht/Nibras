@@ -453,16 +453,54 @@ function QuickInfoCards({ roles, isAdmin, isFinanceRole, isAttendanceRole, isPoi
   return null;
 }
 
+// ─── Quick Nav ────────────────────────────────────────────────────────────────
+const NAV_ITEMS = [
+  { id:'analytics',     href:'/supervisor/analytics',     label:'الإحصائيات',  icon:'📊', always: true },
+  { id:'schedule',      href:'/supervisor/schedule',      label:'الجدول',       icon:'📅', always: true },
+  { id:'attendance',    href:'/supervisor/attendance',    label:'الحضور',       icon:'✅', perm:'attendance' },
+  { id:'points',        href:'/supervisor/points',        label:'النقاط',       icon:'⭐', perm:'points' },
+  { id:'tasks',         href:'/supervisor/tasks',         label:'المهام',       icon:'📌', perm:'tasks' },
+  { id:'groups',        href:'/supervisor/groups',        label:'المجموعات',    icon:'👥', perm:'groups' },
+  { id:'payments',      href:'/supervisor/payments',      label:'المدفوعات',    icon:'💳', perm:'payments' },
+  { id:'invoices',      href:'/supervisor/invoices',      label:'الفواتير',     icon:'🧾', perm:'invoices' },
+  { id:'finance',       href:'/supervisor/finance',       label:'المالية',      icon:'💰', perm:'finance' },
+  { id:'announcements', href:'/supervisor/announcements', label:'الإعلانات',    icon:'📢', perm:'announcements' },
+  { id:'students',      href:'/supervisor/students',      label:'الطلاب',       icon:'🎓', adminOnly: true },
+  { id:'supervisors',   href:'/supervisor/supervisors',   label:'المشرفون',     icon:'👤', adminOnly: true },
+];
+
+function QuickNav({ roles, hasPerm, isAdmin }: { roles: string[]; hasPerm: (p: string) => boolean; isAdmin: boolean }) {
+  const visible = NAV_ITEMS.filter(item => {
+    if (item.always) return true;
+    if (item.adminOnly) return isAdmin;
+    if (item.perm) return hasPerm(item.perm);
+    return false;
+  });
+  if (visible.length === 0) return null;
+  return (
+    <div className="card p-4">
+      <p className="text-[10px] font-bold text-ink-400 mb-3 tracking-wide">الوصول السريع</p>
+      <div className="flex flex-wrap gap-2">
+        {visible.map(item => (
+          <Link key={item.id} href={item.href}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cream-50 border border-ink-150 hover:bg-brand/5 hover:border-brand/30 hover:text-brand-700 transition-all text-xs font-semibold text-ink-700">
+            <span>{item.icon}</span>
+            <span>{item.label}</span>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardHome() {
   const { user } = useSupervisor();
   const [stats, setStats] = useState<any>(null);
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Quick Links states
-  const [selectedLinkIds, setSelectedLinkIds] = useState<string[]>([]);
-  const [customizing, setCustomizing] = useState(false);
-  const [tempSelected, setTempSelected] = useState<string[]>([]);
+  // Schedule stage filter
+  const [scheduleStage, setScheduleStage] = useState<string>('ابتدائي');
 
   // Quick Points Widget states
   const [studentId, setStudentId] = useState('');
@@ -504,20 +542,12 @@ export default function DashboardHome() {
   const isStageRole = roles.includes('stage_supervisor');
   const isMediaRole = roles.includes('media_supervisor');
 
-  const allowedLinks = ALL_LINKS.filter(link => {
-    if (link.id === 'students') {
-      return canSeeStudentDetails;
-    }
-    return hasPerm(link.perm);
-  });
-
   const isGlobal = roles.some((r) =>
     ['admin', 'finance', 'finance_supervisor', 'media_supervisor', 'cultural_supervisor', 'social_supervisor', 'general_supervisor', 'attendance_supervisor'].includes(r)
   );
-  
-  const canManageSchedule = hasPerm('schedule');
+
+  const canAddProgram = isAdmin || roles.some(r => ['social_supervisor', 'cultural_supervisor', 'scientific_supervisor', 'sports_supervisor'].includes(r));
   const canPublishAnnouncements = hasPerm('announcements');
-  const canSeeTasks = hasPerm('tasks');
 
   async function loadData() {
     try {
@@ -544,27 +574,6 @@ export default function DashboardHome() {
   useEffect(() => {
     loadData();
   }, []);
-
-  useEffect(() => {
-    if (!user) return;
-    const saved = localStorage.getItem('nibras_quick_links');
-    if (saved) {
-      try {
-        const ids = JSON.parse(saved);
-        if (Array.isArray(ids)) {
-          const validIds = ids.filter(id => {
-            const link = ALL_LINKS.find(l => l.id === id);
-            return link && hasPerm(link.perm);
-          });
-          setSelectedLinkIds(validIds);
-          return;
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    }
-    setSelectedLinkIds(allowedLinks.map(l => l.id));
-  }, [user]);
 
   // Click outside listener for student search dropdown
   useEffect(() => {
@@ -594,8 +603,6 @@ export default function DashboardHome() {
         String(s.membershipNo).includes(q)
     ).slice(0, 5);
   }, [students, studentQuery]);
-
-  const quickLinks = allowedLinks.filter(link => selectedLinkIds.includes(link.id));
 
   // Handle Quick Points Submit
   async function handleQuickPointsSubmit(e: React.FormEvent) {
@@ -728,8 +735,8 @@ export default function DashboardHome() {
       ) : (
         <div className="space-y-6">
           
-          {/* إجراءات سريعة — حسب الدور */}
-          <RoleActions roles={roles} hasPerm={hasPerm} />
+          {/* Quick Nav — role-based shortcuts */}
+          <QuickNav roles={roles} hasPerm={hasPerm} isAdmin={isAdmin} />
 
           {/* Quick Info Cards — role-specific */}
           <QuickInfoCards
@@ -753,9 +760,9 @@ export default function DashboardHome() {
             {/* Right main column (Timeline + Announcements) */}
             <div className="lg:col-span-2 space-y-6">
               
-              {/* Today's Schedule Timeline Widget */}
+              {/* Today's Schedule Widget */}
               <div className="card p-5 flex flex-col min-h-[350px]">
-                <div className="flex items-center justify-between border-b border-ink-100 pb-3 mb-4">
+                <div className="flex items-center justify-between border-b border-ink-100 pb-3 mb-3">
                   <h3 className="font-bold text-ink-900 flex items-center gap-2 text-base">
                     <svg className="w-5 h-5 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                       <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
@@ -765,10 +772,9 @@ export default function DashboardHome() {
                     </svg>
                     <span>جدول برامج اليوم</span>
                   </h3>
-                  {canManageSchedule && (
-                    <button 
+                  {canAddProgram && (
+                    <button
                       onClick={() => {
-                        // Pre-populate role input from first available role of the user
                         const userRolesList = user?.role ? user.role.split(',').map(r => r.trim()) : [];
                         const matches = SCHEDULE_ROLES.filter(r => userRolesList.includes(r.key));
                         setProgramRole(matches.length > 0 ? matches[0].key : '');
@@ -782,59 +788,84 @@ export default function DashboardHome() {
                   )}
                 </div>
 
-                <div className="flex-1 space-y-4">
-                  {!stats?.schedule?.todayPrograms || stats.schedule.todayPrograms.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-14 text-ink-400 text-sm gap-2">
+                {/* Stage filter tabs */}
+                <div className="flex gap-1.5 mb-4">
+                  {(['ابتدائي','متوسط','ثانوي'] as const).map(s => {
+                    const colors: Record<string,string> = { 'ابتدائي':'#12B3D5','متوسط':'#103F91','ثانوي':'#E52E25' };
+                    const active = scheduleStage === s;
+                    return (
+                      <button key={s} onClick={() => setScheduleStage(s)}
+                        className="flex-1 py-1.5 rounded-xl text-xs font-semibold transition"
+                        style={active ? { backgroundColor: colors[s], color:'#fff' } : { backgroundColor:'#f5f5f3', color:'#666' }}>
+                        {s}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Programs grouped by time slot */}
+                {(() => {
+                  const allProgs: any[] = stats?.schedule?.todayPrograms ?? [];
+                  const filtered = allProgs.filter(p => {
+                    const st = p.stage || 'الكل';
+                    return st === 'الكل' || st.split(',').map((x:string)=>x.trim()).includes(scheduleStage);
+                  });
+
+                  const slots = [
+                    { label: 'الفقرة الأولى', from: '00:00', to: '17:29' },
+                    { label: 'الفقرة الثانية', from: '17:30', to: '19:29' },
+                    { label: 'الفقرة الثالثة', from: '19:30', to: '23:59' },
+                  ];
+
+                  const hasAny = filtered.length > 0;
+                  if (!hasAny) return (
+                    <div className="flex flex-col items-center justify-center py-14 text-ink-400 text-sm gap-2 flex-1">
                       <svg className="w-12 h-12 text-ink-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5m-9-6h.008v.008H12v-.008ZM12 15h.008v.008H12V15Zm0 2.25h.008v.008H12v-.008ZM9.75 15h.008v.008H9.75V15Zm0 2.25h.008v.008H9.75v-.008ZM7.5 15h.008v.008H7.5V15Zm0 2.25h.008v.008H7.5v-.008Zm6.75-4.5h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V15Zm0 2.25h.008v.008h-.008v-.008Zm2.25-4.5h.008v.008H16.5v-.008Zm0 2.25h.008v.008H16.5V15Z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
                       </svg>
-                      <span>لا توجد برامج مسجلة في جدول اليوم حتى الآن.</span>
+                      <span>لا توجد برامج لمرحلة {scheduleStage} اليوم.</span>
                     </div>
-                  ) : (
-                    <div className="relative border-r border-ink-200 pr-5 mr-3 space-y-4 py-2">
-                      {stats.schedule.todayPrograms.map((prog: any, idx: number) => {
-                        const roleStyle = SCHEDULE_ROLES.find(r => r.key === prog.role);
-                        const roleLbl = roleStyle?.label || 'غير محدد';
-                        const badgeColor = roleStyle?.color || 'bg-gray-100 text-gray-800 border-gray-200';
+                  );
+
+                  return (
+                    <div className="flex-1 space-y-5">
+                      {slots.map(slot => {
+                        const progs = filtered.filter(p => p.startTime >= slot.from && p.startTime <= slot.to);
+                        if (progs.length === 0) return null;
                         return (
-                          <div key={prog.id || idx} className="relative group">
-                            {/* Dot on timeline */}
-                            <div className="absolute -right-[25px] top-1.5 w-2.5 h-2.5 rounded-full bg-brand ring-4 ring-white" />
-                            
-                            <div className="bg-white border border-ink-150 p-4 rounded-xl shadow-2xs hover:shadow-xs transition-shadow">
-                              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                                <h4 className="font-bold text-sm text-ink-900">{prog.title}</h4>
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${badgeColor}`}>
-                                  {roleLbl}
-                                </span>
-                              </div>
-                              
-                              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-ink-500 font-semibold mb-1">
-                                <div className="flex items-center gap-1">
-                                  <svg className="w-3.5 h-3.5 text-ink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                                  </svg>
-                                  <span>{prog.startTime} - {prog.endTime}</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <svg className="w-3.5 h-3.5 text-ink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.109A11.386 11.386 0 0 1 10.089 21c-2.243 0-4.307-.648-6.046-1.765a4.125 4.125 0 0 1 7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.109A11.386 11.386 0 0 1 10.089 21c-2.243 0-4.307-.648-6.046-1.765a4.125 4.125 0 0 1 7.533-2.493" />
-                                  </svg>
-                                  <span>المرحلة: <span className="font-bold text-ink-700">{prog.stage || 'الكل'}</span></span>
-                                </div>
-                              </div>
-                              {prog.notes && (
-                                <p className="text-[11px] text-ink-400 mt-2 bg-cream-50/50 p-2 rounded-lg border border-ink-100">
-                                  {prog.notes}
-                                </p>
-                              )}
+                          <div key={slot.label}>
+                            <p className="text-[10px] font-bold text-ink-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-brand inline-block" />
+                              {slot.label}
+                            </p>
+                            <div className="space-y-2">
+                              {progs.map((prog: any, idx: number) => {
+                                const roleStyle = SCHEDULE_ROLES.find(r => r.key === prog.role);
+                                const roleLbl = roleStyle?.label || 'غير محدد';
+                                const badgeColor = roleStyle?.color || 'bg-gray-100 text-gray-800 border-gray-200';
+                                return (
+                                  <div key={prog.id || idx} className="bg-white border border-ink-150 p-3.5 rounded-xl shadow-2xs hover:shadow-xs transition-shadow">
+                                    <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                                      <h4 className="font-bold text-sm text-ink-900">{prog.title}</h4>
+                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${badgeColor}`}>{roleLbl}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1 text-xs text-ink-500 font-semibold">
+                                      <svg className="w-3.5 h-3.5 text-ink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                                      </svg>
+                                      <span>{prog.startTime} - {prog.endTime}</span>
+                                    </div>
+                                    {prog.notes && <p className="text-[11px] text-ink-400 mt-2 bg-cream-50/50 p-2 rounded-lg border border-ink-100">{prog.notes}</p>}
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         );
                       })}
                     </div>
-                  )}
-                </div>
+                  );
+                })()}
               </div>
 
               {/* Announcements Feed Widget */}
@@ -1039,75 +1070,6 @@ export default function DashboardHome() {
 
           </div>
 
-        </div>
-      )}
-
-      {/* TABS Customizer Modal */}
-      {customizing && (
-        <div className="modal-backdrop flex items-center justify-center p-4 z-[999]" onClick={() => setCustomizing(false)}>
-          <div className="modal-panel w-full max-w-md overflow-hidden flex flex-col max-h-[85vh]" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center p-4 border-b border-line bg-cream-50/50">
-              <h3 className="font-bold text-base text-ink-900 flex items-center gap-2">
-                <svg className="w-5 h-5 text-brand" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
-                  <circle cx="12" cy="12" r="3" />
-                </svg>
-                تخصيص الوصول السريع
-              </h3>
-              <button onClick={() => setCustomizing(false)} className="text-ink-400 hover:text-ink-900 text-2xl font-bold p-1 leading-none">×</button>
-            </div>
-            
-            <div className="p-5 overflow-y-auto space-y-3 flex-1 text-right">
-              <p className="text-xs text-ink-500 mb-4">اختر الروابط التي ترغب في ظهورها بصفحة التحكم الرئيسية من قائمة صلاحياتك المتاحة:</p>
-              
-              {allowedLinks.map((link) => {
-                const checked = tempSelected.includes(link.id);
-                return (
-                  <label 
-                    key={link.id} 
-                    className="flex items-center gap-3 p-3 rounded-xl border border-ink-150 bg-white hover:bg-cream-50/30 cursor-pointer transition-colors text-sm font-semibold text-ink-800"
-                  >
-                    <input 
-                      type="checkbox" 
-                      className="w-4.5 h-4.5 text-brand border-ink-300 rounded focus:ring-brand cursor-pointer"
-                      checked={checked}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setTempSelected([...tempSelected, link.id]);
-                        } else {
-                          setTempSelected(tempSelected.filter(id => id !== link.id));
-                        }
-                      }}
-                    />
-                    <span>{link.label}</span>
-                  </label>
-                );
-              })}
-              {allowedLinks.length === 0 && (
-                <div className="text-center py-6 text-ink-400 text-sm">لا توجد صلاحيات وصول سريعة متاحة لحسابك حالياً.</div>
-              )}
-            </div>
-
-            <div className="p-4 border-t border-line bg-cream-50/50 flex gap-2">
-              <button
-                onClick={() => {
-                  localStorage.setItem('nibras_quick_links', JSON.stringify(tempSelected));
-                  setSelectedLinkIds(tempSelected);
-                  setCustomizing(false);
-                  pushToast('success', 'تم حفظ تخصيص الوصول السريع بنجاح');
-                }}
-                className="btn btn-primary py-2 px-4 text-xs flex-1 justify-center flex items-center"
-              >
-                حفظ التخصيص
-              </button>
-              <button
-                onClick={() => setCustomizing(false)}
-                className="btn btn-secondary py-2 px-4 text-xs flex-1 justify-center flex items-center"
-              >
-                إلغاء
-              </button>
-            </div>
-          </div>
         </div>
       )}
 

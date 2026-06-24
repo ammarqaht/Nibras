@@ -206,6 +206,23 @@ async function writeJsonFile<T>(filePath: string, data: T): Promise<void> {
 // Ensure default Admin supervisor is seeded
 export async function seedDefaultAdminIfNeeded(): Promise<void> {
   const defaultHash = hashPassword('12345');
+  const isDev = process.env.NODE_ENV !== 'production';
+
+  const devAccounts = isDev ? [
+    { email: '1',  role: 'admin',                    name: 'تجربة مدير عام' },
+    { email: '2',  role: 'finance',                  name: 'تجربة مسؤول مالية' },
+    { email: '3',  role: 'attendance_supervisor',    name: 'تجربة مشرف تحضير' },
+    { email: '4',  role: 'social_supervisor',        name: 'تجربة مشرف اجتماعية' },
+    { email: '5',  role: 'cultural_supervisor',      name: 'تجربة مشرف ثقافية' },
+    { email: '6',  role: 'groups_supervisor',        name: 'تجربة مشرف أسر' },
+    { email: '7',  role: 'general_supervisor',       name: 'تجربة مشرف عام' },
+    { email: '8',  role: 'media_supervisor',         name: 'تجربة مشرف إعلامية' },
+    { email: '9',  role: 'scientific_supervisor',    name: 'تجربة مشرف علمية' },
+    { email: '10', role: 'sports_supervisor',        name: 'تجربة مشرف رياضية' },
+    { email: '11', role: 'administrative_supervisor',name: 'تجربة مشرف إدارية' },
+    { email: '12', role: 'stage_supervisor',         name: 'تجربة مشرف مرحلة' },
+  ] : [];
+  const devHash = hashPassword('a');
 
   if (databaseAvailable) {
     try {
@@ -214,14 +231,16 @@ export async function seedDefaultAdminIfNeeded(): Promise<void> {
       await prisma.supervisor.upsert({
         where: { email: 'admin' },
         update: { passwordHash: defaultHash, role: 'admin', name: 'المدير العام' },
-        create: {
-          name: 'المدير العام',
-          email: 'admin',
-          passwordHash: defaultHash,
-          role: 'admin',
-          groupIds: ''
-        }
+        create: { name: 'المدير العام', email: 'admin', passwordHash: defaultHash, role: 'admin', groupIds: '' }
       });
+
+      for (const d of devAccounts) {
+        await prisma.supervisor.upsert({
+          where: { email: d.email },
+          update: { passwordHash: devHash, role: d.role, name: d.name, passwordPlain: 'a' },
+          create: { name: d.name, email: d.email, passwordHash: devHash, role: d.role, groupIds: '', departments: '', stage: '', passwordPlain: 'a' }
+        });
+      }
     } catch (err) {
       console.error("Database seed failed, disabling DB client and falling back to JSON:", err);
       databaseAvailable = false;
@@ -231,22 +250,14 @@ export async function seedDefaultAdminIfNeeded(): Promise<void> {
   if (!databaseAvailable) {
     const supervisors = await readJsonFile<SupervisorInfo[]>(FILE_SUPERVISORS, []);
 
-    const idx = supervisors.findIndex(s => s.email === 'admin');
-    if (idx !== -1) {
-      supervisors[idx].passwordHash = defaultHash;
-      supervisors[idx].role = 'admin';
-    } else {
-      supervisors.push({
-        id: supervisors.length > 0 ? Math.max(...supervisors.map(s => s.id)) + 1 : 1,
-        name: 'المدير العام',
-        email: 'admin',
-        passwordHash: defaultHash,
-        role: 'admin',
-        groupIds: '',
-        departments: '',
-        createdAt: new Date().toISOString()
-      });
-    }
+    const upsertJson = (email: string, role: string, name: string, hash: string) => {
+      const idx = supervisors.findIndex(s => s.email === email);
+      if (idx !== -1) { supervisors[idx].passwordHash = hash; supervisors[idx].role = role; }
+      else supervisors.push({ id: supervisors.length > 0 ? Math.max(...supervisors.map(s => s.id)) + 1 : 1, name, email, passwordHash: hash, role, groupIds: '', departments: '', createdAt: new Date().toISOString() });
+    };
+
+    upsertJson('admin', 'admin', 'المدير العام', defaultHash);
+    for (const d of devAccounts) upsertJson(d.email, d.role, d.name, devHash);
 
     await writeJsonFile(FILE_SUPERVISORS, supervisors);
   }
