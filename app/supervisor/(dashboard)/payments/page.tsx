@@ -128,6 +128,20 @@ export default function PaymentsPage() {
     }
   }
 
+  async function deleteStudent(id: number, name: string) {
+    if (!window.confirm(`هل أنت متأكد من حذف الطالب «${name}» نهائياً من النظام؟ سيتم حذف جميع بياناته بشكل كامل ولا يمكن استعادتها.`)) return;
+    setBusyId(id);
+    const r = await fetch(`/api/supervisor/students?id=${id}`, {
+      method: 'DELETE'
+    });
+    setBusyId(null);
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return pushToast('error', j.error ?? 'فشل حذف الطالب');
+    pushToast('success', 'تم حذف الطالب بنجاح من النظام');
+    setStudents((prev) => prev.filter((s) => s.id !== id));
+    setSelectedStudent(null);
+  }
+
   async function openReceipt(receipt: string) {
     if (receipt.startsWith('data:')) {
       const w = window.open();
@@ -447,10 +461,12 @@ export default function PaymentsPage() {
         <StudentDetailsModal
           student={selectedStudent}
           busyId={busyId}
+          isAdmin={user?.role === 'admin'}
           onClose={() => setSelectedStudent(null)}
           onConfirm={confirm}
           onCancelConfirm={cancelConfirm}
           onUpdateStudentReceipt={updateStudentReceipt}
+          onDelete={deleteStudent}
         />
       )}
     </div>
@@ -460,17 +476,21 @@ export default function PaymentsPage() {
 function StudentDetailsModal({
   student,
   busyId,
+  isAdmin,
   onClose,
   onConfirm,
   onCancelConfirm,
-  onUpdateStudentReceipt
+  onUpdateStudentReceipt,
+  onDelete
 }: {
   student: Student;
   busyId: number | null;
+  isAdmin: boolean;
   onClose: () => void;
   onConfirm: (id: number) => void;
   onCancelConfirm: (id: number) => void;
   onUpdateStudentReceipt: (id: number, base64: string) => Promise<void>;
+  onDelete: (id: number, name: string) => Promise<void>;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingReceipt, setUploadingReceipt] = useState(false);
@@ -743,6 +763,20 @@ function StudentDetailsModal({
 
         {/* Footer Actions */}
         <div className="p-4 border-t border-line bg-cream-50/50 flex gap-2">
+          {isAdmin && (
+            <button
+              onClick={() => onDelete(student.id, student.studentName)}
+              disabled={busyId === student.id}
+              className="btn btn-danger py-2 px-4 text-xs flex-1 flex justify-center items-center gap-1"
+              style={{ background: '#E52E25' }}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+              <span>حذف الطالب نهائياً</span>
+            </button>
+          )}
           {student.paymentStatus === 'paid' ? (
             <button
               onClick={() => onCancelConfirm(student.id)}
