@@ -14,6 +14,7 @@ type Student = {
   studentPhone: string | null;
   stage: string;
   grade: string;
+  groupId: number | null;
   neighborhood: string;
   hasCondition: boolean;
   conditionNote: string | null;
@@ -22,6 +23,7 @@ type Student = {
   paymentReceipt: string | null;
   registrationStatus: string;
 };
+type Group = { id: number; name: string };
 
 type Tab = 'unpaid' | 'paid' | 'exempted' | 'all';
 const TABS: { key: Tab; label: string }[] = [
@@ -41,6 +43,7 @@ export default function PaymentsPage() {
   const allowed = (user?.role ?? '').split(',').map((r) => r.trim()).some((r) => r === 'admin' || r === 'finance' || r === 'finance_supervisor');
 
   const [students, setStudents] = useState<Student[]>([]);
+  const [groups,   setGroups]   = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>('all');
   const [stageFilter, setStageFilter] = useState('');
@@ -54,8 +57,12 @@ export default function PaymentsPage() {
   };
 
   async function load() {
-    const r = await fetch('/api/supervisor/students', { cache: 'no-store' });
-    setStudents((await r.json().catch(() => ({ students: [] }))).students ?? []);
+    const [sr, gr] = await Promise.all([
+      fetch('/api/supervisor/students', { cache: 'no-store' }),
+      fetch('/api/supervisor/groups',   { cache: 'no-store' }),
+    ]);
+    setStudents((await sr.json().catch(() => ({ students: [] }))).students ?? []);
+    setGroups((await gr.json().catch(() => ({ groups: [] }))).groups ?? []);
     setLoading(false);
   }
   useEffect(() => { if (allowed) load(); else setLoading(false); }, [allowed]);
@@ -244,8 +251,9 @@ export default function PaymentsPage() {
               <table className="tbl">
                 <thead>
                   <tr>
-                    <th className="w-[20%]">الطالب</th>
-                    <th className="w-[10%]">العضوية</th>
+                    <th className="w-[18%]">الطالب</th>
+                    <th className="w-[8%]">العضوية</th>
+                    <th className="w-[14%]">الموقع</th>
                     <th className="w-[10%]">نوع الدفع</th>
                     <th className="w-[10%]">الإيصال</th>
                     <th className="w-[10%]">الحالة</th>
@@ -268,6 +276,10 @@ export default function PaymentsPage() {
                         )}
                       </td>
                       <td dir="ltr" className="text-right font-mono text-ink-500">#{s.membershipNo}</td>
+                      <td className="text-xs text-ink-600">
+                        <div>{s.stage} — {s.grade}</div>
+                        {s.groupId && <div className="text-ink-400">{groups.find(g=>g.id===s.groupId)?.name??''}</div>}
+                      </td>
                       <td><span className="pill pill-gray">{s.paymentType === 'now' ? 'فوري' : 'آجل'}</span></td>
                       <td>
                         {s.paymentReceipt ? (
@@ -355,8 +367,13 @@ export default function PaymentsPage() {
                             )}
                           </h3>
                           <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-cream-100 text-ink-600">
-                            {s.stage}
+                            {s.stage} — {s.grade}
                           </span>
+                          {s.groupId && (
+                            <span className="text-[10px] px-2 py-0.5 rounded bg-ink-50 text-ink-500">
+                              {groups.find(g=>g.id===s.groupId)?.name??''}
+                            </span>
+                          )}
                         </div>
                         <span dir="ltr" className="font-mono text-xs text-ink-400">#{s.membershipNo}</span>
                       </div>

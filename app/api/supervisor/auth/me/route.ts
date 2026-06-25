@@ -57,6 +57,8 @@ export async function GET(req: NextRequest) {
         name: currentUser.name,
         email: currentUser.email,
         role: currentUser.role,
+        groupIds: currentUser.groupIds ?? '',
+        stage: currentUser.stage ?? '',
         permissions: isGlobalAdmin ? ['*'] : Array.from(basePerms)
       }
     });

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { getAttendance, logAttendance, getStudents } from '@/lib/services';
+import { getAttendance, logAttendance, deleteAttendance, getStudents } from '@/lib/services';
 
 export async function GET(req: NextRequest) {
   try {
@@ -68,5 +68,26 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('attendance POST error', error);
     return NextResponse.json({ error: 'حدث خطأ أثناء تسجيل التحضير' }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const session = getSession(req);
+    if (!session) return NextResponse.json({ error: 'غير مصرح بالدخول' }, { status: 401 });
+
+    const { searchParams } = new URL(req.url);
+    const registrationId = parseInt(searchParams.get('registrationId') ?? '', 10);
+    const date = searchParams.get('date') ?? '';
+
+    if (isNaN(registrationId) || !date) {
+      return NextResponse.json({ error: 'بيانات غير كاملة' }, { status: 400 });
+    }
+
+    await deleteAttendance(registrationId, date);
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('attendance DELETE error', error);
+    return NextResponse.json({ error: 'حدث خطأ أثناء حذف السجل' }, { status: 500 });
   }
 }

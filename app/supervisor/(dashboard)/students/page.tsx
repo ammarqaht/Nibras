@@ -220,10 +220,12 @@ export default function StudentsPage() {
   const isAdmin = user?.role === 'admin';
   const roles = user?.role ? user.role.split(',').map((r) => r.trim()) : [];
   const isGlobal = roles.some((r) =>
-    ['admin', 'finance', 'finance_supervisor', 'media_supervisor', 'cultural_supervisor', 'social_supervisor', 'general_supervisor', 'attendance_supervisor'].includes(r)
+    ['admin', 'finance', 'finance_supervisor', 'administrative_supervisor', 'media_supervisor',
+     'cultural_supervisor', 'social_supervisor', 'scientific_supervisor', 'sports_supervisor',
+     'general_supervisor', 'attendance_supervisor'].includes(r)
   );
   const canSeeFullStudentDetails = roles.some((r) =>
-    ['admin', 'general_supervisor', 'finance', 'finance_supervisor', 'administrative_supervisor', 'media_supervisor'].includes(r)
+    ['admin', 'finance', 'finance_supervisor', 'administrative_supervisor', 'media_supervisor', 'stage_supervisor'].includes(r)
   );
 
   const [students, setStudents] = useState<Student[]>([]);

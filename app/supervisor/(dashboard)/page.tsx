@@ -620,6 +620,7 @@ export default function DashboardHome() {
   const isGeneralRole = roles.includes('general_supervisor');
   const isStageRole = roles.includes('stage_supervisor');
   const isMediaRole = roles.includes('media_supervisor');
+  const canAddPoints = isAdmin || isPointsRole || isGroupsRole || isStageRole || isGeneralRole;
 
   const isGlobal = roles.some((r) =>
     ['admin', 'finance', 'finance_supervisor', 'media_supervisor', 'cultural_supervisor', 'social_supervisor', 'general_supervisor', 'attendance_supervisor'].includes(r)
@@ -1029,8 +1030,8 @@ export default function DashboardHome() {
                 </div>
               )}
 
-              {/* Quick Points Allocator Widget */}
-              <div className="card p-5 flex flex-col">
+              {/* Quick Points Allocator Widget — only for roles with points permission */}
+              {canAddPoints && <div className="card p-5 flex flex-col">
                 <h3 className="font-bold text-ink-900 mb-3 flex items-center gap-2 border-b border-ink-100 pb-2 text-base">
                   <svg className="w-5 h-5 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
@@ -1143,7 +1144,7 @@ export default function DashboardHome() {
                     {pointsBusy ? 'جارٍ الرصد...' : 'رصد النقاط الآن'}
                   </button>
                 </form>
-              </div>
+              </div>}
 
             </div>
 

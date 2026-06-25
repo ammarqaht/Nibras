@@ -6,7 +6,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import Brand from './Brand';
 import ToastHost from './Toast';
 
-export type SupervisorUser = { id: number; email: string; name: string; role: string; permissions?: string[] };
+export type SupervisorUser = { id: number; email: string; name: string; role: string; groupIds?: string; stage?: string; permissions?: string[] };
 
 const SupervisorContext = createContext<{ user: SupervisorUser | null }>({ user: null });
 export const useSupervisor = () => useContext(SupervisorContext);
@@ -42,7 +42,7 @@ const getRoleLabel = (roleStr: string) => {
 const LINKS: NavLink[] = [
   { id: 'home', href: '/supervisor', label: 'الرئيسية' },
   { id: 'students', href: '/supervisor/students', label: 'الطلاب' },
-  { id: 'attendance', href: '/supervisor/attendance', label: 'الحضور', roles: ['attendance_supervisor', 'groups_supervisor', 'stage_supervisor'] },
+  { id: 'attendance', href: '/supervisor/attendance', label: 'الحضور', roles: ['attendance_supervisor', 'administrative_supervisor', 'groups_supervisor', 'stage_supervisor'] },
   { id: 'points', href: '/supervisor/points', label: 'النقاط', roles: ['social_supervisor', 'cultural_supervisor', 'sports_supervisor', 'scientific_supervisor', 'groups_supervisor', 'stage_supervisor'] },
   { id: 'tasks', href: '/supervisor/tasks', label: 'المهام', roles: ['general_supervisor'] },
   { id: 'schedule', href: '/supervisor/schedule', label: 'الجدول' },
@@ -153,7 +153,9 @@ export default function SupervisorShell({ children }: { children: React.ReactNod
     if (isAdmin) return true;
     if (user?.permissions) {
       if (user.permissions.includes(l.id)) return true;
-      if (['home', 'students', 'schedule', 'invoices'].includes(l.id)) return true;
+      if (['home', 'students', 'schedule', 'invoices', 'analytics'].includes(l.id)) return true;
+      // Also honour role-based rules even when permissions are present
+      if (l.roles && l.roles.some((r) => userRoles.includes(r))) return true;
       return false;
     }
     // Fallback if permissions aren't loaded yet

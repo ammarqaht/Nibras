@@ -232,6 +232,7 @@ body::after {
 .pill-green  { background: #E7F6EC; color: #1B7A43; }
 .pill-red    { background: #FDEAE6; color: #C42910; }
 .pill-yellow { background: #FCF3DC; color: #9A6B00; }
+.pill-late   { background: #FEF9C3; color: #854D0E; }
 .pill-blue   { background: #EAF1F9; color: #1E5BA8; }
 .pill-gray   { background: #F0EEE9; color: #6B6B6B; }
 
@@ -285,6 +286,24 @@ body::after {
   border-color: #C42910 !important;
   color: #fff !important;
   box-shadow: 0 4px 14px rgba(196, 41, 16, 0.25) !important;
+}
+
+/* Attendance status choices */
+.choice.choice-present.is-active {
+  background: #1B7A43 !important; border-color: #1B7A43 !important;
+  color: #fff !important; box-shadow: 0 4px 14px rgba(27,122,67,0.25) !important;
+}
+.choice.choice-late.is-active {
+  background: #D97706 !important; border-color: #D97706 !important;
+  color: #fff !important; box-shadow: 0 4px 14px rgba(217,119,6,0.30) !important;
+}
+.choice.choice-excused.is-active {
+  background: #1E5BA8 !important; border-color: #1E5BA8 !important;
+  color: #fff !important; box-shadow: 0 4px 14px rgba(30,91,168,0.25) !important;
+}
+.choice.choice-absent.is-active {
+  background: #C42910 !important; border-color: #C42910 !important;
+  color: #fff !important; box-shadow: 0 4px 14px rgba(196,41,16,0.25) !important;
 }
 @media (max-width: 640px) {
   .choice {

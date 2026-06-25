@@ -713,6 +713,16 @@ export async function logAttendance(registrationId: number, date: string, status
   }
 }
 
+export async function deleteAttendance(registrationId: number, date: string): Promise<void> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    await prisma.attendance.deleteMany({ where: { registrationId, date } });
+  } else {
+    const list = await readJsonFile<AttendanceInfo[]>(FILE_ATTENDANCE, []);
+    await writeJsonFile(FILE_ATTENDANCE, list.filter(a => !(a.registrationId === registrationId && a.date === date)));
+  }
+}
+
 // ==================== POINTS SERVICES ====================
 export async function getPoints(): Promise<PointInfo[]> {
   if (hasDatabase) {
