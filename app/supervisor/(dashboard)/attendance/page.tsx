@@ -545,6 +545,32 @@ export default function AttendancePage() {
             })}
           </ul>
         </div>
+      ) : !canEdit ? (
+        /* Read-only view for all other supervisors (committee, general, etc.) */
+        <div className="card p-0 overflow-hidden">
+          <ul className="divide-y divide-ink-200">
+            {list.map(s=>{
+              const st = records[s.id];
+              const sp = STATUSES.find(x=>x.key===st);
+              return (
+                <li key={s.id} className="flex items-center gap-3 p-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-ink-900 truncate">{s.studentName}</div>
+                    <div className="text-xs text-ink-400">
+                      <span dir="ltr" className="font-mono">#{s.membershipNo}</span>
+                      · {s.stage} — {s.grade}
+                    </div>
+                  </div>
+                  {sp ? (
+                    <span className={`pill text-xs shrink-0 ${sp.pill}`}>{sp.label}</span>
+                  ) : (
+                    <span className="pill pill-gray text-xs shrink-0">بدون</span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       ) : (
         /* canEdit: full editable table */
         <div className="card p-0 overflow-hidden">
