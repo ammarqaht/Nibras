@@ -36,7 +36,6 @@ const SCHEDULE_ROLES: Record<string, string> = {
   general_supervisor: 'الإدارة',
   scientific_supervisor: 'العلمية',
   sports_supervisor: 'الرياضية',
-  administrative_supervisor: 'الإدارية',
 };
 
 export async function GET(req: NextRequest) {
@@ -144,12 +143,13 @@ export async function GET(req: NextRequest) {
       const present = day.filter((a: any) => a.status === 'present').length;
       const absent  = day.filter((a: any) => a.status === 'absent').length;
       const late    = day.filter((a: any) => a.status === 'late').length;
-      return { date, label: weekLabel(date), present, absent, late,
+      const excused = day.filter((a: any) => a.status === 'excused').length;
+      return { date, label: weekLabel(date), present, absent, late, excused,
         rate: (present + absent) > 0 ? Math.round(present / (present + absent) * 100) : 0 };
     });
 
     // By stage last 14 days
-    const last14ByStage: Record<string, { date: string; label: string; present: number; absent: number; late: number; rate: number }[]> = {};
+    const last14ByStage: Record<string, { date: string; label: string; present: number; absent: number; late: number; excused: number; rate: number }[]> = {};
     for (const stage of STAGES) {
       const stageIds = new Set(students.filter((s: any) => s.stage === stage).map((s: any) => s.id));
       last14ByStage[stage] = last14Dates.map((date) => {
@@ -157,7 +157,8 @@ export async function GET(req: NextRequest) {
         const present = day.filter((a: any) => a.status === 'present').length;
         const absent  = day.filter((a: any) => a.status === 'absent').length;
         const late    = day.filter((a: any) => a.status === 'late').length;
-        return { date, label: weekLabel(date), present, absent, late,
+        const excused = day.filter((a: any) => a.status === 'excused').length;
+        return { date, label: weekLabel(date), present, absent, late, excused,
           rate: (present + absent) > 0 ? Math.round(present / (present + absent) * 100) : 0 };
       });
     }
@@ -171,7 +172,13 @@ export async function GET(req: NextRequest) {
       return { stage, avg: totalAll > 0 ? Math.round(totalPresent / totalAll * 100) : 0 };
     });
 
-    // Students with 2+ consecutive absences (last 30 days)
+    // Students who attended today (exclude from consecutive absent list)
+    const attendedTodayIds = new Set(
+      attendance.filter((a: any) => a.date === today && (a.status === 'present' || a.status === 'late' || a.status === 'excused'))
+        .map((a: any) => a.registrationId)
+    );
+
+    // Students with 2+ consecutive absences (last 30 days), excluding those who attended today
     const last30Start = dateNDaysAgo(29);
     const recentAttendance = attendance.filter((a: any) => a.date >= last30Start);
     const absentByStudent: Record<number, string[]> = {};
@@ -184,6 +191,7 @@ export async function GET(req: NextRequest) {
     const consecutiveAbsentStudents: { id: number; name: string; stage: string; grade: string; membershipNo: number; maxStreak: number; lastStreak: string }[] = [];
     for (const [sidStr, dates] of Object.entries(absentByStudent)) {
       const sid = parseInt(sidStr);
+      if (attendedTodayIds.has(sid)) continue;
       const sorted = [...dates].sort();
       let streak = 1, maxStreak = 1, streakEndDate = sorted[0];
       for (let i = 1; i < sorted.length; i++) {
@@ -204,35 +212,57 @@ export async function GET(req: NextRequest) {
     consecutiveAbsentStudents.sort((a, b) => b.maxStreak - a.maxStreak);
 
     // ── SECTION 4: STUDENT POINTS ────────────────────────────────────────────
-    const pointsByStudent: Record<number, number> = {};
-    for (const p of points) pointsByStudent[p.registrationId] = (pointsByStudent[p.registrationId] || 0) + p.delta;
+    // Group raw points per student for breakdown computation
+    const pointsRawByStudent: Record<number, any[]> = {};
+    for (const p of points) {
+      if (!pointsRawByStudent[p.registrationId]) pointsRawByStudent[p.registrationId] = [];
+      pointsRawByStudent[p.registrationId].push(p);
+    }
+    function calcPtDetail(pts: any[]) {
+      let ind = 0, col = 0, ded = 0;
+      for (const p of pts) {
+        const t = p.pointType ?? (p.reason?.endsWith('(رصد جماعي للأسرة)') ? 'collective' : p.delta < 0 ? 'deduction' : 'individual');
+        if (t === 'individual') ind += p.delta;
+        else if (t === 'collective') col += p.delta;
+        else ded += p.delta;
+      }
+      return { individual: ind, collective: col, balance: Math.max(0, ind + col + ded), total: ind + col };
+    }
 
-    const top5PerStage: Record<string, { id: number; name: string; grade: string; membershipNo: number; points: number }[]> = {};
+    const top5PerStage: Record<string, any[]> = {};
     for (const stage of STAGES) {
       const stageStudents = students.filter((s: any) => s.stage === stage && s.registrationStatus === 'approved');
       top5PerStage[stage] = stageStudents
-        .map((s: any) => ({ id: s.id, name: s.studentName, grade: s.grade, membershipNo: s.membershipNo, points: pointsByStudent[s.id] || 0 }))
+        .map((s: any) => {
+          const detail = calcPtDetail(pointsRawByStudent[s.id] || []);
+          return { id: s.id, name: s.studentName, grade: s.grade, membershipNo: s.membershipNo, points: detail.total, ...detail };
+        })
         .sort((a: any, b: any) => b.points - a.points).slice(0, 5);
     }
 
     // Stage average points
     const stagePointsAvg = STAGES.map((stage) => {
       const ss = students.filter((s: any) => s.stage === stage && s.registrationStatus === 'approved');
-      const total = ss.reduce((sum: number, s: any) => sum + (pointsByStudent[s.id] || 0), 0);
+      const total = ss.reduce((sum: number, s: any) => sum + (calcPtDetail(pointsRawByStudent[s.id] || []).total), 0);
       return { stage, avg: ss.length > 0 ? Math.round(total / ss.length) : 0, total };
     });
 
-    // Top 5 most present students (last 30 days)
+    // Top 5 most present students — per stage
     const presentByStudent: Record<number, number> = {};
     for (const a of attendance) {
       if (a.status === 'present') presentByStudent[a.registrationId] = (presentByStudent[a.registrationId] || 0) + 1;
     }
-    const top5MostPresent = Object.entries(presentByStudent)
-      .sort((a, b) => b[1] - a[1]).slice(0, 5)
-      .map(([sidStr, cnt]) => {
-        const st = studentMap[parseInt(sidStr)];
-        return st ? { id: st.id, name: st.studentName, stage: st.stage, grade: st.grade, membershipNo: st.membershipNo, presentDays: cnt } : null;
-      }).filter(Boolean);
+    const top5MostPresentPerStage: Record<string, any[]> = {};
+    for (const stage of STAGES) {
+      const stageIds = new Set(students.filter((s: any) => s.stage === stage).map((s: any) => s.id));
+      top5MostPresentPerStage[stage] = Object.entries(presentByStudent)
+        .filter(([sidStr]) => stageIds.has(parseInt(sidStr)))
+        .sort((a, b) => b[1] - a[1]).slice(0, 5)
+        .map(([sidStr, cnt]) => {
+          const st = studentMap[parseInt(sidStr)];
+          return st ? { id: st.id, name: st.studentName, stage: st.stage, grade: st.grade, membershipNo: st.membershipNo, presentDays: cnt } : null;
+        }).filter(Boolean);
+    }
 
     // ── SECTION 5: GROUPS ────────────────────────────────────────────────────
     const groupStudentCount: Record<number, number> = {};
@@ -250,7 +280,15 @@ export async function GET(req: NextRequest) {
     for (const stage of STAGES) {
       groupsByStage[stage] = groups
         .filter((g: any) => g.stage === stage)
-        .map((g: any) => ({ id: g.id, name: g.name, stage: g.stage, studentCount: groupStudentCount[g.id] || 0, points: groupPointsMap[g.id] || 0 }))
+        .map((g: any) => {
+          const members = students
+            .filter((s: any) => s.groupId === g.id && s.registrationStatus === 'approved')
+            .map((s: any) => {
+              const detail = calcPtDetail(pointsRawByStudent[s.id] || []);
+              return { id: s.id, name: s.studentName, membershipNo: s.membershipNo, stage: s.stage, grade: s.grade, ...detail };
+            });
+          return { id: g.id, name: g.name, stage: g.stage, studentCount: members.length, points: groupPointsMap[g.id] || 0, members };
+        })
         .sort((a: any, b: any) => b.points - a.points);
     }
 
@@ -332,7 +370,7 @@ export async function GET(req: NextRequest) {
       },
       studentPoints: {
         totalPoints: points.reduce((s: number, p: any) => s + p.delta, 0),
-        top5PerStage, stagePointsAvg, top5MostPresent,
+        top5PerStage, stagePointsAvg, top5MostPresentPerStage,
       },
       groups: { total: groups.length, byStage: groupsByStage },
       tasks: {

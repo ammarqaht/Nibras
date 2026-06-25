@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     const userRoles = session.role.split(',').map(r => r.trim());
     const allowedRoles = [
       'admin', 'cultural_supervisor', 'sports_supervisor', 'social_supervisor', 'scientific_supervisor',
-      'media_supervisor', 'groups_supervisor', 'attendance_supervisor', 'general_supervisor', 'administrative_supervisor'
+      'media_supervisor', 'groups_supervisor', 'attendance_supervisor', 'general_supervisor'
     ];
     const canManage = userRoles.some(r => allowedRoles.includes(r));
     if (!canManage) {
@@ -80,7 +80,7 @@ export async function DELETE(req: NextRequest) {
     const userRoles = session.role.split(',').map(r => r.trim());
     const allowedRoles = [
       'admin', 'cultural_supervisor', 'sports_supervisor', 'social_supervisor', 'scientific_supervisor',
-      'media_supervisor', 'groups_supervisor', 'attendance_supervisor', 'general_supervisor', 'administrative_supervisor'
+      'media_supervisor', 'groups_supervisor', 'attendance_supervisor', 'general_supervisor'
     ];
     const canManage = userRoles.some(r => allowedRoles.includes(r));
     if (!canManage) {
@@ -123,7 +123,7 @@ export async function PUT(req: NextRequest) {
     const userRoles = session.role.split(',').map(r => r.trim());
     const allowedRoles = [
       'admin', 'cultural_supervisor', 'sports_supervisor', 'social_supervisor', 'scientific_supervisor',
-      'media_supervisor', 'groups_supervisor', 'attendance_supervisor', 'general_supervisor', 'administrative_supervisor'
+      'media_supervisor', 'groups_supervisor', 'attendance_supervisor', 'general_supervisor'
     ];
     const canManage = userRoles.some(r => allowedRoles.includes(r));
     if (!canManage) {

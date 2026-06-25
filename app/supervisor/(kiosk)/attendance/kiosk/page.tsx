@@ -159,10 +159,8 @@ export default function KioskPage() {
     setExitPct(0);
   }
 
-  /* ── check-in submit ── */
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const mNo = input.trim();
+  /* ── check-in core logic ── */
+  async function doCheckIn(mNo: string) {
     if (!mNo||busy) return;
     setInput('');
 
@@ -208,6 +206,12 @@ export default function KioskPage() {
     setTodayRecs(prev=>({...prev,[found.id]:status}));
     setBusy(false);
     showFlash({ kind:'ok', student:found, groupName, pts:updatedPts, status });
+  }
+
+  /* ── check-in submit ── */
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    await doCheckIn(input.trim());
   }
 
   if (!ready) return (
@@ -270,7 +274,12 @@ export default function KioskPage() {
               <input
                 ref={inputRef}
                 type="text" inputMode="numeric"
-                value={input} onChange={e=>setInput(e.target.value)}
+                value={input}
+                onChange={e => {
+                  const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                  setInput(val);
+                  if (val.length === 4 && !busy) doCheckIn(val);
+                }}
                 disabled={busy} autoFocus autoComplete="off" dir="ltr" placeholder="0000"
                 className="w-full text-center rounded-2xl border-2 border-ink-200 focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/15 transition-all bg-white placeholder:text-ink-200 py-5 text-5xl font-bold tracking-[0.2em]"
                 style={{fontFamily:'ui-monospace,monospace'}}

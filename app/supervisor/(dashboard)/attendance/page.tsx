@@ -42,7 +42,7 @@ export default function AttendancePage() {
 
   const roles = useMemo(() => (user?.role ?? '').split(',').map(r => r.trim()).filter(Boolean), [user]);
   const isAdmin     = roles.includes('admin') || user?.permissions?.includes('*');
-  const canEdit     = isAdmin || roles.some(r => ['attendance_supervisor','general_supervisor','administrative_supervisor'].includes(r));
+  const canEdit     = isAdmin || roles.some(r => ['attendance_supervisor','general_supervisor'].includes(r));
   const isGroupsSup = !canEdit && roles.includes('groups_supervisor');
   const isStageSup  = !canEdit && !isGroupsSup && roles.includes('stage_supervisor');
 

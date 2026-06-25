@@ -37,8 +37,7 @@ export async function GET(req: NextRequest) {
     const isGlobal = roles.some(r =>
       ['admin', 'finance', 'finance_supervisor', 'media_supervisor',
        'cultural_supervisor', 'social_supervisor', 'scientific_supervisor',
-       'sports_supervisor', 'general_supervisor', 'attendance_supervisor',
-       'administrative_supervisor'].includes(r)
+       'sports_supervisor', 'general_supervisor', 'attendance_supervisor'].includes(r)
     );
 
     const isFinanceRole = roles.some(r => ['finance', 'finance_supervisor', 'admin'].includes(r));

@@ -33,14 +33,13 @@ export async function GET(req: NextRequest) {
 
     // Scope students: non-global supervisors only see their group/stage students
     if (scope !== 'all') {
-      if (!isGlobal && !isStage) {
+      if (isStage && !isGlobal) {
+        const supStage = supervisor.stage ?? '';
+        if (supStage) students = students.filter((s: any) => s.stage === supStage);
+      } else if (!isGlobal && !isStage) {
         const groups = await getGroups();
         const allowedGroupIds = getAccessibleGroupIds(supervisor, groups);
-        students = students.filter(s => s.groupId !== null && allowedGroupIds.includes(s.groupId));
-      } else if (isStage && !isGlobal) {
-        const groups = await getGroups();
-        const allowedGroupIds = getAccessibleGroupIds(supervisor, groups);
-        students = students.filter(s => s.groupId !== null && allowedGroupIds.includes(s.groupId));
+        students = students.filter((s: any) => s.groupId !== null && allowedGroupIds.includes(s.groupId));
       }
     }
 

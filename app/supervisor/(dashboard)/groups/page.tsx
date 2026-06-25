@@ -9,16 +9,15 @@ type Group = { id: number; name: string; stage: string };
 type Student = { id: number; membershipNo: number; studentName: string; stage: string; grade: string; groupId: number | null; registrationStatus: string; paymentStatus: string };
 type Supervisor = { id: number; name: string; groupIds: string };
 
-const SOURCES = [
-  { key: 'attendance', label: 'الحضور' },
-  { key: 'tasks', label: 'المهام' },
-  { key: 'group', label: 'الجماعية' },
-];
-
-function getPointSource(p: { reason: string; category: string }): string {
-  if (p.reason.endsWith('(رصد جماعي للأسرة)')) return 'group';
-  if (p.category === 'attendance') return 'attendance';
-  return 'tasks';
+function calcPts(pts: any[]) {
+  let ind = 0, col = 0, ded = 0;
+  for (const p of pts) {
+    const isCollective = p.reason?.endsWith('(رصد جماعي للأسرة)') || p.pointType === 'collective';
+    if (isCollective) col += p.delta;
+    else if (p.delta < 0) ded += p.delta;
+    else ind += p.delta;
+  }
+  return { individual: ind, collective: col, balance: Math.max(0, ind + col + ded), total: ind + col };
 }
 
 function formatDate(dStr: string) {
@@ -581,7 +580,7 @@ export default function GroupsPage() {
                               <span className="font-bold text-ink-900 flex-1 truncate">{st.studentName}</span>
                             </div>
                             <div className="flex flex-wrap items-center gap-1.5 pr-5">
-                              <span className="pill pill-green font-bold text-[11px]">{studentTotal} نقطة</span>
+                              <span className="pill pill-green font-bold text-[11px]">إجمالي {studentTotal}</span>
                               {st.membershipNo ? <span className="text-[10px] font-mono text-ink-400 bg-ink-50 border border-ink-200 px-1.5 py-0.5 rounded">#{st.membershipNo}</span> : null}
                               <span className="text-[10px] text-ink-500 bg-cream-100 px-1.5 py-0.5 rounded font-mono">{st.grade}</span>
                               <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${performanceCls}`}>{performanceLabel}</span>
@@ -589,16 +588,19 @@ export default function GroupsPage() {
                           </div>
                           {isExpanded && (
                             <div className="px-4 py-3 bg-ink-50/40 border-t border-ink-150 text-xs space-y-2 text-right">
-                              <div className="text-[11px] font-bold text-ink-500 mb-2">مصادر النقاط:</div>
                               {(() => {
-                                const bySource: Record<string, number> = {};
-                                studentLogs.forEach(p => { const s = getPointSource(p); bySource[s] = (bySource[s] || 0) + p.delta; });
+                                const bp = calcPts(studentLogs);
+                                const boxes = [
+                                  { label: 'فردية', val: bp.individual, color: 'text-blue-600' },
+                                  { label: 'جماعية', val: bp.collective, color: 'text-cyan-600' },
+                                  { label: 'الرصيد', val: bp.balance, color: 'text-green-600' },
+                                ];
                                 return (
                                   <div className="grid grid-cols-3 gap-2">
-                                    {SOURCES.map(src => (
-                                      <div key={src.key} className="bg-white rounded-lg border border-ink-150 px-3 py-2 text-center">
-                                        <div className="text-[10px] text-ink-400 mb-1">{src.label}</div>
-                                        <div className={`text-sm font-bold ${(bySource[src.key]||0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>{bySource[src.key] ?? 0}</div>
+                                    {boxes.map(b => (
+                                      <div key={b.label} className="bg-white rounded-lg border border-ink-150 px-3 py-2 text-center">
+                                        <div className="text-[10px] text-ink-400 mb-1">{b.label}</div>
+                                        <div className={`text-sm font-bold ${b.color}`}>{b.val}</div>
                                       </div>
                                     ))}
                                   </div>
@@ -784,35 +786,6 @@ export default function GroupsPage() {
             )}
           </div>
 
-          {/* Unassigned students for the active stage */}
-          {(() => {
-            const stageUnassigned = students.filter(s => s.groupId === null && s.stage === adminStageTab);
-            if (stageUnassigned.length === 0) return null;
-            return (
-              <div className="card p-6">
-                <h2 className="text-lg font-bold text-ink-900 mb-1">
-                  طلاب {adminStageTab} غير مسجلين في أسرة ({stageUnassigned.length})
-                </h2>
-                <p className="text-xs text-ink-400 mb-4">هؤلاء الطلاب لم يُسنَدوا إلى أسرة بعد.</p>
-                <div className="overflow-x-auto scroll-soft">
-                  <table className="tbl">
-                    <thead>
-                      <tr><th>الاسم</th><th>العضوية</th><th>الصف</th></tr>
-                    </thead>
-                    <tbody>
-                      {stageUnassigned.map(s => (
-                        <tr key={s.id}>
-                          <td className="font-medium">{s.studentName}</td>
-                          <td className="font-mono text-ink-400 text-xs">#{s.membershipNo}</td>
-                          <td className="text-ink-500 text-sm">{s.grade}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            );
-          })()}
         </div>
       ) : (
         loading ? (
@@ -898,7 +871,7 @@ export default function GroupsPage() {
                               <span className="font-bold text-ink-900 flex-1 truncate">{st.studentName}</span>
                             </div>
                             <div className="flex flex-wrap items-center gap-1.5 pr-5">
-                              <span className="pill pill-green font-bold text-[11px]">{studentTotal} نقطة</span>
+                              <span className="pill pill-green font-bold text-[11px]">إجمالي {studentTotal}</span>
                               {st.membershipNo ? <span className="text-[10px] font-mono text-ink-400 bg-ink-50 border border-ink-200 px-1.5 py-0.5 rounded">#{st.membershipNo}</span> : null}
                               <span className="text-[10px] text-ink-500 bg-cream-100 px-1.5 py-0.5 rounded font-mono">{st.grade}</span>
                               <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${performanceCls}`}>{performanceLabel}</span>
@@ -906,19 +879,22 @@ export default function GroupsPage() {
                           </div>
 
                           {isExpanded && (() => {
-                            const bySource: Record<string, number> = {};
-                            studentLogs.forEach(p => { const s = getPointSource(p); bySource[s] = (bySource[s] || 0) + p.delta; });
+                            const bp = calcPts(studentLogs);
+                            const boxes = [
+                              { label: 'فردية', val: bp.individual, color: 'text-blue-600' },
+                              { label: 'جماعية', val: bp.collective, color: 'text-cyan-600' },
+                              { label: 'الرصيد', val: bp.balance, color: 'text-green-600' },
+                            ];
                             return (
                               <div className="px-4 py-3 bg-ink-50/40 border-t border-ink-150 text-xs space-y-2 text-right" dir="rtl">
-                                <div className="text-[11px] font-bold text-ink-500 mb-2">مصادر النقاط:</div>
                                 {studentLogs.length === 0 ? (
                                   <p className="text-ink-400 text-center py-3 bg-white rounded-lg border border-ink-150">لا توجد نقاط مسجلة لهذا الطالب بعد.</p>
                                 ) : (
                                   <div className="grid grid-cols-3 gap-2">
-                                    {SOURCES.map(src => (
-                                      <div key={src.key} className="bg-white rounded-lg border border-ink-150 px-3 py-2 text-center">
-                                        <div className="text-[10px] text-ink-400 mb-1">{src.label}</div>
-                                        <div className={`text-sm font-bold ${(bySource[src.key]||0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>{bySource[src.key] ?? 0}</div>
+                                    {boxes.map(b => (
+                                      <div key={b.label} className="bg-white rounded-lg border border-ink-150 px-3 py-2 text-center">
+                                        <div className="text-[10px] text-ink-400 mb-1">{b.label}</div>
+                                        <div className={`text-sm font-bold ${b.color}`}>{b.val}</div>
                                       </div>
                                     ))}
                                   </div>
@@ -970,7 +946,7 @@ export default function GroupsPage() {
       )}
 
       {/* قسم الطلاب غير المعينين في أسرة */}
-      {canManageGroups && (
+      {(canManageGroups || isGlobal || isStage) && (
         <div className="card p-6 mt-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
             <div>
@@ -1278,21 +1254,24 @@ export default function GroupsPage() {
                           </div>
                         </div>
 
-                        {/* Accordion Body - source summary */}
+                        {/* Accordion Body - point breakdown */}
                         {isExpanded && (() => {
-                          const bySource: Record<string, number> = {};
-                          studentLogs.forEach(p => { const s = getPointSource(p); bySource[s] = (bySource[s] || 0) + p.delta; });
+                          const bp = calcPts(studentLogs);
+                          const boxes = [
+                            { label: 'فردية', val: bp.individual, color: 'text-blue-600' },
+                            { label: 'جماعية', val: bp.collective, color: 'text-cyan-600' },
+                            { label: 'الرصيد', val: bp.balance, color: 'text-green-600' },
+                          ];
                           return (
                             <div className="px-4 py-3 bg-ink-50/40 border-t border-ink-150 text-xs">
-                              <div className="text-[11px] font-bold text-ink-500 mb-2">مصادر النقاط:</div>
                               {studentLogs.length === 0 ? (
                                 <p className="text-ink-400 text-center py-2">لا توجد نقاط مسجلة بعد.</p>
                               ) : (
                                 <div className="grid grid-cols-3 gap-2">
-                                  {SOURCES.map(src => (
-                                    <div key={src.key} className="bg-white rounded-lg border border-ink-150 px-2 py-2 text-center">
-                                      <div className="text-[10px] text-ink-400 mb-1">{src.label}</div>
-                                      <div className={`text-sm font-bold ${(bySource[src.key]||0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>{bySource[src.key] ?? 0}</div>
+                                  {boxes.map(b => (
+                                    <div key={b.label} className="bg-white rounded-lg border border-ink-150 px-2 py-2 text-center">
+                                      <div className="text-[10px] text-ink-400 mb-1">{b.label}</div>
+                                      <div className={`text-sm font-bold ${b.color}`}>{b.val}</div>
                                     </div>
                                   ))}
                                 </div>

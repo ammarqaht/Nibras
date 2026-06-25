@@ -220,13 +220,21 @@ export default function StudentsPage() {
   const isAdmin = user?.role === 'admin';
   const roles = user?.role ? user.role.split(',').map((r) => r.trim()) : [];
   const isGlobal = roles.some((r) =>
-    ['admin', 'finance', 'finance_supervisor', 'administrative_supervisor', 'media_supervisor',
+    ['admin', 'finance', 'finance_supervisor', 'media_supervisor',
      'cultural_supervisor', 'social_supervisor', 'scientific_supervisor', 'sports_supervisor',
      'general_supervisor', 'attendance_supervisor'].includes(r)
   );
   const canSeeFullStudentDetails = roles.some((r) =>
-    ['admin', 'finance', 'finance_supervisor', 'administrative_supervisor', 'media_supervisor', 'stage_supervisor'].includes(r)
+    ['admin', 'finance', 'finance_supervisor', 'media_supervisor', 'stage_supervisor'].includes(r)
   );
+  const isStageSup  = !isGlobal && roles.includes('stage_supervisor');
+  const isGroupsSup = !isGlobal && !isStageSup && roles.includes('groups_supervisor');
+
+  const myGroupIds = useMemo(() => {
+    if (!user?.groupIds) return new Set<number>();
+    return new Set(user.groupIds.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n)));
+  }, [user]);
+  const myStage = user?.stage ?? '';
 
   const [students, setStudents] = useState<Student[]>([]);
 
@@ -335,8 +343,14 @@ export default function StudentsPage() {
   }, []);
 
   const approvedStudents = useMemo(() => {
-    return students.filter((s) => s.registrationStatus === 'approved' && s.paymentStatus === 'paid');
-  }, [students]);
+    let base = students.filter((s) =>
+      s.registrationStatus === 'approved' &&
+      (s.paymentStatus === 'paid' || s.paymentStatus === 'exempted')
+    );
+    if (isGroupsSup) base = base.filter(s => s.groupId !== null && myGroupIds.has(s.groupId));
+    else if (isStageSup) base = base.filter(s => s.stage === myStage);
+    return base;
+  }, [students, isGroupsSup, isStageSup, myGroupIds, myStage]);
 
   const neighborhoods = useMemo(() => {
     const list = approvedStudents.map((s) => s.neighborhood?.trim()).filter(Boolean);

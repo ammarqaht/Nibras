@@ -508,6 +508,7 @@ export default function PaymentsPage() {
       {selectedStudent && (
         <StudentDetailsModal
           student={selectedStudent}
+          groupName={selectedStudent.groupId ? groups.find(g=>g.id===selectedStudent.groupId)?.name??'' : ''}
           busyId={busyId}
           isAdmin={user?.role === 'admin'}
           onClose={() => setSelectedStudent(null)}
@@ -523,6 +524,7 @@ export default function PaymentsPage() {
 
 function StudentDetailsModal({
   student,
+  groupName,
   busyId,
   isAdmin,
   onClose,
@@ -532,6 +534,7 @@ function StudentDetailsModal({
   onDelete
 }: {
   student: Student;
+  groupName: string;
   busyId: number | null;
   isAdmin: boolean;
   onClose: () => void;
@@ -647,6 +650,10 @@ function StudentDetailsModal({
             <div>
               <span className="text-ink-500 text-xs block mb-1">المرحلة والصف</span>
               <span className="text-ink-900 font-semibold">{student.stage} — {student.grade}</span>
+            </div>
+            <div>
+              <span className="text-ink-500 text-xs block mb-1">الأسرة / المجموعة</span>
+              <span className="text-ink-900 font-semibold">{groupName || '—'}</span>
             </div>
             <div>
               <span className="text-ink-500 text-xs block mb-1">الحي السكني</span>
@@ -810,26 +817,27 @@ function StudentDetailsModal({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 border-t border-line bg-cream-50/50 flex gap-2">
+        <div className="p-4 border-t border-line bg-cream-50/50 flex items-center gap-2">
+          {/* Delete — icon-only, far right to avoid accidental taps */}
           {isAdmin && (
             <button
               onClick={() => onDelete(student.id, student.studentName)}
               disabled={busyId === student.id}
-              className="btn btn-danger py-2 px-4 text-xs flex-1 flex justify-center items-center gap-1"
-              style={{ background: '#E52E25' }}
+              className="btn py-2 px-2.5 text-xs flex items-center justify-center text-red-600 border-red-200 bg-red-50 hover:bg-red-100 shrink-0"
+              title="حذف الطالب نهائياً"
             >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="3 6 5 6 21 6" />
                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
               </svg>
-              <span>حذف الطالب نهائياً</span>
             </button>
           )}
-          {student.paymentStatus === 'paid' ? (
+          <button onClick={onClose} className="btn btn-ghost py-2 px-4 text-xs shrink-0">إغلاق</button>
+          {student.paymentStatus === 'paid' || student.paymentStatus === 'exempted' ? (
             <button
               onClick={() => onCancelConfirm(student.id)}
               disabled={busyId === student.id}
-              className="btn btn-danger py-2 px-4 text-xs flex-1 flex justify-center items-center gap-1"
+              className="btn py-2 px-4 text-xs flex-1 flex justify-center items-center gap-1 text-red-600 border-red-200 bg-red-50 hover:bg-red-100"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M18 6 6 18M6 6l12 12" />
@@ -849,12 +857,6 @@ function StudentDetailsModal({
               <span>تأكيد استلام الدفع</span>
             </button>
           )}
-          <button
-            onClick={onClose}
-            className="btn btn-secondary py-2 px-4 text-xs flex-1"
-          >
-            إغلاق
-          </button>
         </div>
       </div>
     </div>

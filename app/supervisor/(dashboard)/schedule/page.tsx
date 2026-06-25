@@ -26,7 +26,6 @@ const ROLES = [
   { key: 'general_supervisor', label: 'الإدارة', color: 'bg-slate-100 text-slate-800 border-slate-300' },
   { key: 'scientific_supervisor', label: 'اللجنة العلمية', color: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
   { key: 'sports_supervisor', label: 'اللجنة الرياضية', color: 'bg-orange-100 text-orange-800 border-orange-200' },
-  { key: 'administrative_supervisor', label: 'اللجنة الإدارية', color: 'bg-teal-100 text-teal-800 border-teal-200' }
 ];
 
 const DEFAULT_SLOTS = [
@@ -96,10 +95,9 @@ export default function SchedulePage() {
   }, [user]);
 
   const isAdmin = userRoles.includes('admin');
-  const isAdministrative = userRoles.includes('administrative_supervisor');
-  // Admins and administrative supervisors can manage all schedules; committee supervisors manage their own
-  const canManageSchedule = isAdmin || isAdministrative || userRoles.some(r => COMMITTEE_ROLES.includes(r));
-  const availableRoles = (isAdmin || isAdministrative)
+  // Admins can manage all schedules; committee supervisors manage their own
+  const canManageSchedule = isAdmin || userRoles.some(r => COMMITTEE_ROLES.includes(r));
+  const availableRoles = isAdmin
     ? ROLES.filter(r => COMMITTEE_ROLES.includes(r.key))
     : ROLES.filter(r => userRoles.includes(r.key) && COMMITTEE_ROLES.includes(r.key));
 

@@ -17,7 +17,7 @@ const ROLE_MAP: Record<string, string> = {
   media_supervisor: 'مشرف الإعلامية',
   scientific_supervisor: 'مشرف العلمية',
   sports_supervisor: 'مشرف الرياضية',
-  administrative_supervisor: 'مشرف الإدارية'
+  stage_supervisor: 'مشرف مرحلة'
 };
 
 const getRoleLabel = (roleStr: string) => {
@@ -52,8 +52,7 @@ const SCHEDULE_ROLES = [
   { key: 'attendance_supervisor', label: 'لجنة التحضير', color: 'border-gray-500 text-gray-700 bg-gray-50' },
   { key: 'general_supervisor', label: 'الإدارة', color: 'border-slate-500 text-slate-700 bg-slate-50' },
   { key: 'scientific_supervisor', label: 'اللجنة العلمية', color: 'border-indigo-500 text-indigo-700 bg-indigo-50' },
-  { key: 'sports_supervisor', label: 'اللجنة الرياضية', color: 'border-orange-500 text-orange-700 bg-orange-50' },
-  { key: 'administrative_supervisor', label: 'اللجنة الإدارية', color: 'border-teal-500 text-teal-700 bg-teal-50' }
+  { key: 'sports_supervisor', label: 'اللجنة الرياضية', color: 'border-orange-500 text-orange-700 bg-orange-50' }
 ];
 
 const DEFAULT_SLOTS = [
@@ -609,7 +608,7 @@ export default function DashboardHome() {
   const roles = user?.role ? user.role.split(',').map((r) => r.trim()) : [];
 
   const canSeeStudentDetails = roles.some((r) =>
-    ['admin', 'general_supervisor', 'finance', 'finance_supervisor', 'administrative_supervisor'].includes(r)
+    ['admin', 'general_supervisor', 'finance', 'finance_supervisor'].includes(r)
   );
 
   const isAdmin = roles.includes('admin');
@@ -620,7 +619,7 @@ export default function DashboardHome() {
   const isGeneralRole = roles.includes('general_supervisor');
   const isStageRole = roles.includes('stage_supervisor');
   const isMediaRole = roles.includes('media_supervisor');
-  const canAddPoints = isAdmin || isPointsRole || isGroupsRole || isStageRole || isGeneralRole;
+  const canAddPoints = isPointsRole;
 
   const isGlobal = roles.some((r) =>
     ['admin', 'finance', 'finance_supervisor', 'media_supervisor', 'cultural_supervisor', 'social_supervisor', 'general_supervisor', 'attendance_supervisor'].includes(r)

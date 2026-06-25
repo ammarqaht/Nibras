@@ -26,7 +26,6 @@ const ROLES = [
   { id: 'media_supervisor', label: 'مشرف الإعلامية' },
   { id: 'scientific_supervisor', label: 'مشرف العلمية' },
   { id: 'sports_supervisor', label: 'مشرف الرياضية' },
-  { id: 'administrative_supervisor', label: 'مشرف الإدارية' },
   { id: 'stage_supervisor', label: 'مشرف مرحلة' }
 ];
 

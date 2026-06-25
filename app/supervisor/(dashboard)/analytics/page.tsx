@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useSupervisor } from '@/components/SupervisorShell';
 
 // ─── types ────────────────────────────────────────────────────────────────────
-type DayRow  = { date: string; label: string; present: number; absent: number; late: number; rate: number };
+type DayRow  = { date: string; label: string; present: number; absent: number; late: number; excused: number; rate: number };
 type Student = { id: number; name: string; stage: string; grade: string; membershipNo: number };
+type GroupMember = Student & { individual: number; collective: number; balance: number; total: number };
 type Analytics = {
   updatedAt: string;
   registration: {
@@ -33,13 +34,13 @@ type Analytics = {
   };
   studentPoints: {
     totalPoints: number;
-    top5PerStage: Record<string, (Student & { points: number })[]>;
+    top5PerStage: Record<string, (Student & { points: number; individual: number; collective: number; balance: number })[]>;
     stagePointsAvg: { stage: string; avg: number; total: number }[];
-    top5MostPresent: (Student & { presentDays: number })[];
+    top5MostPresentPerStage: Record<string, (Student & { presentDays: number })[]>;
   };
   groups: {
     total: number;
-    byStage: Record<string, { id: number; name: string; stage: string; studentCount: number; points: number }[]>;
+    byStage: Record<string, { id: number; name: string; stage: string; studentCount: number; points: number; members: GroupMember[] }[]>;
   };
   tasks: {
     total: number; active: number; expired: number;
@@ -282,16 +283,18 @@ export default function AnalyticsPage() {
   const [modal, setModal]       = useState<null|'conditions'|'consecutive'>(null);
 
   // per-section stage tabs
-  const [ptStage,  setPtStage]  = useState<string>('ابتدائي');
-  const [grpStage, setGrpStage] = useState<string>('ابتدائي');
+  const [ptStage,        setPtStage]        = useState<string>('ابتدائي');
+  const [ptPresentStage, setPtPresentStage] = useState<string>('ابتدائي');
+  const [grpStage,       setGrpStage]       = useState<string>('ابتدائي');
+  const [selectedGroup,  setSelectedGroup]  = useState<{ id: number; name: string; members: GroupMember[] } | null>(null);
 
   const sectionRefs = useRef<Record<string, HTMLElement|null>>({});
 
   // Role-based section visibility
   const roles = user?.role ? user.role.split(',').map(r => r.trim()) : [];
-  const isPrivileged = roles.some(r => ['admin','general_supervisor','administrative_supervisor','finance','finance_supervisor'].includes(r));
+  const isPrivileged = roles.some(r => ['admin','general_supervisor','finance','finance_supervisor'].includes(r));
   const canSeeFinance = roles.some(r =>
-    ['admin','finance','finance_supervisor','administrative_supervisor'].includes(r)
+    ['admin','finance','finance_supervisor'].includes(r)
   );
 
   const TABS = ALL_TABS.filter(t => {
@@ -546,8 +549,13 @@ export default function AnalyticsPage() {
                       </div>
                       <div className="h-px bg-gray-100" />
                       <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-500">متأخر</span>
+                        <span className="text-base font-bold text-blue-500">{att.today?.late??0}</span>
+                      </div>
+                      <div className="h-px bg-gray-100" />
+                      <div className="flex items-center justify-between">
                         <span className="text-sm text-gray-500">معتذر</span>
-                        <span className="text-base font-bold text-amber-500">{att.today?.late??0}</span>
+                        <span className="text-base font-bold text-amber-500">{att.today?.excused??0}</span>
                       </div>
                       <div className="h-px bg-gray-100" />
                       <div className="flex items-center justify-between">
@@ -621,18 +629,19 @@ export default function AnalyticsPage() {
             </div>
           </Card>
 
-          {/* أكثر الطلاب حضوراً */}
+          {/* أكثر الطلاب حضوراً — per stage */}
           <Card className="mb-4">
             <p className="text-sm font-semibold text-gray-700 mb-3">🎯 أكثر الطلاب حضوراً</p>
-            {pts.top5MostPresent.length===0
+            <StageTabs active={ptPresentStage} onChange={setPtPresentStage} />
+            {(pts.top5MostPresentPerStage?.[ptPresentStage] || []).length===0
               ? <p className="text-sm text-gray-400 text-center py-3">لا توجد بيانات</p>
               : <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                  {pts.top5MostPresent.map((s:any, i) => (
-                    <div key={s.id} className="flex flex-col items-center gap-1 p-3 rounded-xl text-center" style={{ backgroundColor:STAGE_COLOR[s.stage]+'11' }}>
+                  {(pts.top5MostPresentPerStage[ptPresentStage] || []).map((s:any, i:number) => (
+                    <div key={s.id} className="flex flex-col items-center gap-1 p-3 rounded-xl text-center" style={{ backgroundColor:STAGE_COLOR[ptPresentStage]+'11' }}>
                       <MedalBadge rank={i+1} />
                       <p className="text-sm font-semibold text-gray-800 mt-1 text-center leading-tight">{s.name}</p>
-                      <p className="text-xs text-gray-500">{s.stage}</p>
-                      <p className="text-lg font-bold" style={{ color:STAGE_COLOR[s.stage] }}>{s.presentDays}</p>
+                      <p className="text-xs text-gray-400 font-mono">#{s.membershipNo}</p>
+                      <p className="text-lg font-bold" style={{ color:STAGE_COLOR[ptPresentStage] }}>{s.presentDays}</p>
                       <p className="text-xs text-gray-400">يوم</p>
                     </div>
                   ))}
@@ -666,19 +675,27 @@ export default function AnalyticsPage() {
           {/* single tabbed card */}
           <Card>
             <StageTabs active={ptStage} onChange={setPtStage} />
-            <div className="space-y-2">
+            <div className="space-y-3">
               {(pts.top5PerStage[ptStage] || []).length===0
                 ? <p className="text-sm text-gray-400 text-center py-4">لا توجد بيانات</p>
-                : (pts.top5PerStage[ptStage] || []).map((s, i) => (
-                    <div key={s.id} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
-                      <MedalBadge rank={i+1} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-800 truncate">{s.name}</p>
-                        <p className="text-xs text-gray-400">{s.grade}</p>
+                : (pts.top5PerStage[ptStage] || []).map((s:any, i:number) => (
+                    <div key={s.id} className="py-2 border-b border-gray-50 last:border-0">
+                      <div className="flex items-center gap-3 mb-1.5">
+                        <MedalBadge rank={i+1} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-gray-800 truncate">{s.name}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <p className="text-xs text-gray-400">{s.grade}</p>
+                            <span className="text-gray-300">·</span>
+                            <span className="text-xs font-mono text-gray-400">#{s.membershipNo}</span>
+                          </div>
+                        </div>
+                        <span className="text-base font-bold shrink-0" style={{ color:STAGE_COLOR[ptStage] }}>إجمالي {s.points}</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Bar value={s.points} max={(pts.top5PerStage[ptStage]||[])[0]?.points||1} color={STAGE_COLOR[ptStage]} h={5} />
-                        <span className="text-base font-bold shrink-0" style={{ color:STAGE_COLOR[ptStage], minWidth:40, textAlign:'left' }}>{s.points}</span>
+                      <div className="flex gap-1.5 mr-9">
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-semibold">فردية {s.individual}</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-50 text-cyan-600 font-semibold">جماعية {s.collective}</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-600 font-semibold">رصيد {s.balance}</span>
                       </div>
                     </div>
                   ))
@@ -701,8 +718,9 @@ export default function AnalyticsPage() {
               return list.length===0
                 ? <p className="text-sm text-gray-400 text-center py-4">لا توجد مجموعات في هذه المرحلة</p>
                 : <div className="space-y-3">
-                    {list.map((g, i) => (
-                      <div key={g.id} className="flex items-center gap-3">
+                    {list.map((g:any, i:number) => (
+                      <button key={g.id} onClick={() => setSelectedGroup(g)}
+                        className="w-full flex items-center gap-3 rounded-xl p-2 hover:bg-gray-50 transition-colors text-right">
                         <MedalBadge rank={i+1} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between mb-1">
@@ -711,12 +729,13 @@ export default function AnalyticsPage() {
                           </div>
                           <div className="flex items-center gap-2">
                             <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
-                              <div className="h-full rounded-full transition-all duration-700" style={{ width:`${(g.points/maxPts)*100}%`, backgroundColor:STAGE_COLOR[grpStage] }} />
+                              <div className="h-full rounded-full transition-all duration-700" style={{ width:`${maxPts>0?(g.points/maxPts)*100:0}%`, backgroundColor:STAGE_COLOR[grpStage] }} />
                             </div>
                             <span className="text-xs text-gray-400 shrink-0">{g.studentCount} طالب</span>
+                            <span className="text-xs text-gray-300">←</span>
                           </div>
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>;
             })()}
@@ -837,11 +856,38 @@ export default function AnalyticsPage() {
                   <div key={s.id} className="flex items-center justify-between rounded-xl border border-amber-100 bg-amber-50 p-3">
                     <div>
                       <p className="font-semibold text-gray-800">{s.name}</p>
-                      <p className="text-xs text-gray-500">{s.stage} · {s.grade}</p>
+                      <p className="text-xs text-gray-500">{s.stage} · {s.grade} · <span className="font-mono">#{s.membershipNo}</span></p>
                     </div>
                     <div className="text-center">
                       <p className="text-xl font-bold text-amber-700">{s.maxStreak}</p>
                       <p className="text-xs text-amber-500">أيام متتالية</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+          }
+        </Modal>
+      )}
+
+      {selectedGroup && (
+        <Modal title={`أعضاء ${selectedGroup.name} (${selectedGroup.members?.length ?? 0})`} onClose={() => setSelectedGroup(null)}>
+          {!selectedGroup.members?.length
+            ? <p className="text-gray-400 text-center py-6">لا يوجد طلاب في هذه المجموعة</p>
+            : <div className="space-y-2">
+                {selectedGroup.members.map((m: GroupMember) => (
+                  <div key={m.id} className="rounded-xl border border-gray-100 p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <p className="font-semibold text-gray-800 text-sm">{m.name}</p>
+                        <p className="text-xs text-gray-500">{m.stage} · {m.grade}</p>
+                      </div>
+                      <span className="text-xs font-mono text-gray-400">#{m.membershipNo}</span>
+                    </div>
+                    <div className="flex gap-1.5 flex-wrap">
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-semibold">فردية {m.individual}</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-50 text-cyan-600 font-semibold">جماعية {m.collective}</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-600 font-semibold">رصيد {m.balance}</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-semibold">إجمالي {m.total}</span>
                     </div>
                   </div>
                 ))}

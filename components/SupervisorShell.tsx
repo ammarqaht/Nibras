@@ -25,7 +25,6 @@ const ROLE_MAP: Record<string, string> = {
   media_supervisor: 'مشرف الإعلامية',
   scientific_supervisor: 'مشرف العلمية',
   sports_supervisor: 'مشرف الرياضية',
-  administrative_supervisor: 'مشرف الإدارية',
   stage_supervisor: 'مشرف مرحلة'
 };
 
@@ -42,11 +41,11 @@ const getRoleLabel = (roleStr: string) => {
 const LINKS: NavLink[] = [
   { id: 'home', href: '/supervisor', label: 'الرئيسية' },
   { id: 'students', href: '/supervisor/students', label: 'الطلاب' },
-  { id: 'attendance', href: '/supervisor/attendance', label: 'الحضور', roles: ['attendance_supervisor', 'administrative_supervisor', 'groups_supervisor', 'stage_supervisor'] },
+  { id: 'attendance', href: '/supervisor/attendance', label: 'الحضور' },
   { id: 'points', href: '/supervisor/points', label: 'النقاط', roles: ['social_supervisor', 'cultural_supervisor', 'sports_supervisor', 'scientific_supervisor', 'groups_supervisor', 'stage_supervisor'] },
   { id: 'tasks', href: '/supervisor/tasks', label: 'المهام', roles: ['general_supervisor'] },
   { id: 'schedule', href: '/supervisor/schedule', label: 'الجدول' },
-  { id: 'groups', href: '/supervisor/groups', label: 'المجموعات', roles: ['groups_supervisor', 'general_supervisor', 'stage_supervisor'] },
+  { id: 'groups', href: '/supervisor/groups', label: 'المجموعات', roles: ['groups_supervisor', 'general_supervisor', 'stage_supervisor', 'cultural_supervisor', 'social_supervisor', 'scientific_supervisor', 'sports_supervisor', 'attendance_supervisor'] },
   { id: 'payments', href: '/supervisor/payments', label: 'المدفوعات', roles: ['finance', 'finance_supervisor'] },
   { id: 'invoices', href: '/supervisor/invoices', label: 'الفواتير' },
   { id: 'finance', href: '/supervisor/finance', label: 'المالية', roles: ['finance', 'finance_supervisor'] },
@@ -153,7 +152,7 @@ export default function SupervisorShell({ children }: { children: React.ReactNod
     if (isAdmin) return true;
     if (user?.permissions) {
       if (user.permissions.includes(l.id)) return true;
-      if (['home', 'students', 'schedule', 'invoices', 'analytics'].includes(l.id)) return true;
+      if (['home', 'students', 'schedule', 'invoices', 'analytics', 'attendance'].includes(l.id)) return true;
       // Also honour role-based rules even when permissions are present
       if (l.roles && l.roles.some((r) => userRoles.includes(r))) return true;
       return false;

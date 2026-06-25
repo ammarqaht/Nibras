@@ -121,12 +121,12 @@ export type SettingInfo = {
 /** الأدوار التي تملك صلاحية كاملة على بيانات الطلاب (شاملة الهوية والجوال والدفع) */
 export const FULL_STUDENT_DATA_ROLES = [
   'admin', 'finance', 'finance_supervisor',
-  'administrative_supervisor', 'media_supervisor', 'stage_supervisor'
+  'media_supervisor', 'stage_supervisor'
 ];
 
 /** الأدوار التي تستطيع رؤية البيانات المالية في الإحصائيات */
 export const FINANCE_ANALYTICS_ROLES = [
-  'admin', 'finance', 'finance_supervisor', 'administrative_supervisor'
+  'admin', 'finance', 'finance_supervisor'
 ];
 
 /** الأدوار التي تستطيع إضافة نقاط جماعية للمجموعات */
@@ -138,7 +138,7 @@ export const GROUP_POINTS_ROLES = [
 /** الأدوار التي تُعامَل كـ "عامة" وترى بيانات الجميع بدون تصفية أسرة/مرحلة */
 export const GLOBAL_ROLES = [
   'admin', 'finance', 'finance_supervisor',
-  'administrative_supervisor', 'media_supervisor',
+  'media_supervisor',
   'general_supervisor', 'attendance_supervisor',
   'cultural_supervisor', 'sports_supervisor',
   'scientific_supervisor', 'social_supervisor'
@@ -151,9 +151,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
   scientific_supervisor:    ['points', 'students', 'groups', 'schedule', 'analytics'],
   sports_supervisor:        ['points', 'students', 'groups', 'schedule', 'analytics'],
   groups_supervisor:        ['groups', 'students', 'points', 'attendance', 'analytics'],
-  general_supervisor:       ['students', 'analytics', 'invoices'],
+  general_supervisor:       ['students', 'analytics', 'invoices', 'groups', 'attendance'],
   media_supervisor:         ['announcements', 'schedule', 'students', 'analytics'],
-  administrative_supervisor:['students', 'schedule', 'groups', 'analytics'],
   stage_supervisor:         ['groups', 'students', 'points', 'attendance', 'analytics'],
 };
 
@@ -275,8 +274,7 @@ export async function seedDefaultAdminIfNeeded(): Promise<void> {
     { email: '8',  role: 'media_supervisor',         name: 'تجربة مشرف إعلامية' },
     { email: '9',  role: 'scientific_supervisor',    name: 'تجربة مشرف علمية' },
     { email: '10', role: 'sports_supervisor',        name: 'تجربة مشرف رياضية' },
-    { email: '11', role: 'administrative_supervisor',name: 'تجربة مشرف إدارية' },
-    { email: '12', role: 'stage_supervisor',         name: 'تجربة مشرف مرحلة' },
+    { email: '11', role: 'stage_supervisor',         name: 'تجربة مشرف مرحلة' },
   ] : [];
   const devHash = hashPassword('a');
 
