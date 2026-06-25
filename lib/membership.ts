@@ -40,15 +40,41 @@ export async function createRegistration(input: RegistrationInput): Promise<Regi
   if (useDb) {
     try {
       const prisma = getPrisma()!;
-      // Create first to obtain the autoincrement id, then derive the membership number.
-      const created = await prisma.registration.create({
-        data: { ...input, membershipNo: 0 }
-      });
-      const membershipNo = membership.base + created.id;
-      await prisma.registration.update({
-        where: { id: created.id },
-        data: { membershipNo }
-      });
+      let membershipNo: number | null = null;
+
+      // Try up to 5 times in case of concurrent registration race conditions
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const registrations = await prisma.registration.findMany({
+          select: { membershipNo: true },
+          orderBy: { membershipNo: 'asc' }
+        });
+
+        const usedNos = new Set(registrations.map(r => r.membershipNo));
+        let candidate = membership.base + 1;
+        while (usedNos.has(candidate)) {
+          candidate++;
+        }
+
+        try {
+          const created = await prisma.registration.create({
+            data: { ...input, membershipNo: candidate }
+          });
+          membershipNo = created.membershipNo;
+          break; // success!
+        } catch (err: any) {
+          // Check if it's a unique constraint failure on membershipNo (Prisma error code P2002)
+          if (err.code === 'P2002' && (err.meta?.target?.includes('membershipNo') || err.message?.includes('membershipNo'))) {
+            console.warn(`Conflict on membershipNo ${candidate}, retrying...`);
+            continue;
+          }
+          throw err; // rethrow other errors
+        }
+      }
+
+      if (!membershipNo) {
+        throw new Error("Failed to allocate a unique membership number after multiple attempts.");
+      }
+
       return { membershipNo, mode: 'database' };
     } catch (dbErr) {
       console.error("Database registration failed, falling back to JSON:", dbErr);
@@ -71,33 +97,43 @@ async function localFallback(input: RegistrationInput): Promise<RegistrationResu
     await fs.mkdir(DATA_DIR, { recursive: true });
   } catch {}
 
-  let count = 0;
+  let records: any[] = [];
   try {
-    const raw = await fs.readFile(COUNTER_FILE, 'utf8');
-    count = JSON.parse(raw).count ?? 0;
+    const raw = await fs.readFile(RECORDS_FILE, 'utf8');
+    records = JSON.parse(raw);
+    if (!Array.isArray(records)) {
+      records = [];
+    }
   } catch {
-    count = 0;
+    records = [];
   }
-  count += 1;
-  try {
-    await fs.writeFile(COUNTER_FILE, JSON.stringify({ count }, null, 2), 'utf8');
-  } catch {}
 
-  const membershipNo = membership.base + count;
+  const usedNos = new Set<number>();
+  for (const r of records) {
+    if (r && typeof r.membershipNo === 'number') {
+      usedNos.add(r.membershipNo);
+    }
+  }
+
+  let candidate = membership.base + 1;
+  while (usedNos.has(candidate)) {
+    candidate++;
+  }
+
+  const membershipNo = candidate;
 
   // Best-effort local record (not a substitute for a real DB).
   try {
-    let records: unknown[] = [];
-    try {
-      records = JSON.parse(await fs.readFile(RECORDS_FILE, 'utf8'));
-    } catch {
-      records = [];
-    }
     records.push({ membershipNo, ...input, createdAt: new Date().toISOString() });
     await fs.writeFile(RECORDS_FILE, JSON.stringify(records, null, 2), 'utf8');
   } catch {
     /* ignore local record write errors */
   }
+
+  // Maintain counter file for backwards compatibility
+  try {
+    await fs.writeFile(COUNTER_FILE, JSON.stringify({ count: candidate - membership.base }, null, 2), 'utf8');
+  } catch {}
 
   return { membershipNo, mode: 'local-fallback' };
 }
