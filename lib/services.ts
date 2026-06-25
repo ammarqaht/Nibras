@@ -145,14 +145,14 @@ export const GLOBAL_ROLES = [
 ];
 
 export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
-  attendance_supervisor:    ['attendance', 'students', 'analytics'],
+  attendance_supervisor:    ['attendance', 'students', 'analytics', 'points'],
   social_supervisor:        ['points', 'students', 'groups', 'schedule', 'analytics'],
   cultural_supervisor:      ['points', 'students', 'groups', 'schedule', 'analytics'],
   scientific_supervisor:    ['points', 'students', 'groups', 'schedule', 'analytics'],
   sports_supervisor:        ['points', 'students', 'groups', 'schedule', 'analytics'],
   groups_supervisor:        ['groups', 'students', 'points', 'attendance', 'analytics'],
-  general_supervisor:       ['students', 'analytics', 'invoices', 'groups', 'attendance'],
-  media_supervisor:         ['announcements', 'schedule', 'students', 'analytics'],
+  general_supervisor:       ['students', 'analytics', 'invoices', 'groups', 'attendance', 'points'],
+  media_supervisor:         ['announcements', 'schedule', 'students', 'analytics', 'points'],
   stage_supervisor:         ['groups', 'students', 'points', 'attendance', 'analytics'],
 };
 

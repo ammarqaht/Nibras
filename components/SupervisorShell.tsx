@@ -152,7 +152,7 @@ export default function SupervisorShell({ children }: { children: React.ReactNod
     if (isAdmin) return true;
     if (user?.permissions) {
       if (user.permissions.includes(l.id)) return true;
-      if (['home', 'students', 'schedule', 'invoices', 'analytics', 'attendance'].includes(l.id)) return true;
+      if (['home', 'students', 'schedule', 'invoices', 'analytics', 'attendance', 'points'].includes(l.id)) return true;
       // Also honour role-based rules even when permissions are present
       if (l.roles && l.roles.some((r) => userRoles.includes(r))) return true;
       return false;

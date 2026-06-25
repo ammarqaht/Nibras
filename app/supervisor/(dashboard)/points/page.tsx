@@ -21,7 +21,7 @@ type StageName = typeof STAGES[number];
 
 const ADD_POINTS_ROLES = [
   'admin', 'cultural_supervisor', 'sports_supervisor',
-  'scientific_supervisor', 'social_supervisor',
+  'scientific_supervisor', 'social_supervisor', 'stage_supervisor',
 ];
 
 function calcSummary(pts: Point[]) {

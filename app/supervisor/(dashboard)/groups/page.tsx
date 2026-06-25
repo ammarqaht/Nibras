@@ -437,7 +437,7 @@ export default function GroupsPage() {
     reader.readAsBinaryString(file);
   }
 
-  const activeGroup = isGlobal ? selectedGroupModal : groups[0] ?? null;
+  const activeGroup = (isGroupsSup && !canManageGroups) ? (groups[0] ?? null) : selectedGroupModal;
 
   const activeGroupStudents = useMemo(() => {
     if (!activeGroup) return [];
@@ -734,7 +734,7 @@ export default function GroupsPage() {
             </div>
           )}
         </div>
-      ) : isGlobal || isStage ? (
+      ) : canManageGroups ? (
         <div className="w-full space-y-4">
           {/* Stage tabs — stage_supervisor sees only their stage */}
           <div className="flex gap-2 flex-wrap">

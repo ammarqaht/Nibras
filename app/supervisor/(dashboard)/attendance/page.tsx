@@ -42,7 +42,7 @@ export default function AttendancePage() {
 
   const roles = useMemo(() => (user?.role ?? '').split(',').map(r => r.trim()).filter(Boolean), [user]);
   const isAdmin     = roles.includes('admin') || user?.permissions?.includes('*');
-  const canEdit     = isAdmin || roles.some(r => ['attendance_supervisor','general_supervisor'].includes(r));
+  const canEdit     = isAdmin || roles.includes('attendance_supervisor');
   const isGroupsSup = !canEdit && roles.includes('groups_supervisor');
   const isStageSup  = !canEdit && !isGroupsSup && roles.includes('stage_supervisor');
 
@@ -88,7 +88,8 @@ export default function AttendancePage() {
     const gj = await gr.json().catch(()=>({groups:[]}));
     const cj = await cr.json().catch(()=>({}));
     setStudents((sj.students??[]).filter((s:Student) =>
-      s.registrationStatus==='approved' && (s.paymentStatus==='paid'||s.paymentStatus==='exempted')
+      s.registrationStatus==='approved' &&
+      (!s.paymentStatus || s.paymentStatus==='paid' || s.paymentStatus==='exempted')
     ));
     setGroups(gj.groups??[]);
     if (cj.lateAfter) { setCfg(cj); setCfgDraft(cj); }
@@ -202,15 +203,12 @@ export default function AttendancePage() {
 
   /* filtered list based on role */
   const list = useMemo(()=>{
-    let base = students;
-    if (isGroupsSup) base = base.filter(s => s.groupId !== null && myGroupIds.has(s.groupId));
-    else if (isStageSup) base = base.filter(s => s.stage === myStage);
-    return base.filter(s=>
+    return students.filter(s=>
       (!fGroup||String(s.groupId)===fGroup) &&
       (!fStage||s.stage===fStage) &&
       (!nameSearch.trim()||s.studentName.includes(nameSearch.trim()))
     );
-  }, [students,fGroup,fStage,nameSearch,isGroupsSup,isStageSup,myGroupIds,myStage]);
+  }, [students,fGroup,fStage,nameSearch]);
 
   const counts = useMemo(()=>{
     const c = { present:0, late:0, excused:0, absent:0, none:0 };

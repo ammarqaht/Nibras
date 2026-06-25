@@ -327,8 +327,12 @@ export default function StudentsPage() {
   };
 
   async function load() {
+    // isGlobal roles see all students; stage/groups supervisors are scoped server-side
+    const studentsUrl = isGlobal
+      ? '/api/supervisor/students?scope=all'
+      : '/api/supervisor/students';
     const [sr, gr] = await Promise.all([
-      fetch('/api/supervisor/students', { cache: 'no-store' }),
+      fetch(studentsUrl, { cache: 'no-store' }),
       fetch('/api/supervisor/groups', { cache: 'no-store' })
     ]);
     const sj = await sr.json().catch(() => ({ students: [] }));
@@ -343,14 +347,11 @@ export default function StudentsPage() {
   }, []);
 
   const approvedStudents = useMemo(() => {
-    let base = students.filter((s) =>
+    return students.filter((s) =>
       s.registrationStatus === 'approved' &&
-      (s.paymentStatus === 'paid' || s.paymentStatus === 'exempted')
+      (s.paymentStatus === 'paid' || s.paymentStatus === 'exempted' || s.paymentStatus === '')
     );
-    if (isGroupsSup) base = base.filter(s => s.groupId !== null && myGroupIds.has(s.groupId));
-    else if (isStageSup) base = base.filter(s => s.stage === myStage);
-    return base;
-  }, [students, isGroupsSup, isStageSup, myGroupIds, myStage]);
+  }, [students]);
 
   const neighborhoods = useMemo(() => {
     const list = approvedStudents.map((s) => s.neighborhood?.trim()).filter(Boolean);
