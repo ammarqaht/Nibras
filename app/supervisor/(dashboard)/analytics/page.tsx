@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useSupervisor } from '@/components/SupervisorShell';
 
 // ─── types ────────────────────────────────────────────────────────────────────
-type DayRow  = { date: string; label: string; present: number; absent: number; rate: number };
+type DayRow  = { date: string; label: string; present: number; absent: number; late: number; rate: number };
 type Student = { id: number; name: string; stage: string; grade: string; membershipNo: number };
 type Analytics = {
   updatedAt: string;
@@ -290,8 +290,9 @@ export default function AnalyticsPage() {
   // Role-based section visibility
   const roles = user?.role ? user.role.split(',').map(r => r.trim()) : [];
   const isPrivileged = roles.some(r => ['admin','general_supervisor','administrative_supervisor','finance','finance_supervisor'].includes(r));
-  const canSeeFinance = roles.some(r => ['finance','finance_supervisor'].includes(r));
-  // registration, attendance, points, groups, tasks, schedule: all supervisors
+  const canSeeFinance = roles.some(r =>
+    ['admin','finance','finance_supervisor','administrative_supervisor'].includes(r)
+  );
 
   const TABS = ALL_TABS.filter(t => {
     if (t.id === 'finance') return canSeeFinance;
@@ -546,6 +547,11 @@ export default function AnalyticsPage() {
                       <div className="h-px bg-gray-100" />
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-gray-500">معتذر</span>
+                        <span className="text-base font-bold text-amber-500">{att.today?.late??0}</span>
+                      </div>
+                      <div className="h-px bg-gray-100" />
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-500">غائب</span>
                         <span className="text-base font-bold text-red-500">{att.today?.absent??0}</span>
                       </div>
                     </div>

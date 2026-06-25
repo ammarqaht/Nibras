@@ -1,421 +1,322 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { pushToast } from '@/components/Toast';
+import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
 import { useSupervisor } from '@/components/SupervisorShell';
 
-type Student = { id: number; membershipNo: number; studentName: string; groupId: number | null; registrationStatus: string; paymentStatus: string; stage: string; grade: string };
-type Group = { id: number; name: string };
+type Student = {
+  id: number; membershipNo: number; studentName: string;
+  groupId: number | null; registrationStatus: string;
+  paymentStatus: string; stage: string; grade: string;
+};
+type Group = { id: number; name: string; stage: string };
 type Point = {
-  id: number; registrationId: number; delta: number; reason: string;
-  category: string; recordedBy: string | null; createdAt: string;
+  id: number; registrationId: number; delta: number;
+  reason: string; category: string; pointType: string;
+  recordedBy: string | null; createdAt: string;
 };
 
-const CATEGORIES = [
-  { key: 'behavior', label: 'سلوك' },
-  { key: 'participation', label: 'مشاركة' },
-  { key: 'activity', label: 'نشاط' },
-  { key: 'other', label: 'أخرى' }
-];
-const catLabel = (k: string) => CATEGORIES.find((c) => c.key === k)?.label ?? k;
+const STAGES = ['ابتدائي', 'متوسط', 'ثانوي'] as const;
+type StageName = typeof STAGES[number];
 
-export default function PointsPage() {
+const ADD_POINTS_ROLES = [
+  'admin', 'cultural_supervisor', 'sports_supervisor',
+  'scientific_supervisor', 'social_supervisor',
+];
+
+function calcSummary(pts: Point[]) {
+  let individual = 0, collective = 0, deduction = 0;
+  for (const p of pts) {
+    const t = p.pointType ?? (
+      p.reason.endsWith('(رصد جماعي للأسرة)') ? 'collective'
+        : p.delta < 0 ? 'deduction' : 'individual'
+    );
+    if (t === 'individual') individual += p.delta;
+    else if (t === 'collective') collective += p.delta;
+    else deduction += p.delta;
+  }
+  const total = individual + collective;           // الاجمالي — basis for ranking
+  const balance = Math.max(0, total + deduction);  // الرصيد — never below zero
+  return { individual, collective, deduction, total, balance };
+}
+
+function RankBadge({ rank }: { rank: number }) {
+  const base = 'w-6 h-6 rounded-full font-bold text-xs flex items-center justify-center shadow-sm';
+  if (rank === 1) return <span className={`${base} bg-amber-400 text-ink-900 border border-amber-500`}>١</span>;
+  if (rank === 2) return <span className={`${base} bg-slate-300 text-ink-900 border border-slate-400`}>٢</span>;
+  if (rank === 3) return <span className={`${base} bg-amber-700 text-white border border-amber-800`}>٣</span>;
+  return <span className="text-ink-400 font-mono text-xs">#{rank}</span>;
+}
+
+export default function PointsBoardPage() {
   const { user } = useSupervisor();
-  const roles = user?.role ? user.role.split(',').map((r) => r.trim()) : [];
-  const isGlobal = roles.some((r) =>
-    ['admin', 'finance', 'finance_supervisor', 'media_supervisor', 'cultural_supervisor', 'social_supervisor', 'general_supervisor', 'attendance_supervisor'].includes(r)
-  );
-  const canAddGroupPoints = roles.some((r) =>
-    ['admin', 'cultural_supervisor', 'sports_supervisor', 'general_supervisor', 'social_supervisor'].includes(r)
-  );
+  const roles = user?.role ? user.role.split(',').map(r => r.trim()) : [];
+  const canAddPoints = roles.some(r => ADD_POINTS_ROLES.includes(r));
 
   const [students, setStudents] = useState<Student[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [points, setPoints] = useState<Point[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const [mode, setMode] = useState<'individual' | 'group'>('individual');
-  const [studentId, setStudentId] = useState('');
-  const [studentQuery, setStudentQuery] = useState('');
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const searchContainerRef = useRef<HTMLDivElement>(null);
-  const [groupId, setGroupId] = useState('');
-  const [sign, setSign] = useState<1 | -1>(1);
-  const [amount, setAmount] = useState('5');
-  const [reason, setReason] = useState('');
-  const [category, setCategory] = useState('behavior');
-  const [busy, setBusy] = useState(false);
-
-  const [activeTab, setActiveTab] = useState<'leaderboard' | 'history'>('leaderboard');
-  const [historySubTab, setHistorySubTab] = useState<'students' | 'groups'>('students');
-  const [leaderboardSearch, setLeaderboardSearch] = useState('');
-  const [historySearch, setHistorySearch] = useState('');
-  const [historyStageFilter, setHistoryStageFilter] = useState('');
-
-  async function loadAll() {
-    const [sr, gr, pr] = await Promise.all([
-      fetch('/api/supervisor/students?scope=all', { cache: 'no-store' }),
-      fetch('/api/supervisor/groups', { cache: 'no-store' }),
-      fetch('/api/supervisor/points', { cache: 'no-store' })
-    ]);
-    const srj = await sr.json().catch(() => ({ students: [] }));
-    const grj = await gr.json().catch(() => ({ groups: [] }));
-    const prj = await pr.json().catch(() => ({ points: [] }));
-    const allSt: Student[] = srj.students ?? [];
-    setStudents(allSt.filter((s) => s.registrationStatus === 'approved' && (s.paymentStatus === 'paid' || s.paymentStatus === 'exempted' || s.paymentStatus === '')));
-
-    setGroups(grj.groups ?? []);
-    setPoints(prj.points ?? []);
-    setLoading(false);
-  }
-  useEffect(() => { loadAll(); }, []);
+  const [activeStage, setActiveStage] = useState<StageName>('ابتدائي');
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+  const [logSearch, setLogSearch] = useState('');
+  const [leaderSearch, setLeaderSearch] = useState('');
 
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
-        setIsDropdownOpen(false);
-        if (studentId) {
-          const selected = students.find((s) => String(s.id) === studentId);
-          if (selected) {
-            setStudentQuery(`${selected.studentName} (#${selected.membershipNo})`);
-          }
-        } else {
-          setStudentQuery('');
-        }
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [studentId, students]);
-
-  const nameOf = useMemo(() => {
-    const m = new Map(students.map((s) => [s.id, s.studentName]));
-    return (id: number) => m.get(id) ?? `#${id}`;
-  }, [students]);
-
-  const leaderboard = useMemo(() => {
-    const pointsMap = new Map<number, number>();
-    points.forEach((p) => {
-      pointsMap.set(p.registrationId, (pointsMap.get(p.registrationId) ?? 0) + p.delta);
+    Promise.all([
+      fetch('/api/supervisor/students?scope=all', { cache: 'no-store' }),
+      fetch('/api/supervisor/groups', { cache: 'no-store' }),
+      fetch('/api/supervisor/points', { cache: 'no-store' }),
+    ]).then(async ([sr, gr, pr]) => {
+      const srj = await sr.json().catch(() => ({ students: [] }));
+      const grj = await gr.json().catch(() => ({ groups: [] }));
+      const prj = await pr.json().catch(() => ({ points: [] }));
+      const allSt: Student[] = srj.students ?? [];
+      setStudents(allSt.filter(s =>
+        s.registrationStatus === 'approved' &&
+        (s.paymentStatus === 'paid' || s.paymentStatus === 'exempted' || s.paymentStatus === '')
+      ));
+      setGroups(grj.groups ?? []);
+      setPoints(prj.points ?? []);
+      setLoading(false);
     });
+  }, []);
 
-    const list = students.map((s) => {
-      const total = pointsMap.get(s.id) ?? 0;
-      const groupName = s.groupId ? groups.find((g) => g.id === s.groupId)?.name : '—';
+  const groupMap = useMemo(() => new Map(groups.map(g => [g.id, g.name])), [groups]);
+  const studentMap = useMemo(() => new Map(students.map(s => [s.id, s])), [students]);
+
+  const studentSummaries = useMemo(() => {
+    const byStudent = new Map<number, Point[]>();
+    for (const p of points) {
+      if (!byStudent.has(p.registrationId)) byStudent.set(p.registrationId, []);
+      byStudent.get(p.registrationId)!.push(p);
+    }
+    return students.map(s => {
+      const pts = byStudent.get(s.id) ?? [];
+      const { individual, collective, deduction, total, balance } = calcSummary(pts);
       return {
-        ...s,
-        totalPoints: total,
-        groupName
+        ...s, individual, collective, deduction, total, balance,
+        rankScore: total,
+        groupName: s.groupId ? (groupMap.get(s.groupId) ?? '—') : '—',
       };
     });
+  }, [students, points, groupMap]);
 
-    list.sort((a, b) => b.totalPoints - a.totalPoints);
-    return list;
-  }, [students, points, groups]);
+  const leaderboard = useMemo(() => {
+    const q = leaderSearch.trim();
+    return [...studentSummaries]
+      .filter(s => s.stage === activeStage && (!q || s.studentName.includes(q)))
+      .sort((a, b) => b.rankScore - a.rankScore);
+  }, [studentSummaries, activeStage, leaderSearch]);
 
-  const filteredLeaderboard = useMemo(() => {
-    return leaderboard.filter((item) =>
-      item.studentName.toLowerCase().includes(leaderboardSearch.trim().toLowerCase())
-    );
-  }, [leaderboard, leaderboardSearch]);
+  const stageStudentIds = useMemo(
+    () => new Set(students.filter(s => s.stage === activeStage).map(s => s.id)),
+    [students, activeStage]
+  );
 
-  const filteredStudents = useMemo(() => {
-    if (!studentQuery.trim()) return students;
-    const q = studentQuery.toLowerCase().trim();
-    return students.filter(
-      (s) =>
-        s.studentName.toLowerCase().includes(q) ||
-        String(s.membershipNo).includes(q)
-    );
-  }, [students, studentQuery]);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    const delta = sign * Math.abs(parseInt(amount, 10) || 0);
-    if (!delta || !reason.trim()) return pushToast('error', 'أدخل عدد النقاط والسبب');
-    if (mode === 'individual' && !studentId) return pushToast('error', 'اختر الطالب');
-    if (mode === 'group' && !groupId) return pushToast('error', 'اختر المجموعة');
-
-    setBusy(true);
-    const r = await fetch('/api/supervisor/points', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        registrationId: mode === 'individual' ? studentId : undefined,
-        groupId: mode === 'group' ? groupId : undefined,
-        delta, reason: reason.trim(), category
+  const stageLog = useMemo(() => {
+    const q = logSearch.trim().toLowerCase();
+    return [...points]
+      .filter(p => {
+        if (!stageStudentIds.has(p.registrationId)) return false;
+        if (!q) return true;
+        const st = studentMap.get(p.registrationId);
+        return st?.studentName.toLowerCase().includes(q) || String(st?.membershipNo).includes(q);
       })
-    });
-    setBusy(false);
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) return pushToast('error', j.error ?? 'فشل تسجيل النقاط');
-    pushToast('success', j.bulk ? `تم رصد النقاط لـ ${j.pointRecords.length} طالب` : 'تم رصد النقاط');
-    setReason('');
-    setStudentId('');
-    setStudentQuery('');
-    loadAll();
-  }
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [points, stageStudentIds, logSearch, studentMap]);
+
+  const toggleExpand = (id: number) => setExpandedIds(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-ink-900 mb-1">رصد النقاط</h1>
-        <p className="text-sm text-ink-500">امنح أو اخصم نقاطاً لطالب أو لمجموعة كاملة.</p>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-ink-900 mb-1">لوحة النقاط</h1>
+          <p className="text-sm text-ink-500">ترتيب الأوائل وسجل الرصد مقسم حسب المرحلة الدراسية.</p>
+        </div>
+        {canAddPoints && (
+          <Link href="/supervisor/points/add" className="btn btn-primary shrink-0 flex items-center gap-1.5 text-sm">
+            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            رصد النقاط
+          </Link>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <form onSubmit={submit} className="card p-6 space-y-4 lg:col-span-1 self-start">
-          {canAddGroupPoints && (
-            <div className="flex gap-2">
-              <button type="button" className={`choice flex-1 ${mode === 'individual' ? 'is-active' : ''}`} onClick={() => setMode('individual')}>طالب</button>
-              <button type="button" className={`choice flex-1 ${mode === 'group' ? 'is-active' : ''}`} onClick={() => setMode('group')}>مجموعة</button>
-            </div>
-          )}
+      {/* Stage tabs */}
+      <div className="flex gap-2 mb-6">
+        {STAGES.map(stage => (
+          <button
+            key={stage}
+            type="button"
+            onClick={() => { setActiveStage(stage); setLeaderSearch(''); setLogSearch(''); }}
+            className={`choice py-1.5 px-4 text-sm font-medium ${activeStage === stage ? 'is-active' : ''}`}
+          >
+            {stage}
+          </button>
+        ))}
+      </div>
 
-
-            {mode === 'individual' ? (
-              <div className="relative font-sans" ref={searchContainerRef}>
-                <label className="label">الطالب</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    className="field w-full pl-8 pr-3"
-                    placeholder="ابحث عن طالب بالاسم أو العضوية..."
-                    value={studentQuery}
-                    onChange={(e) => {
-                      setStudentQuery(e.target.value);
-                      setIsDropdownOpen(true);
-                      if (!e.target.value) {
-                        setStudentId('');
-                      }
-                    }}
-                    onFocus={() => setIsDropdownOpen(true)}
-                  />
-                  {studentId && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setStudentId('');
-                        setStudentQuery('');
-                      }}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400 hover:text-ink-900 font-bold p-0.5 flex items-center justify-center"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M18 6 6 18M6 6l12 12" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-                {isDropdownOpen && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border border-ink-200 rounded-lg shadow-lg max-h-60 overflow-y-auto scroll-soft">
-                    {filteredStudents.length === 0 ? (
-                      <div className="p-3 text-sm text-ink-400 text-center">لا يوجد طلاب يطابقون البحث</div>
-                    ) : (
-                      filteredStudents.map((s) => (
-                        <button
-                          key={s.id}
-                          type="button"
-                          onClick={() => {
-                            setStudentId(String(s.id));
-                            setStudentQuery(`${s.studentName} (#${s.membershipNo})`);
-                            setIsDropdownOpen(false);
-                          }}
-                          className={`w-full text-right px-3 py-2 text-sm hover:bg-cream-50 transition-colors flex items-center justify-between border-b border-ink-50 last:border-0 ${
-                            studentId === String(s.id) ? 'bg-brand/5 text-brand-600 font-semibold' : 'text-ink-900'
-                          }`}
-                        >
-                          <span className="font-semibold">{s.studentName}</span>
-                          <span className="text-xs text-ink-400 font-mono">#{s.membershipNo}</span>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                )}
+      {loading ? (
+        <p className="text-center py-16 text-ink-400 text-sm">جارٍ التحميل…</p>
+      ) : (
+        <div className="space-y-6">
+          {/* Leaderboard */}
+          <div className="card overflow-hidden">
+            <div className="px-5 py-4 border-b border-ink-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <h2 className="font-bold text-ink-900">ترتيب الأوائل</h2>
+                <span className="text-xs text-ink-400 bg-ink-100 px-2 py-0.5 rounded-full">
+                  {studentSummaries.filter(s => s.stage === activeStage).length} طالب
+                </span>
               </div>
-            ) : (
-              <div>
-                <label className="label">المجموعة / الأسرة</label>
-                <select className="field" value={groupId} onChange={(e) => setGroupId(e.target.value)}>
-                  <option value="">اختر المجموعة</option>
-                  {groups.map((g) => <option key={g.id} value={String(g.id)}>{g.name}</option>)}
-                </select>
-              </div>
-            )}
-
-            <div>
-              <label className="label">النوع</label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  className={`choice choice-add flex-1 transition-all ${
-                    sign === 1
-                      ? 'is-active font-bold'
-                      : 'text-green-600 border-green-200 bg-white hover:bg-green-50'
-                  }`}
-                  onClick={() => setSign(1)}
-                >
-                  + إضافة
-                </button>
-                <button
-                  type="button"
-                  className={`choice choice-deduct flex-1 transition-all ${
-                    sign === -1
-                      ? 'is-active font-bold'
-                      : 'text-red-600 border-red-200 bg-white hover:bg-red-50'
-                  }`}
-                  onClick={() => setSign(-1)}
-                >
-                  − خصم
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="label">عدد النقاط</label>
-                <input className="field" dir="ltr" inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ''))} />
-              </div>
-              <div>
-                <label className="label">التصنيف</label>
-                <select className="field" value={category} onChange={(e) => setCategory(e.target.value)}>
-                  {CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="label">السبب</label>
-              <input className="field" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="مثال: تميّز في النشاط" />
-            </div>
-
-            <button type="submit" disabled={busy} className="btn btn-primary w-full">{busy ? '...' : 'رصد النقاط'}</button>
-          </form>
-
-
-
-        <div className="card p-6 lg:col-span-2">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 border-b border-ink-200 pb-4">
-            <div className="flex gap-2">
-              <button
-                type="button"
-                className={`choice py-1.5 px-4 text-sm flex items-center gap-1.5 ${activeTab === 'leaderboard' ? 'is-active' : ''}`}
-                onClick={() => setActiveTab('leaderboard')}
-              >
-                <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
-                  <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
-                  <path d="M4 22h16" />
-                  <path d="M10 14.66V17c0 .55-.45 1-1 1H4v2h16v-2h-5c-.55 0-1-.45-1-1v-2.34" />
-                  <path d="M12 2a6 6 0 0 1 6 6v7a6 6 0 0 1-12 0V8a6 6 0 0 1 6-6Z" />
-                </svg>
-                <span>ترتيب الصدارة</span>
-              </button>
-              <button
-                type="button"
-                className={`choice py-1.5 px-4 text-sm flex items-center gap-1.5 ${activeTab === 'history' ? 'is-active' : ''}`}
-                onClick={() => setActiveTab('history')}
-              >
-                <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                  <polyline points="14 2 14 8 20 8" />
-                  <line x1="16" y1="13" x2="8" y2="13" />
-                  <line x1="16" y1="17" x2="8" y2="17" />
-                </svg>
-                <span>سجل رصد النقاط</span>
-              </button>
-            </div>
-            
-            {activeTab === 'leaderboard' && (
               <input
                 type="text"
-                placeholder="ابحث عن اسم طالب..."
-                className="field py-1 px-3 text-xs sm:w-48"
-                value={leaderboardSearch}
-                onChange={(e) => setLeaderboardSearch(e.target.value)}
+                placeholder="بحث عن طالب..."
+                className="field py-1.5 px-3 text-xs sm:w-44"
+                value={leaderSearch}
+                onChange={e => setLeaderSearch(e.target.value)}
               />
-            )}
-          </div>
-
-          {/* History sub-tabs */}
-          {activeTab === 'history' && (
-            <div className="flex gap-2 mb-4 border-b border-ink-100 pb-3">
-              <button
-                type="button"
-                className={`choice py-1 px-3 text-xs ${historySubTab === 'students' ? 'is-active' : ''}`}
-                onClick={() => setHistorySubTab('students')}
-              >
-                سجل الطلاب
-              </button>
-              <button
-                type="button"
-                className={`choice py-1 px-3 text-xs ${historySubTab === 'groups' ? 'is-active' : ''}`}
-                onClick={() => setHistorySubTab('groups')}
-              >
-                سجل المجموعات
-              </button>
-              <div className="flex gap-2 mr-auto">
-                {historySubTab === 'students' && (
-                  <>
-                    <input
-                      type="text"
-                      placeholder="بحث باسم الطالب..."
-                      className="field py-1 px-2 text-xs w-32"
-                      value={historySearch}
-                      onChange={e => setHistorySearch(e.target.value)}
-                    />
-                    <select
-                      className="field py-1 px-2 text-xs w-28"
-                      value={historyStageFilter}
-                      onChange={e => setHistoryStageFilter(e.target.value)}
-                    >
-                      <option value="">كل المراحل</option>
-                      <option value="ابتدائي">ابتدائي</option>
-                      <option value="متوسط">متوسط</option>
-                      <option value="ثانوي">ثانوي</option>
-                    </select>
-                  </>
-                )}
-              </div>
             </div>
-          )}
 
-          {loading ? (
-            <p className="text-center py-10 text-ink-400 text-sm">جارٍ التحميل…</p>
-          ) : activeTab === 'leaderboard' ? (
-            filteredLeaderboard.length === 0 ? (
-              <p className="text-center py-10 text-ink-400 text-sm">لا يوجد طلاب تطابق خيارات البحث.</p>
+            {leaderboard.length === 0 ? (
+              <p className="text-center py-10 text-ink-400 text-sm">لا يوجد طلاب.</p>
             ) : (
               <>
+                {/* Desktop */}
                 <div className="hidden lg:block overflow-x-auto scroll-soft">
                   <table className="tbl">
                     <thead>
                       <tr>
                         <th>الترتيب</th>
                         <th>الطالب</th>
-                        <th>رقم العضوية</th>
-                        <th>الأسرة / المجموعة</th>
-                        <th>إجمالي النقاط</th>
+                        <th>العضوية</th>
+                        <th>الأسرة</th>
+                        <th>فردية</th>
+                        <th>جماعية</th>
+                        <th>الرصيد</th>
+                        <th>الاجمالي</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredLeaderboard.map((item) => {
-                        const rank = leaderboard.findIndex((x) => x.id === item.id) + 1;
-                        let rankBadge;
-                        if (rank === 1) rankBadge = <span className="w-6 h-6 rounded-full bg-amber-400 text-ink-900 border border-amber-500 font-bold text-xs flex items-center justify-center shadow-sm" title="المركز الأول">١</span>;
-                        else if (rank === 2) rankBadge = <span className="w-6 h-6 rounded-full bg-slate-300 text-ink-900 border border-slate-400 font-bold text-xs flex items-center justify-center shadow-sm" title="المركز الثاني">٢</span>;
-                        else if (rank === 3) rankBadge = <span className="w-6 h-6 rounded-full bg-amber-600 text-white border border-amber-700 font-bold text-xs flex items-center justify-center shadow-sm" title="المركز الثالث">٣</span>;
-                        else rankBadge = <span className="text-ink-400 font-mono">#{rank}</span>;
+                      {leaderboard.map((item, idx) => (
+                        <tr key={item.id}>
+                          <td><RankBadge rank={idx + 1} /></td>
+                          <td className="font-semibold text-ink-900">{item.studentName}</td>
+                          <td className="font-mono text-ink-400 text-xs">#{item.membershipNo}</td>
+                          <td className="text-ink-500 text-sm">{item.groupName}</td>
+                          <td><span className="pill pill-green text-xs">{item.individual}</span></td>
+                          <td><span className="pill pill-blue text-xs">{item.collective}</span></td>
+                          <td>
+                            <span className={`pill text-xs ${item.balance > 0 ? 'pill-green' : item.balance === 0 ? 'pill-gray' : 'pill-red'}`}>
+                              {item.balance}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`pill font-bold text-xs ${item.total >= 0 ? 'pill-green' : 'pill-red'}`}>
+                              {item.total}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
 
+                {/* Mobile */}
+                <ul className="lg:hidden divide-y divide-ink-100">
+                  {leaderboard.map((item, idx) => (
+                    <li key={item.id} className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-7 h-7 flex items-center justify-center shrink-0">
+                          <RankBadge rank={idx + 1} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-bold text-sm text-ink-900 truncate">{item.studentName}</div>
+                          <div className="text-[11px] text-ink-400 mt-0.5">#{item.membershipNo} · {item.groupName}</div>
+                        </div>
+                        <div className="flex gap-3 text-left shrink-0">
+                          <div>
+                            <div className={`text-sm font-bold ${item.balance > 0 ? 'text-green-600' : item.balance === 0 ? 'text-ink-400' : 'text-red-600'}`}>
+                              {item.balance}
+                            </div>
+                            <div className="text-[10px] text-ink-400 text-center">رصيد</div>
+                          </div>
+                          <div>
+                            <div className="text-sm font-bold text-green-600">{item.total}</div>
+                            <div className="text-[10px] text-ink-400 text-center">اجمالي</div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-4 mt-1.5 text-[11px] text-ink-500 pr-10">
+                        <span>فردية: <span className="text-green-600 font-semibold">{item.individual}</span></span>
+                        <span>جماعية: <span className="text-blue-700 font-semibold">{item.collective}</span></span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
+
+          {/* Log */}
+          <div className="card overflow-hidden">
+            <div className="px-5 py-4 border-b border-ink-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <h2 className="font-bold text-ink-900">سجل الرصد</h2>
+              <input
+                type="text"
+                placeholder="بحث باسم أو رقم عضوية..."
+                className="field py-1.5 px-3 text-xs sm:w-48"
+                value={logSearch}
+                onChange={e => setLogSearch(e.target.value)}
+              />
+            </div>
+
+            {stageLog.length === 0 ? (
+              <p className="text-center py-10 text-ink-400 text-sm">لا توجد سجلات.</p>
+            ) : (
+              <>
+                {/* Desktop */}
+                <div className="hidden lg:block overflow-x-auto scroll-soft">
+                  <table className="tbl">
+                    <thead>
+                      <tr>
+                        <th>الطالب</th>
+                        <th>العضوية</th>
+                        <th>الأسرة</th>
+                        <th>النقاط</th>
+                        <th>النوع</th>
+                        <th>السبب</th>
+                        <th>بواسطة</th>
+                        <th>التاريخ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {stageLog.map(p => {
+                        const st = studentMap.get(p.registrationId);
+                        const typeLabel = p.pointType === 'collective' ? 'جماعية' : p.pointType === 'deduction' ? 'خصم' : 'فردية';
+                        const typeCls = p.pointType === 'collective' ? 'pill-blue' : p.pointType === 'deduction' ? 'pill-red' : 'pill-green';
                         return (
-                          <tr key={item.id}>
-                            <td>{rankBadge}</td>
-                            <td className="font-semibold text-ink-900">{item.studentName}</td>
-                            <td className="font-mono text-ink-500 text-sm">#{item.membershipNo}</td>
-                            <td className="text-ink-600 text-sm">{item.groupName}</td>
+                          <tr key={p.id}>
+                            <td className="font-medium">{st?.studentName ?? `#${p.registrationId}`}</td>
+                            <td className="font-mono text-xs text-ink-400">{st?.membershipNo ? `#${st.membershipNo}` : '—'}</td>
+                            <td className="text-ink-500 text-sm">{st?.groupId ? (groupMap.get(st.groupId) ?? '—') : '—'}</td>
                             <td>
-                              <span className={`pill ${item.totalPoints >= 0 ? 'pill-green' : 'pill-red'} font-bold`}>
-                                {item.totalPoints} نقطة
+                              <span className={`pill text-xs ${p.delta >= 0 ? 'pill-green' : 'pill-red'}`} dir="ltr">
+                                {p.delta >= 0 ? `+${p.delta}` : p.delta}
                               </span>
+                            </td>
+                            <td><span className={`pill text-xs ${typeCls}`}>{typeLabel}</span></td>
+                            <td className="text-ink-700 text-sm max-w-[180px] truncate">
+                              {p.reason.replace(' (رصد جماعي للأسرة)', '')}
+                            </td>
+                            <td className="text-ink-400 text-sm">{p.recordedBy || '—'}</td>
+                            <td className="text-ink-400 text-xs whitespace-nowrap">
+                              {new Date(p.createdAt).toLocaleDateString('ar-SA', { year: 'numeric', month: 'short', day: 'numeric' })}
                             </td>
                           </tr>
                         );
@@ -424,141 +325,60 @@ export default function PointsPage() {
                   </table>
                 </div>
 
+                {/* Mobile */}
                 <ul className="lg:hidden divide-y divide-ink-100">
-                  {filteredLeaderboard.map((item) => {
-                    const rank = leaderboard.findIndex((x) => x.id === item.id) + 1;
-                    let rankBadge;
-                    if (rank === 1) rankBadge = <span className="w-6 h-6 rounded-full bg-amber-400 text-ink-900 border border-amber-500 font-bold text-xs flex items-center justify-center shadow-sm mx-auto" title="المركز الأول">١</span>;
-                    else if (rank === 2) rankBadge = <span className="w-6 h-6 rounded-full bg-slate-300 text-ink-900 border border-slate-400 font-bold text-xs flex items-center justify-center shadow-sm mx-auto" title="المركز الثاني">٢</span>;
-                    else if (rank === 3) rankBadge = <span className="w-6 h-6 rounded-full bg-amber-600 text-white border border-amber-700 font-bold text-xs flex items-center justify-center shadow-sm mx-auto" title="المركز الثالث">٣</span>;
-                    else rankBadge = <span className="text-ink-400 font-mono text-xs">#{rank}</span>;
-
+                  {stageLog.map(p => {
+                    const st = studentMap.get(p.registrationId);
+                    const isExp = expandedIds.has(p.id);
+                    const typeLabel = p.pointType === 'collective' ? 'جماعية' : p.pointType === 'deduction' ? 'خصم' : 'فردية';
                     return (
-                      <li key={item.id} className="py-3.5 flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="shrink-0 w-8 text-center">{rankBadge}</div>
-                          <div className="min-w-0">
-                            <div className="text-sm font-bold text-ink-900 truncate leading-snug">{item.studentName}</div>
-                            <div className="text-[11px] text-ink-500 mt-0.5">العضوية: #{item.membershipNo} · الأسرة: {item.groupName}</div>
+                      <li key={p.id} className="py-3 px-4">
+                        <button
+                          type="button"
+                          className="w-full flex items-center gap-3 text-right"
+                          onClick={() => toggleExpand(p.id)}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-bold text-ink-900 truncate">
+                              {st?.studentName ?? `#${p.registrationId}`}
+                            </div>
+                            <div className="text-[11px] text-ink-400 mt-0.5">
+                              #{st?.membershipNo} · {typeLabel}
+                            </div>
                           </div>
-                        </div>
-                        <span className={`pill shrink-0 text-xs py-1 px-2.5 ${item.totalPoints >= 0 ? 'pill-green' : 'pill-red'} font-bold`}>
-                          {item.totalPoints} ن
-                        </span>
+                          <span
+                            className={`pill shrink-0 text-xs py-1 px-2.5 ${p.delta >= 0 ? 'pill-green' : 'pill-red'}`}
+                            dir="ltr"
+                          >
+                            {p.delta >= 0 ? `+${p.delta}` : p.delta}
+                          </span>
+                          <svg
+                            className={`w-3.5 h-3.5 shrink-0 text-ink-400 transition-transform ${isExp ? 'rotate-180' : ''}`}
+                            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"
+                            strokeLinecap="round" strokeLinejoin="round"
+                          >
+                            <polyline points="6 9 12 15 18 9" />
+                          </svg>
+                        </button>
+                        {isExp && (
+                          <div className="mt-2 text-[11px] text-ink-500 space-y-0.5 pr-1 border-r-2 border-ink-100">
+                            <div>الأسرة: {st?.groupId ? (groupMap.get(st.groupId) ?? '—') : '—'}</div>
+                            <div>السبب: {p.reason.replace(' (رصد جماعي للأسرة)', '')}</div>
+                            <div>
+                              بواسطة: {p.recordedBy || '—'} ·{' '}
+                              {new Date(p.createdAt).toLocaleDateString('ar-SA', { year: 'numeric', month: 'short', day: 'numeric' })}
+                            </div>
+                          </div>
+                        )}
                       </li>
                     );
                   })}
                 </ul>
               </>
-            )
-          ) : historySubTab === 'students' ? (() => {
-            const studentPoints = points.filter(p => !p.reason.endsWith('(رصد جماعي للأسرة)'));
-            const filtered = studentPoints.filter(p => {
-              const st = students.find(s => s.id === p.registrationId);
-              if (!st) return !historySearch && !historyStageFilter;
-              const matchName = !historySearch || st.studentName.toLowerCase().includes(historySearch.toLowerCase());
-              const matchStage = !historyStageFilter || st.stage === historyStageFilter;
-              return matchName && matchStage;
-            });
-            const groupMap = new Map(groups.map(g => [g.id, g.name]));
-            if (filtered.length === 0) return <p className="text-center py-10 text-ink-400 text-sm">لا توجد سجلات.</p>;
-            return (
-              <>
-                <div className="hidden lg:block overflow-x-auto scroll-soft">
-                  <table className="tbl">
-                    <thead>
-                      <tr><th>الطالب</th><th>المرحلة</th><th>الأسرة</th><th>النقاط</th><th>التصنيف</th><th>السبب</th><th>بواسطة</th></tr>
-                    </thead>
-                    <tbody>
-                      {filtered.map((p) => {
-                        const st = students.find(s => s.id === p.registrationId);
-                        return (
-                          <tr key={p.id}>
-                            <td className="font-medium">{st?.studentName ?? `#${p.registrationId}`}</td>
-                            <td className="text-ink-500 text-sm">{st?.stage ?? '—'}</td>
-                            <td className="text-ink-500 text-sm">{st?.groupId ? (groupMap.get(st.groupId) ?? '—') : '—'}</td>
-                            <td><span className={`pill ${p.delta >= 0 ? 'pill-green' : 'pill-red'}`} dir="ltr">{p.delta >= 0 ? `+${p.delta}` : p.delta}</span></td>
-                            <td className="text-ink-500 text-sm">{catLabel(p.category)}</td>
-                            <td className="text-ink-700 text-sm">{p.reason}</td>
-                            <td className="text-ink-400 text-sm">{p.recordedBy || '—'}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-                <ul className="lg:hidden divide-y divide-ink-100">
-                  {filtered.map((p) => {
-                    const st = students.find(s => s.id === p.registrationId);
-                    return (
-                      <li key={p.id} className="py-3.5 flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="text-sm font-bold text-ink-900 truncate">{st?.studentName ?? `#${p.registrationId}`}</div>
-                          <div className="text-[11px] text-ink-500 mt-0.5">{st?.stage ?? ''} · {st?.groupId ? (groupMap.get(st.groupId) ?? '—') : '—'}</div>
-                          <div className="text-xs text-ink-700 mt-1">{p.reason}</div>
-                          <div className="text-[11px] text-ink-400 mt-0.5">{catLabel(p.category)} · {p.recordedBy || '—'}</div>
-                        </div>
-                        <span className={`pill shrink-0 text-xs py-1 px-2.5 ${p.delta >= 0 ? 'pill-green' : 'pill-red'}`} dir="ltr">{p.delta >= 0 ? `+${p.delta}` : p.delta}</span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </>
-            );
-          })() : (() => {
-            // Groups log: only bulk group records, deduplicated per event
-            const groupPoints = points.filter(p => p.reason.endsWith('(رصد جماعي للأسرة)'));
-            // Deduplicate by reason+delta+createdAt+recordedBy
-            const seen = new Set<string>();
-            const events: typeof groupPoints = [];
-            for (const p of groupPoints) {
-              const key = `${p.reason}|${p.delta}|${p.createdAt}|${p.recordedBy}`;
-              if (!seen.has(key)) { seen.add(key); events.push(p); }
-            }
-            // Find group name for each event from student
-            const groupMap = new Map(groups.map(g => [g.id, g.name]));
-            const getGroupName = (p: typeof groupPoints[0]) => {
-              const st = students.find(s => s.id === p.registrationId);
-              return st?.groupId ? (groupMap.get(st.groupId) ?? '—') : '—';
-            };
-            if (events.length === 0) return <p className="text-center py-10 text-ink-400 text-sm">لا توجد سجلات مجموعات.</p>;
-            return (
-              <>
-                <div className="hidden lg:block overflow-x-auto scroll-soft">
-                  <table className="tbl">
-                    <thead>
-                      <tr><th>الأسرة / المجموعة</th><th>النقاط</th><th>السبب</th><th>بواسطة</th><th>التاريخ</th></tr>
-                    </thead>
-                    <tbody>
-                      {events.map((p) => (
-                        <tr key={p.id}>
-                          <td className="font-medium">{getGroupName(p)}</td>
-                          <td><span className={`pill ${p.delta >= 0 ? 'pill-green' : 'pill-red'}`} dir="ltr">{p.delta >= 0 ? `+${p.delta}` : p.delta}</span></td>
-                          <td className="text-ink-700 text-sm">{p.reason.replace(' (رصد جماعي للأسرة)', '')}</td>
-                          <td className="text-ink-400 text-sm">{p.recordedBy || '—'}</td>
-                          <td className="text-ink-400 text-xs">{new Date(p.createdAt).toLocaleDateString('ar-SA', { month: 'short', day: 'numeric' })}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <ul className="lg:hidden divide-y divide-ink-100">
-                  {events.map((p) => (
-                    <li key={p.id} className="py-3.5 flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="text-sm font-bold text-ink-900">{getGroupName(p)}</div>
-                        <div className="text-xs text-ink-700 mt-1">{p.reason.replace(' (رصد جماعي للأسرة)', '')}</div>
-                        <div className="text-[11px] text-ink-400 mt-0.5">{p.recordedBy || '—'} · {new Date(p.createdAt).toLocaleDateString('ar-SA', { month: 'short', day: 'numeric' })}</div>
-                      </div>
-                      <span className={`pill shrink-0 text-xs py-1 px-2.5 ${p.delta >= 0 ? 'pill-green' : 'pill-red'}`} dir="ltr">{p.delta >= 0 ? `+${p.delta}` : p.delta}</span>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            );
-          })()}
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

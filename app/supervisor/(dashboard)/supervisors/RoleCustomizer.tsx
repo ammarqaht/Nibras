@@ -13,7 +13,8 @@ const MODULES = [
   { id: 'payments', label: 'المدفوعات' },
   { id: 'invoices', label: 'الفواتير' },
   { id: 'finance', label: 'المالية' },
-  { id: 'announcements', label: 'الإشعارات' }
+  { id: 'announcements', label: 'الإشعارات' },
+  { id: 'analytics', label: 'الإحصائيات' }
 ];
 
 const ROLES = [

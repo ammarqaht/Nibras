@@ -71,7 +71,8 @@ model Point {
   registrationId Int
   delta          Int // +points or -points
   reason         String
-  category       String // 'behavior' | 'participation' | 'activity' | 'other'
+  category       String // 'attendance' | 'tasks' | 'behavior' | 'other'
+  pointType      String   @default("individual") // 'individual' | 'collective' | 'deduction'
   recordedBy     String?
   createdAt      DateTime @default(now())
 }

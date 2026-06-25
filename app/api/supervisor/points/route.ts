@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { getPoints, addPointsRecord, getSupervisorByEmail } from '@/lib/services';
+import { getPoints, addPointsRecord, getSupervisorByEmail, GROUP_POINTS_ROLES } from '@/lib/services';
 
 export async function GET(req: NextRequest) {
   try {
@@ -56,19 +56,69 @@ export async function POST(req: NextRequest) {
     );
 
     const body = await req.json();
-    const { registrationId, groupId, delta, reason, category } = body;
+    const { registrationId, registrationIds, groupId, delta, reason, category } = body;
 
     if (groupId) {
-      const groupAllowedRoles = ['admin', 'cultural_supervisor', 'sports_supervisor', 'general_supervisor', 'social_supervisor'];
-      const canAddGroupPoints = roles.some(r => groupAllowedRoles.includes(r));
+      const canAddGroupPoints = roles.some(r => GROUP_POINTS_ROLES.includes(r));
       if (!canAddGroupPoints) {
-        return NextResponse.json({ error: 'غير مصرح لك برصد النقاط للمجموعات' }, { status: 403 });
+        return NextResponse.json({ error: 'غير مصرح لك برصد النقاط الجماعية' }, { status: 403 });
       }
     }
 
     const dVal = parseInt(delta, 10);
     if (isNaN(dVal) || !reason || !category) {
       return NextResponse.json({ error: 'البيانات غير كاملة أو غير صحيحة' }, { status: 400 });
+    }
+
+    // Deductions always go to balance (deduction type), never to individual/collective
+    const isDeduction = dVal < 0;
+
+    // Helper: compute current balance for a student from their points
+    function calcBalance(pts: { delta: number; pointType?: string; reason?: string }[]): number {
+      let individual = 0, collective = 0, deduction = 0;
+      for (const p of pts) {
+        const t = p.pointType ?? (
+          (p.reason ?? '').endsWith('(رصد جماعي للأسرة)') ? 'collective'
+            : p.delta < 0 ? 'deduction' : 'individual'
+        );
+        if (t === 'individual') individual += p.delta;
+        else if (t === 'collective') collective += p.delta;
+        else deduction += p.delta;
+      }
+      return Math.max(0, individual + collective + deduction);
+    }
+
+    // Multi-student individual points
+    if (registrationIds && Array.isArray(registrationIds) && registrationIds.length > 0) {
+      if (isDeduction) {
+        const allPts = await getPoints();
+        const insufficient: number[] = [];
+        for (const rId of registrationIds) {
+          const id = parseInt(String(rId), 10);
+          if (isNaN(id)) continue;
+          const balance = calcBalance(allPts.filter(p => p.registrationId === id));
+          if (balance + dVal < 0) insufficient.push(id);
+        }
+        if (insufficient.length > 0) {
+          return NextResponse.json({ error: 'رصيد بعض الطلاب غير كافٍ لإتمام الخصم' }, { status: 400 });
+        }
+      }
+      const records = [];
+      for (const rId of registrationIds) {
+        const id = parseInt(String(rId), 10);
+        if (isNaN(id)) continue;
+        const pointType = isDeduction ? 'deduction' : 'individual';
+        const rec = await addPointsRecord({
+          registrationId: id,
+          delta: dVal,
+          reason,
+          category,
+          pointType,
+          recordedBy: session.name,
+        });
+        records.push(rec);
+      }
+      return NextResponse.json({ success: true, pointRecords: records, bulk: true, count: records.length });
     }
 
     if (groupId) {
@@ -85,6 +135,19 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'لا يوجد طلاب مسجلين في هذه المجموعة / الأسرة' }, { status: 400 });
       }
 
+      if (isDeduction) {
+        const allPts = await getPoints();
+        const insufficient = studentsInGroup.filter(s => {
+          const balance = calcBalance(allPts.filter(p => p.registrationId === s.id));
+          return balance + dVal < 0;
+        });
+        if (insufficient.length > 0) {
+          return NextResponse.json({
+            error: `رصيد ${insufficient.length} طالب/طلاب في الأسرة غير كافٍ لإتمام الخصم`
+          }, { status: 400 });
+        }
+      }
+
       const records = [];
       for (const s of studentsInGroup) {
         const rec = await addPointsRecord({
@@ -92,6 +155,7 @@ export async function POST(req: NextRequest) {
           delta: dVal,
           reason: `${reason} (رصد جماعي للأسرة)`,
           category,
+          pointType: isDeduction ? 'deduction' : 'collective',
           recordedBy: session.name
         });
         records.push(rec);
@@ -104,11 +168,22 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'الطالب المحدد غير صحيح' }, { status: 400 });
       }
 
+      if (isDeduction) {
+        const allPts = await getPoints();
+        const balance = calcBalance(allPts.filter(p => p.registrationId === rId));
+        if (balance + dVal < 0) {
+          return NextResponse.json({ error: 'رصيد الطالب غير كافٍ لإتمام الخصم' }, { status: 400 });
+        }
+      }
+
+      const pointType = isDeduction ? 'deduction' : 'individual';
+
       const record = await addPointsRecord({
         registrationId: rId,
         delta: dVal,
         reason,
         category,
+        pointType,
         recordedBy: session.name
       });
 

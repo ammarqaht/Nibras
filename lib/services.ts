@@ -89,6 +89,7 @@ export type PointInfo = {
   delta: number;
   reason: string;
   category: string;
+  pointType: 'individual' | 'collective' | 'deduction'; // individual=حضور+مهام, collective=لجان, deduction=خصم من الرصيد
   recordedBy: string | null;
   createdAt: string;
 };
@@ -115,18 +116,73 @@ export type SettingInfo = {
   value: string; // JSON string
 };
 
+// ==================== ROLE CONSTANTS ====================
+
+/** الأدوار التي تملك صلاحية كاملة على بيانات الطلاب (شاملة الهوية والجوال والدفع) */
+export const FULL_STUDENT_DATA_ROLES = [
+  'admin', 'finance', 'finance_supervisor',
+  'administrative_supervisor', 'media_supervisor', 'stage_supervisor'
+];
+
+/** الأدوار التي تستطيع رؤية البيانات المالية في الإحصائيات */
+export const FINANCE_ANALYTICS_ROLES = [
+  'admin', 'finance', 'finance_supervisor', 'administrative_supervisor'
+];
+
+/** الأدوار التي تستطيع إضافة نقاط جماعية للمجموعات */
+export const GROUP_POINTS_ROLES = [
+  'admin', 'cultural_supervisor', 'sports_supervisor',
+  'scientific_supervisor', 'social_supervisor', 'stage_supervisor'
+];
+
+/** الأدوار التي تُعامَل كـ "عامة" وترى بيانات الجميع بدون تصفية أسرة/مرحلة */
+export const GLOBAL_ROLES = [
+  'admin', 'finance', 'finance_supervisor',
+  'administrative_supervisor', 'media_supervisor',
+  'general_supervisor', 'attendance_supervisor',
+  'cultural_supervisor', 'sports_supervisor',
+  'scientific_supervisor', 'social_supervisor'
+];
+
 export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
-  attendance_supervisor: ['attendance', 'students'],
-  social_supervisor: ['points', 'students', 'groups'],
-  cultural_supervisor: ['tasks', 'students', 'groups', 'schedule'],
-  groups_supervisor: ['groups', 'students', 'points', 'attendance', 'tasks'],
-  general_supervisor: ['students', 'attendance', 'points', 'tasks', 'schedule', 'groups', 'announcements'],
-  media_supervisor: ['announcements', 'schedule'],
-  scientific_supervisor: ['students', 'points', 'tasks', 'schedule', 'groups'],
-  sports_supervisor: ['students', 'points', 'attendance', 'schedule', 'groups'],
-  administrative_supervisor: ['students', 'attendance', 'schedule', 'groups', 'announcements'],
-  stage_supervisor: ['groups', 'students', 'points', 'attendance', 'tasks']
+  attendance_supervisor:    ['attendance', 'students', 'analytics'],
+  social_supervisor:        ['points', 'students', 'groups', 'schedule', 'analytics'],
+  cultural_supervisor:      ['points', 'students', 'groups', 'schedule', 'analytics'],
+  scientific_supervisor:    ['points', 'students', 'groups', 'schedule', 'analytics'],
+  sports_supervisor:        ['points', 'students', 'groups', 'schedule', 'analytics'],
+  groups_supervisor:        ['groups', 'students', 'points', 'attendance', 'analytics'],
+  general_supervisor:       ['students', 'analytics', 'invoices'],
+  media_supervisor:         ['announcements', 'schedule', 'students', 'analytics'],
+  administrative_supervisor:['students', 'schedule', 'groups', 'analytics'],
+  stage_supervisor:         ['groups', 'students', 'points', 'attendance', 'analytics'],
 };
+
+/**
+ * Calculates the three-part point summary for a student or set of points.
+ * individual = committee positive points (مشاركة / سلوك / متجر / أخرى)
+ * collective = group committee additions (مسابقة / رياضي / اجتماعي / علمي)
+ * deduction  = deducted from balance only (never counts toward ranking)
+ * balance    = max(0, individual + collective + deduction)
+ * rankScore  = individual + collective (leaderboard ranking)
+ */
+export function calcPointSummary(points: PointInfo[]): {
+  individual: number; collective: number; deduction: number; balance: number; rankScore: number;
+} {
+  let individual = 0, collective = 0, deduction = 0;
+  for (const p of points) {
+    const t = p.pointType ?? (
+      p.reason.endsWith('(رصد جماعي للأسرة)') ? 'collective' : p.delta < 0 ? 'deduction' : 'individual'
+    );
+    if (t === 'individual') individual += p.delta;
+    else if (t === 'collective') collective += p.delta;
+    else deduction += p.delta;
+  }
+  return {
+    individual, collective, deduction,
+    balance: Math.max(0, individual + collective + deduction),
+    rankScore: individual + collective,
+  };
+}
 
 /**
  * Resolves the set of group IDs a supervisor may access.
@@ -250,14 +306,39 @@ export async function seedDefaultAdminIfNeeded(): Promise<void> {
   if (!databaseAvailable) {
     const supervisors = await readJsonFile<SupervisorInfo[]>(FILE_SUPERVISORS, []);
 
-    const upsertJson = (email: string, role: string, name: string, hash: string) => {
+    const upsertJson = (email: string, role: string, name: string, hash: string, defaultStage = '', defaultGroupIds = '') => {
       const idx = supervisors.findIndex(s => s.email === email);
-      if (idx !== -1) { supervisors[idx].passwordHash = hash; supervisors[idx].role = role; }
-      else supervisors.push({ id: supervisors.length > 0 ? Math.max(...supervisors.map(s => s.id)) + 1 : 1, name, email, passwordHash: hash, role, groupIds: '', departments: '', createdAt: new Date().toISOString() });
+      if (idx !== -1) { 
+        supervisors[idx].passwordHash = hash; 
+        supervisors[idx].role = role;
+        // Do not overwrite groupIds or stage if they already exist
+      }
+      else {
+        supervisors.push({ 
+          id: supervisors.length > 0 ? Math.max(...supervisors.map(s => s.id)) + 1 : 1, 
+          name, 
+          email, 
+          passwordHash: hash, 
+          role, 
+          groupIds: defaultGroupIds, 
+          departments: '', 
+          stage: defaultStage,
+          createdAt: new Date().toISOString() 
+        });
+      }
     };
 
     upsertJson('admin', 'admin', 'المدير العام', defaultHash);
-    for (const d of devAccounts) upsertJson(d.email, d.role, d.name, devHash);
+    for (const d of devAccounts) {
+      upsertJson(
+        d.email, 
+        d.role, 
+        d.name, 
+        devHash, 
+        d.role === 'stage_supervisor' ? 'ابتدائي' : '',
+        d.role === 'groups_supervisor' ? '1' : ''
+      );
+    }
 
     await writeJsonFile(FILE_SUPERVISORS, supervisors);
   }
@@ -429,6 +510,7 @@ export async function updateSupervisor(
     if (updateData.groupIds !== undefined) updated.groupIds = updateData.groupIds;
     if (updateData.departments !== undefined) updated.departments = updateData.departments;
     if (updateData.passwordHash !== undefined) updated.passwordHash = updateData.passwordHash;
+    if (updateData.stage !== undefined) updated.stage = updateData.stage;
 
     list[index] = updated;
     await writeJsonFile(FILE_SUPERVISORS, list);
@@ -644,6 +726,9 @@ export async function getPoints(): Promise<PointInfo[]> {
       delta: p.delta,
       reason: p.reason,
       category: p.category,
+      pointType: ((p as any).pointType as PointInfo['pointType']) ?? (
+        p.reason.endsWith('(رصد جماعي للأسرة)') ? 'collective' : p.delta < 0 ? 'deduction' : 'individual'
+      ),
       recordedBy: p.recordedBy,
       createdAt: p.createdAt.toISOString()
     }));
@@ -661,8 +746,9 @@ export async function addPointsRecord(data: Omit<PointInfo, 'id' | 'createdAt'>)
         delta: data.delta,
         reason: data.reason,
         category: data.category,
+        pointType: data.pointType,
         recordedBy: data.recordedBy
-      }
+      } as any
     });
     return {
       id: p.id,
@@ -670,6 +756,7 @@ export async function addPointsRecord(data: Omit<PointInfo, 'id' | 'createdAt'>)
       delta: p.delta,
       reason: p.reason,
       category: p.category,
+      pointType: data.pointType,
       recordedBy: p.recordedBy,
       createdAt: p.createdAt.toISOString()
     };

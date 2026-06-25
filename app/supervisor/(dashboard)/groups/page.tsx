@@ -6,16 +6,20 @@ import { pushToast } from '@/components/Toast';
 import { useSupervisor } from '@/components/SupervisorShell';
 
 type Group = { id: number; name: string; stage: string };
-type Student = { id: number; studentName: string; stage: string; grade: string; groupId: number | null; registrationStatus: string; paymentStatus: string };
+type Student = { id: number; membershipNo: number; studentName: string; stage: string; grade: string; groupId: number | null; registrationStatus: string; paymentStatus: string };
 type Supervisor = { id: number; name: string; groupIds: string };
 
-const CATEGORIES = [
-  { key: 'behavior', label: 'سلوك' },
-  { key: 'participation', label: 'مشاركة' },
-  { key: 'activity', label: 'نشاط' },
-  { key: 'other', label: 'أخرى' }
+const SOURCES = [
+  { key: 'attendance', label: 'الحضور' },
+  { key: 'tasks', label: 'المهام' },
+  { key: 'group', label: 'الجماعية' },
 ];
-const catLabel = (k: string) => CATEGORIES.find((c) => c.key === k)?.label ?? k;
+
+function getPointSource(p: { reason: string; category: string }): string {
+  if (p.reason.endsWith('(رصد جماعي للأسرة)')) return 'group';
+  if (p.category === 'attendance') return 'attendance';
+  return 'tasks';
+}
 
 function formatDate(dStr: string) {
   try {
@@ -54,6 +58,7 @@ export default function GroupsPage() {
   const [selectedGroups, setSelectedGroups] = useState<Record<number, number>>({});
   const [selectedGroupModal, setSelectedGroupModal] = useState<Group | null>(null);
 
+  const [adminStageTab, setAdminStageTab] = useState<string>(isStage && supervisorStage ? supervisorStage : 'ابتدائي');
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [checkedNewGroupStudentIds, setCheckedNewGroupStudentIds] = useState<number[]>([]);
   const [showAddStudents, setShowAddStudents] = useState(false);
@@ -79,6 +84,12 @@ export default function GroupsPage() {
     setLoading(false);
   }
   useEffect(() => { load(); }, []);
+  useEffect(() => {
+    if (isStage && supervisorStage) setAdminStageTab(supervisorStage);
+  }, [isStage, supervisorStage]);
+  useEffect(() => {
+    if (isGlobal || isStage) setStageFilter(adminStageTab);
+  }, [adminStageTab]);
 
   const countOf = useMemo(() => {
     const m = new Map<number, number>();
@@ -564,26 +575,35 @@ export default function GroupsPage() {
                       else if (studentTotal < studentAvgPoints * 0.8 && studentAvgPoints > 0) { performanceCls = 'bg-red-50 text-red-700 font-bold'; performanceLabel = 'يحتاج تشجيع ⚠️'; }
                       return (
                         <div key={st.id} className="border border-ink-200 rounded-xl overflow-hidden bg-white shadow-sm">
-                          <div onClick={() => setExpandedStudentId(isExpanded ? null : st.id)} className="text-sm px-4 py-3.5 flex justify-between items-center cursor-pointer hover:bg-cream-50/50 select-none">
-                            <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                          <div onClick={() => setExpandedStudentId(isExpanded ? null : st.id)} className="text-sm px-4 pt-3 pb-2.5 cursor-pointer hover:bg-cream-50/50 select-none">
+                            <div className="flex items-center gap-2 mb-1.5">
                               <svg className={`w-3.5 h-3.5 text-ink-400 shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
-                              <span className="font-semibold text-ink-900 flex-1">{st.studentName}</span>
-                              <span className="text-[10px] text-ink-500 bg-cream-100 px-2 py-0.5 rounded font-mono shrink-0">{st.grade}</span>
-                              <span className={`text-[9px] px-1.5 py-0.5 rounded-full shrink-0 ${performanceCls}`}>{performanceLabel}</span>
+                              <span className="font-bold text-ink-900 flex-1 truncate">{st.studentName}</span>
                             </div>
-                            <span className="pill pill-green font-bold text-xs shrink-0 mr-2">{studentTotal} نقطة</span>
+                            <div className="flex flex-wrap items-center gap-1.5 pr-5">
+                              <span className="pill pill-green font-bold text-[11px]">{studentTotal} نقطة</span>
+                              {st.membershipNo ? <span className="text-[10px] font-mono text-ink-400 bg-ink-50 border border-ink-200 px-1.5 py-0.5 rounded">#{st.membershipNo}</span> : null}
+                              <span className="text-[10px] text-ink-500 bg-cream-100 px-1.5 py-0.5 rounded font-mono">{st.grade}</span>
+                              <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${performanceCls}`}>{performanceLabel}</span>
+                            </div>
                           </div>
                           {isExpanded && (
                             <div className="px-4 py-3 bg-ink-50/40 border-t border-ink-150 text-xs space-y-2 text-right">
                               <div className="text-[11px] font-bold text-ink-500 mb-2">مصادر النقاط:</div>
-                              <div className="grid grid-cols-3 gap-2">
-                                {[{key:'behavior',label:'سلوك'},{key:'participation',label:'مشاركة'},{key:'activity',label:'نشاط'},{key:'other',label:'أخرى'}].map(cat => (
-                                  <div key={cat.key} className="bg-white rounded-lg border border-ink-150 px-3 py-2 text-center">
-                                    <div className="text-[10px] text-ink-400 mb-1">{cat.label}</div>
-                                    <div className={`text-sm font-bold ${(byCategory[cat.key]||0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>{byCategory[cat.key] ?? 0}</div>
+                              {(() => {
+                                const bySource: Record<string, number> = {};
+                                studentLogs.forEach(p => { const s = getPointSource(p); bySource[s] = (bySource[s] || 0) + p.delta; });
+                                return (
+                                  <div className="grid grid-cols-3 gap-2">
+                                    {SOURCES.map(src => (
+                                      <div key={src.key} className="bg-white rounded-lg border border-ink-150 px-3 py-2 text-center">
+                                        <div className="text-[10px] text-ink-400 mb-1">{src.label}</div>
+                                        <div className={`text-sm font-bold ${(bySource[src.key]||0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>{bySource[src.key] ?? 0}</div>
+                                      </div>
+                                    ))}
                                   </div>
-                                ))}
-                              </div>
+                                );
+                              })()}
                             </div>
                           )}
                         </div>
@@ -594,6 +614,36 @@ export default function GroupsPage() {
                   <p className="text-sm text-ink-400 text-center py-6">لا يوجد طلاب مسجلين في هذه المجموعة حالياً.</p>
                 )}
               </div>
+            <div className="card p-6">
+              <h3 className="text-base font-bold text-ink-900 flex items-center gap-2 border-b border-ink-100 pb-3 mb-4">
+                <svg className="w-5 h-5 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" /><path d="M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2" /><path d="M9 5a2 2 0 0 0 2-2h2a2 2 0 0 0 2 2" /></svg>
+                <span>سجل رصد النقاط الجماعية</span>
+              </h3>
+              {(() => {
+                const gStudentIds = new Set(activeGroupStudents.map(s => s.id));
+                const bulkPts = points.filter(p => p.reason.endsWith('(رصد جماعي للأسرة)') && gStudentIds.has(p.registrationId));
+                const seen = new Set<string>();
+                const events = bulkPts.filter(p => {
+                  const k = `${p.reason}|${p.delta}|${p.createdAt}`;
+                  if (seen.has(k)) return false;
+                  seen.add(k); return true;
+                }).sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                if (events.length === 0) return <p className="text-sm text-ink-400 text-center py-4">لا توجد نقاط جماعية مرصودة بعد.</p>;
+                return (
+                  <div className="space-y-2 max-h-60 overflow-y-auto scroll-soft">
+                    {events.map((p: any, i: number) => (
+                      <div key={i} className="flex justify-between items-center bg-cream-50 rounded-lg px-3 py-2.5 border border-ink-100">
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-ink-800 truncate">{p.reason.replace(' (رصد جماعي للأسرة)', '')}</div>
+                          <div className="text-[10px] text-ink-400 mt-0.5">{formatDate(p.createdAt)}</div>
+                        </div>
+                        <span className={`pill ${p.delta >= 0 ? 'pill-green' : 'pill-red'} text-xs font-bold shrink-0 mr-3`} dir="ltr">{p.delta >= 0 ? `+${p.delta}` : p.delta}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
             </>
           )}
         </div>
@@ -683,24 +733,33 @@ export default function GroupsPage() {
           )}
         </div>
       ) : isGlobal || isStage ? (
-        <div className="w-full">
+        <div className="w-full space-y-4">
+          {/* Stage tabs — stage_supervisor sees only their stage */}
+          <div className="flex gap-2 flex-wrap">
+            {(isStage && supervisorStage ? [supervisorStage] : ['ابتدائي', 'متوسط', 'ثانوي']).map((st) => (
+              <button
+                key={st}
+                type="button"
+                className={`choice text-sm ${adminStageTab === st ? 'is-active' : ''}`}
+                onClick={() => setAdminStageTab(st)}
+              >
+                {st}
+              </button>
+            ))}
+          </div>
+
+          {/* Groups for the active stage */}
           <div className="card p-6">
-            {(() => {
-              const displayGroups = isStage && supervisorStage
-                ? groups.filter(g => g.stage === supervisorStage)
-                : groups;
-              return (
-            <>
             <h2 className="text-lg font-bold text-ink-900 mb-4">
-              {isStage ? `مجموعات مرحلة ${supervisorStage} (${displayGroups.length})` : `المجموعات (${groups.length})`}
+              مجموعات {adminStageTab} ({groups.filter(g => g.stage === adminStageTab).length})
             </h2>
             {loading ? (
               <p className="text-center py-10 text-ink-400 text-sm">جارٍ التحميل…</p>
-            ) : displayGroups.length === 0 ? (
-              <p className="text-center py-10 text-ink-400 text-sm">لا توجد مجموعات بعد.</p>
+            ) : groups.filter(g => g.stage === adminStageTab).length === 0 ? (
+              <p className="text-center py-10 text-ink-400 text-sm">لا توجد مجموعات لهذه المرحلة.</p>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                {displayGroups.map((g) => (
+                {groups.filter(g => g.stage === adminStageTab).map((g) => (
                   <div key={g.id}
                        onClick={() => { setSelectedGroupModal(g); setShowAddStudents(false); setCheckedAddStudentIds([]); setExpandedStudentId(null); }}
                        className="cursor-pointer hover:border-brand transition-colors rounded-xl border border-ink-200 p-4 flex items-center justify-between bg-white shadow-sm hover:shadow">
@@ -723,10 +782,37 @@ export default function GroupsPage() {
                 ))}
               </div>
             )}
-            </>
-            );
-            })()}
           </div>
+
+          {/* Unassigned students for the active stage */}
+          {(() => {
+            const stageUnassigned = students.filter(s => s.groupId === null && s.stage === adminStageTab);
+            if (stageUnassigned.length === 0) return null;
+            return (
+              <div className="card p-6">
+                <h2 className="text-lg font-bold text-ink-900 mb-1">
+                  طلاب {adminStageTab} غير مسجلين في أسرة ({stageUnassigned.length})
+                </h2>
+                <p className="text-xs text-ink-400 mb-4">هؤلاء الطلاب لم يُسنَدوا إلى أسرة بعد.</p>
+                <div className="overflow-x-auto scroll-soft">
+                  <table className="tbl">
+                    <thead>
+                      <tr><th>الاسم</th><th>العضوية</th><th>الصف</th></tr>
+                    </thead>
+                    <tbody>
+                      {stageUnassigned.map(s => (
+                        <tr key={s.id}>
+                          <td className="font-medium">{s.studentName}</td>
+                          <td className="font-mono text-ink-400 text-xs">#{s.membershipNo}</td>
+                          <td className="text-ink-500 text-sm">{s.grade}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       ) : (
         loading ? (
@@ -772,7 +858,7 @@ export default function GroupsPage() {
             </div>
 
             <div className="card p-6">
-              <div className="font-body">
+              <div>
                 <h3 className="text-lg font-bold text-ink-900 flex items-center gap-2 border-b border-ink-100 pb-3 mb-4">
                   <svg className="w-5 h-5 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -800,53 +886,46 @@ export default function GroupsPage() {
 
                       return (
                         <div key={st.id} className="border border-ink-200 rounded-xl overflow-hidden bg-white shadow-sm hover:shadow transition-shadow">
-                          <div 
+                          <div
                             onClick={() => setExpandedStudentId(isExpanded ? null : st.id)}
-                            className="text-sm px-4 py-3.5 flex justify-between items-center bg-white cursor-pointer hover:bg-cream-50/50 transition-colors select-none"
+                            className="text-sm px-4 pt-3 pb-2.5 bg-white cursor-pointer hover:bg-cream-50/50 transition-colors select-none"
                             dir="rtl"
                           >
-                            <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1.5">
                               <svg className={`w-3.5 h-3.5 text-ink-400 shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                 <polyline points="6 9 12 15 18 9" />
                               </svg>
-                              <span className="font-semibold text-ink-900 flex-1">{st.studentName}</span>
-                              <span className="text-[10px] text-ink-500 bg-cream-100 px-2 py-0.5 rounded font-mono shrink-0">{st.grade}</span>
-                              <span className={`text-[9px] px-1.5 py-0.5 rounded-full shrink-0 ${performanceCls}`}>{performanceLabel}</span>
+                              <span className="font-bold text-ink-900 flex-1 truncate">{st.studentName}</span>
                             </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <span className="pill pill-green font-bold text-xs">{studentTotal} نقطة</span>
+                            <div className="flex flex-wrap items-center gap-1.5 pr-5">
+                              <span className="pill pill-green font-bold text-[11px]">{studentTotal} نقطة</span>
+                              {st.membershipNo ? <span className="text-[10px] font-mono text-ink-400 bg-ink-50 border border-ink-200 px-1.5 py-0.5 rounded">#{st.membershipNo}</span> : null}
+                              <span className="text-[10px] text-ink-500 bg-cream-100 px-1.5 py-0.5 rounded font-mono">{st.grade}</span>
+                              <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${performanceCls}`}>{performanceLabel}</span>
                             </div>
                           </div>
 
-                          {isExpanded && (
-                            <div className="px-4 py-3.5 bg-ink-50/30 border-t border-ink-150 text-xs space-y-2 text-right" dir="rtl">
-                              <div className="text-[11px] font-bold text-ink-500 mb-1">تفاصيل ورصد النقاط:</div>
-                              {studentLogs.length === 0 ? (
-                                <p className="text-ink-400 text-center py-3 bg-white rounded-lg border border-ink-150">لا توجد نقاط مسجلة لهذا الطالب بعد.</p>
-                              ) : (
-                                <div className="divide-y divide-ink-150 max-h-56 overflow-y-auto scroll-soft bg-white rounded-lg border border-ink-150 px-3">
-                                  {studentLogs.map((log) => (
-                                    <div key={log.id} className="py-2.5 flex items-center justify-between gap-4">
-                                      <div className="min-w-0 flex-1">
-                                        <div className="font-semibold text-ink-800 truncate">{log.reason}</div>
-                                        <div className="text-[10px] text-ink-400 flex gap-2 mt-0.5">
-                                          <span>الفئة: {catLabel(log.category)}</span>
-                                          <span>•</span>
-                                          <span>بواسطة: {log.recordedBy || '—'}</span>
-                                        </div>
+                          {isExpanded && (() => {
+                            const bySource: Record<string, number> = {};
+                            studentLogs.forEach(p => { const s = getPointSource(p); bySource[s] = (bySource[s] || 0) + p.delta; });
+                            return (
+                              <div className="px-4 py-3 bg-ink-50/40 border-t border-ink-150 text-xs space-y-2 text-right" dir="rtl">
+                                <div className="text-[11px] font-bold text-ink-500 mb-2">مصادر النقاط:</div>
+                                {studentLogs.length === 0 ? (
+                                  <p className="text-ink-400 text-center py-3 bg-white rounded-lg border border-ink-150">لا توجد نقاط مسجلة لهذا الطالب بعد.</p>
+                                ) : (
+                                  <div className="grid grid-cols-3 gap-2">
+                                    {SOURCES.map(src => (
+                                      <div key={src.key} className="bg-white rounded-lg border border-ink-150 px-3 py-2 text-center">
+                                        <div className="text-[10px] text-ink-400 mb-1">{src.label}</div>
+                                        <div className={`text-sm font-bold ${(bySource[src.key]||0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>{bySource[src.key] ?? 0}</div>
                                       </div>
-                                      <div className="flex items-center gap-2 shrink-0">
-                                        <span className="text-[10px] text-ink-400">{formatDate(log.createdAt)}</span>
-                                        <span className={`font-bold font-mono px-2 py-0.5 rounded text-[11px] ${log.delta >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-750'}`}>
-                                          {log.delta >= 0 ? `+${log.delta}` : log.delta}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          )}
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
                       );
                     })}
@@ -855,6 +934,36 @@ export default function GroupsPage() {
                   <p className="text-sm text-ink-400 text-center py-6">لا يوجد طلاب مسجلين في هذه المجموعة حالياً.</p>
                 )}
               </div>
+            </div>
+            <div className="card p-6">
+              <h3 className="text-base font-bold text-ink-900 flex items-center gap-2 border-b border-ink-100 pb-3 mb-4">
+                <svg className="w-5 h-5 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" /><path d="M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2" /><path d="M9 5a2 2 0 0 0 2-2h2a2 2 0 0 0 2 2" /></svg>
+                <span>سجل رصد النقاط الجماعية</span>
+              </h3>
+              {(() => {
+                const gStudentIds = new Set(activeGroupStudents.map(s => s.id));
+                const bulkPts = points.filter(p => p.reason.endsWith('(رصد جماعي للأسرة)') && gStudentIds.has(p.registrationId));
+                const seen = new Set<string>();
+                const events = bulkPts.filter(p => {
+                  const k = `${p.reason}|${p.delta}|${p.createdAt}`;
+                  if (seen.has(k)) return false;
+                  seen.add(k); return true;
+                }).sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                if (events.length === 0) return <p className="text-sm text-ink-400 text-center py-4">لا توجد نقاط جماعية مرصودة بعد.</p>;
+                return (
+                  <div className="space-y-2 max-h-60 overflow-y-auto scroll-soft">
+                    {events.map((p: any, i: number) => (
+                      <div key={i} className="flex justify-between items-center bg-cream-50 rounded-lg px-3 py-2.5 border border-ink-100">
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-ink-800 truncate">{p.reason.replace(' (رصد جماعي للأسرة)', '')}</div>
+                          <div className="text-[10px] text-ink-400 mt-0.5">{formatDate(p.createdAt)}</div>
+                        </div>
+                        <span className={`pill ${p.delta >= 0 ? 'pill-green' : 'pill-red'} text-xs font-bold shrink-0 mr-3`} dir="ltr">{p.delta >= 0 ? `+${p.delta}` : p.delta}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         )
@@ -1098,7 +1207,7 @@ export default function GroupsPage() {
                 </div>
                 <div className="border-r border-ink-150 space-y-1">
                   <div className="text-[11px] text-ink-500 font-semibold">الطالب المتصدر</div>
-                  <div className="text-xs font-bold text-ink-900 truncate px-1" title={activeTopStudent ? activeTopStudent.studentName : '—'}>
+                  <div className="text-xs font-bold text-ink-900 break-words leading-tight px-1">
                     {activeTopStudent ? activeTopStudent.studentName : '—'}
                   </div>
                 </div>
@@ -1107,7 +1216,7 @@ export default function GroupsPage() {
 
             {/* الجزء السفلي: طلاب المجموعة وتفاصيل نقاطهم */}
             <div className="p-5 overflow-y-auto flex-1 space-y-4">
-              <div className="font-body">
+              <div>
               <h4 className="font-bold text-ink-900 flex items-center gap-2 border-b border-ink-100 pb-2">
                 <svg className="w-4 h-4 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -1137,50 +1246,53 @@ export default function GroupsPage() {
                     return (
                       <div key={st.id} className="border border-ink-200 rounded-xl overflow-hidden bg-white shadow-sm hover:shadow transition-shadow">
                         {/* Row Header */}
-                        <div 
+                        <div
                           onClick={() => setExpandedStudentId(isExpanded ? null : st.id)}
-                          className="text-sm px-4 py-3 flex justify-between items-center bg-white cursor-pointer hover:bg-cream-50/50 transition-colors select-none"
+                          className="text-sm px-4 pt-3 pb-2.5 bg-white cursor-pointer hover:bg-cream-50/50 transition-colors select-none"
                         >
-                          <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1.5">
                             <svg className={`w-3.5 h-3.5 text-ink-400 shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                               <polyline points="6 9 12 15 18 9" />
                             </svg>
-                            <span className="font-semibold text-ink-900 flex-1">{st.studentName}</span>
-                            <span className="text-[10px] text-ink-500 bg-cream-100 px-2 py-0.5 rounded font-mono shrink-0">{st.grade}</span>
-                            <span className={`text-[9px] px-1.5 py-0.5 rounded-full shrink-0 ${performanceCls}`}>{performanceLabel}</span>
-                          </div>
-                          <div className="flex items-center gap-2.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                            <span className="pill pill-green font-bold text-xs">{studentTotal} نقطة</span>
+                            <span className="font-bold text-ink-900 flex-1 truncate">{st.studentName}</span>
                             {canManageGroups && (
-                              <button
-                                onClick={() => removeStudentFromGroup(st.id)}
-                                disabled={busy}
-                                className="text-red-500 hover:text-red-750 hover:bg-red-50 w-7 h-7 flex items-center justify-center rounded-full font-bold transition-all shrink-0"
-                                title="إزالة من المجموعة"
-                              >
-                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M18 6 6 18M6 6l12 12" />
-                                </svg>
-                              </button>
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  onClick={() => removeStudentFromGroup(st.id)}
+                                  disabled={busy}
+                                  className="text-red-500 hover:text-red-750 hover:bg-red-50 w-6 h-6 flex items-center justify-center rounded-full transition-all shrink-0"
+                                  title="إزالة من المجموعة"
+                                >
+                                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M18 6 6 18M6 6l12 12" />
+                                  </svg>
+                                </button>
+                              </div>
                             )}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5 pr-5">
+                            <span className="pill pill-green font-bold text-[11px]">{studentTotal} نقطة</span>
+                            {st.membershipNo ? <span className="text-[10px] font-mono text-ink-400 bg-ink-50 border border-ink-200 px-1.5 py-0.5 rounded">#{st.membershipNo}</span> : null}
+                            <span className="text-[10px] text-ink-500 bg-cream-100 px-1.5 py-0.5 rounded font-mono">{st.grade}</span>
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${performanceCls}`}>{performanceLabel}</span>
                           </div>
                         </div>
 
-                        {/* Accordion Body - category summary */}
+                        {/* Accordion Body - source summary */}
                         {isExpanded && (() => {
-                          const byCategory: Record<string, number> = {};
-                          studentLogs.forEach(p => { byCategory[p.category] = (byCategory[p.category] || 0) + p.delta; });
+                          const bySource: Record<string, number> = {};
+                          studentLogs.forEach(p => { const s = getPointSource(p); bySource[s] = (bySource[s] || 0) + p.delta; });
                           return (
                             <div className="px-4 py-3 bg-ink-50/40 border-t border-ink-150 text-xs">
                               <div className="text-[11px] font-bold text-ink-500 mb-2">مصادر النقاط:</div>
                               {studentLogs.length === 0 ? (
                                 <p className="text-ink-400 text-center py-2">لا توجد نقاط مسجلة بعد.</p>
                               ) : (
-                                <div className="grid grid-cols-4 gap-2">
-                                  {[{key:'behavior',label:'سلوك'},{key:'participation',label:'مشاركة'},{key:'activity',label:'نشاط'},{key:'other',label:'أخرى'}].map(cat => (
-                                    <div key={cat.key} className="bg-white rounded-lg border border-ink-150 px-2 py-2 text-center">
-                                      <div className="text-[9px] text-ink-400 mb-1">{cat.label}</div>
-                                      <div className={`text-sm font-bold ${(byCategory[cat.key]||0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>{byCategory[cat.key] ?? 0}</div>
+                                <div className="grid grid-cols-3 gap-2">
+                                  {SOURCES.map(src => (
+                                    <div key={src.key} className="bg-white rounded-lg border border-ink-150 px-2 py-2 text-center">
+                                      <div className="text-[10px] text-ink-400 mb-1">{src.label}</div>
+                                      <div className={`text-sm font-bold ${(bySource[src.key]||0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>{bySource[src.key] ?? 0}</div>
                                     </div>
                                   ))}
                                 </div>
@@ -1263,6 +1375,38 @@ export default function GroupsPage() {
                     )}
                   </div>
                 )}
+              </div>
+
+              {/* سجل رصد النقاط الجماعية */}
+              <div className="border-t border-ink-100 pt-4 mt-2">
+                <h4 className="font-bold text-ink-900 text-sm flex items-center gap-2 mb-3">
+                  <svg className="w-4 h-4 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" /><path d="M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2" /><path d="M9 5a2 2 0 0 0 2-2h2a2 2 0 0 0 2 2" /></svg>
+                  <span>سجل رصد النقاط الجماعية</span>
+                </h4>
+                {(() => {
+                  const gStudentIds = new Set(activeGroupStudents.map(s => s.id));
+                  const bulkPts = points.filter(p => p.reason.endsWith('(رصد جماعي للأسرة)') && gStudentIds.has(p.registrationId));
+                  const seen = new Set<string>();
+                  const events = bulkPts.filter(p => {
+                    const k = `${p.reason}|${p.delta}|${p.createdAt}`;
+                    if (seen.has(k)) return false;
+                    seen.add(k); return true;
+                  }).sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                  if (events.length === 0) return <p className="text-sm text-ink-400 text-center py-3">لا توجد نقاط جماعية مرصودة بعد.</p>;
+                  return (
+                    <div className="space-y-2 max-h-48 overflow-y-auto scroll-soft">
+                      {events.map((p: any, i: number) => (
+                        <div key={i} className="flex justify-between items-center bg-cream-50 rounded-lg px-3 py-2 border border-ink-100">
+                          <div className="min-w-0">
+                            <div className="text-xs font-semibold text-ink-800 truncate">{p.reason.replace(' (رصد جماعي للأسرة)', '')}</div>
+                            <div className="text-[10px] text-ink-400 mt-0.5">{formatDate(p.createdAt)}</div>
+                          </div>
+                          <span className={`pill ${p.delta >= 0 ? 'pill-green' : 'pill-red'} text-xs font-bold shrink-0 mr-3`} dir="ltr">{p.delta >= 0 ? `+${p.delta}` : p.delta}</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
 
             </div>

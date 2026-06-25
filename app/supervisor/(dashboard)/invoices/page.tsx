@@ -48,22 +48,24 @@ export default function InvoicesPage() {
   const [adding, setAdding] = useState(false);
   const [viewing, setViewing] = useState<Invoice | null>(null);
 
-  const isFinance = user?.role === 'admin' || user?.role === 'finance';
+  const roles = (user?.role ?? '').split(',').map(r => r.trim());
+  const canDeleteAny = roles.some(r => ['admin', 'finance'].includes(r));
 
   async function load() {
     const r = await fetch('/api/supervisor/invoices', { cache: 'no-store' });
     const j = await r.json().catch(() => ({ invoices: [] }));
-    setInvoices(j.invoices ?? []);
+    // Always show only own invoices regardless of role
+    const all: Invoice[] = j.invoices ?? [];
+    setInvoices(all.filter(inv => inv.supervisorName === user?.name || !user?.name));
     setMyDepartments(j.myDepartments ?? []);
     setLoading(false);
   }
   useEffect(() => { load(); }, []);
 
   const deptOptions = useMemo(() => {
-    if (isFinance) return DEPARTMENTS.map((d) => ({ key: d.key, label: d.label }));
     if (myDepartments.length > 0) return myDepartments.map((k) => ({ key: k, label: departmentLabel(k) }));
     return DEPARTMENTS.map((d) => ({ key: d.key, label: d.label }));
-  }, [isFinance, myDepartments]);
+  }, [myDepartments]);
 
   async function del(inv: Invoice) {
     if (!confirm(`حذف الفاتورة #${inv.invoiceNo}؟`)) return;
@@ -82,9 +84,7 @@ export default function InvoicesPage() {
       <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-ink-900 mb-1">الفواتير</h1>
-          <p className="text-sm text-ink-500">
-            {isFinance ? 'فواتير جميع المشرفين.' : 'فواتيرك المُضافة. صوّرها ليقرأها الذكاء الاصطناعي أو أدخلها يدوياً.'}
-          </p>
+          <p className="text-sm text-ink-500">فواتيرك المُضافة. صوّرها ليقرأها الذكاء الاصطناعي أو أدخلها يدوياً.</p>
         </div>
         <button onClick={() => setAdding(true)} className="btn btn-primary">+ إضافة فاتورة</button>
       </div>
@@ -102,7 +102,6 @@ export default function InvoicesPage() {
                 <thead>
                   <tr>
                     <th>الرقم</th><th>العنوان</th><th>القسم</th>
-                    {isFinance && <th>المشرف</th>}
                     <th>الإجمالي</th><th>الحالة</th><th></th>
                   </tr>
                 </thead>
@@ -121,7 +120,6 @@ export default function InvoicesPage() {
                         )}
                       </td>
                       <td className="text-ink-500 text-sm">{departmentLabel(inv.department)}</td>
-                      {isFinance && <td className="text-ink-500 text-sm">{inv.supervisorName}</td>}
                       <td className="font-semibold" dir="ltr">{money(inv.total)}</td>
                       <td>
                         <span className={`pill ${statusPill(inv.status)}`}>{statusLabel(inv.status)}</span>
@@ -149,7 +147,6 @@ export default function InvoicesPage() {
                     </div>
                     <div className="text-xs text-ink-400 mt-0.5">
                       <span dir="ltr" className="font-mono">#{inv.invoiceNo}</span> · {departmentLabel(inv.department)}
-                      {isFinance && ` · ${inv.supervisorName}`}
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5 mt-2">
                       <span className="font-semibold text-sm" dir="ltr">{money(inv.total)}</span>
@@ -176,7 +173,7 @@ export default function InvoicesPage() {
       {viewing && (
         <ViewInvoiceModal
           invoice={viewing}
-          canDelete={isFinance || viewing.status === 'pending'}
+          canDelete={canDeleteAny || viewing.status === 'pending'}
           onClose={() => setViewing(null)}
           onDelete={() => del(viewing)}
         />

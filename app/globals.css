@@ -366,17 +366,20 @@ body::after {
 .scroll-soft::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
 .scroll-soft::-webkit-scrollbar-track { background: transparent; }
 
-/* Clean font override for supervisor dashboard pages */
-.supervisor-body,
-.supervisor-body h1,
-.supervisor-body h2,
-.supervisor-body h3,
-.supervisor-body h4,
-.supervisor-body h5,
-.supervisor-body h6,
-.supervisor-body .font-display {
+/* Clean font override for supervisor dashboard pages — force Thmanyah on every element */
+.supervisor-body {
   font-family: var(--font-body) !important;
 }
+.supervisor-body * {
+  font-family: inherit !important;
+}
+/* Restore monospace where it matters (IDs, numbers, code) */
+.supervisor-body .font-mono,
+.supervisor-body code,
+.supervisor-body pre {
+  font-family: ui-monospace, 'SFMono-Regular', 'Menlo', 'Monaco', monospace !important;
+}
+
 
 /* Date & Select inputs height fix for mobile Safari/iOS */
 input[type="date"],

@@ -207,14 +207,15 @@ function SmallCard({ accent, icon, label, value, sub }: { accent: string; icon: 
   );
 }
 
-function AttendanceCard({ label, present, absent, percent, color, sub }: { label: string; present: number; absent: number; percent: number; color: string; sub?: string }) {
+function AttendanceCard({ label, present, late = 0, absent, percent, color, sub }: { label: string; present: number; late?: number; absent: number; percent: number; color: string; sub?: string }) {
   return (
     <div className="card p-5 flex items-center justify-between relative overflow-hidden">
       <div className="absolute top-0 right-0 w-1.5 h-full" style={{ backgroundColor: color }} />
       <div className="space-y-1 min-w-0">
         <div className="text-xs text-ink-500 font-bold">{label}</div>
-        <div className="text-xl font-bold text-ink-900">{present} <span className="text-sm text-ink-400 font-medium">حاضر</span></div>
-        <div className="text-sm font-semibold text-red-500">{absent} <span className="text-xs text-ink-400 font-medium">معتذر</span></div>
+        <div className="text-xl font-bold text-green-600">{present} <span className="text-sm text-ink-400 font-medium">حاضر</span></div>
+        <div className="text-sm font-semibold text-amber-500">{late} <span className="text-xs text-ink-400 font-medium">معتذر</span></div>
+        <div className="text-sm font-semibold text-red-500">{absent} <span className="text-xs text-ink-400 font-medium">غائب</span></div>
         {sub && <div className="text-[10px] text-ink-400 font-semibold">{sub}</div>}
       </div>
       <AttendanceRing percent={percent} color={color} />
@@ -258,6 +259,7 @@ function QuickInfoCards({ roles, isAdmin, isFinanceRole, isAttendanceRole, isPoi
   stats: any; attendancePercent: number; groupAttendancePercent: number;
 }) {
   const overallPresent = stats?.attendanceOverall?.presentToday ?? 0;
+  const overallLate = stats?.attendanceOverall?.lateToday ?? 0;
   const overallAbsent = stats?.attendanceOverall?.absentToday ?? 0;
 
   // Admin / General supervisor
@@ -273,7 +275,7 @@ function QuickInfoCards({ roles, isAdmin, isFinanceRole, isAttendanceRole, isPoi
         />
         <AttendanceCard
           label="حضور اليوم"
-          present={overallPresent} absent={overallAbsent}
+          present={overallPresent} late={overallLate} absent={overallAbsent}
           percent={attendancePercent} color="var(--accent)"
         />
       </div>
@@ -285,7 +287,7 @@ function QuickInfoCards({ roles, isAdmin, isFinanceRole, isAttendanceRole, isPoi
       <div className="grid grid-cols-1 sm:grid-cols-1 gap-4 max-w-sm">
         <AttendanceCard
           label="حضور اليوم"
-          present={overallPresent} absent={overallAbsent}
+          present={overallPresent} late={overallLate} absent={overallAbsent}
           percent={attendancePercent} color="var(--accent)"
         />
       </div>
@@ -323,7 +325,7 @@ function QuickInfoCards({ roles, isAdmin, isFinanceRole, isAttendanceRole, isPoi
     return (
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <AttendanceCard
-          label="حضور اليوم" present={overallPresent} absent={overallAbsent}
+          label="حضور اليوم" present={overallPresent} late={overallLate} absent={overallAbsent}
           percent={attendancePercent} color="var(--accent)"
         />
         <SmallCard accent="#12B3D5"
@@ -343,7 +345,7 @@ function QuickInfoCards({ roles, isAdmin, isFinanceRole, isAttendanceRole, isPoi
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <AttendanceCard
-          label="حضور اليوم" present={overallPresent} absent={overallAbsent}
+          label="حضور اليوم" present={overallPresent} late={overallLate} absent={overallAbsent}
           percent={attendancePercent} color="var(--accent)"
         />
         <NextProgramCard program={stats?.nextCommitteeProgram ?? null} />
@@ -355,8 +357,9 @@ function QuickInfoCards({ roles, isAdmin, isFinanceRole, isAttendanceRole, isPoi
   if (isGroupsRole) {
     const gs = stats?.groupStats;
     const myPresent = stats?.attendance?.presentToday ?? 0;
+    const myLate = stats?.attendance?.lateToday ?? 0;
     const myAbsent = stats?.attendance?.absentToday ?? 0;
-    const myTotal = myPresent + myAbsent;
+    const myTotal = myPresent + myLate + myAbsent;
     const myPct = myTotal > 0 ? Math.round(myPresent / myTotal * 100) : 0;
     return (
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -365,7 +368,7 @@ function QuickInfoCards({ roles, isAdmin, isFinanceRole, isAttendanceRole, isPoi
           label="طلاب الأسرة" value={stats?.myStudents?.length ?? 0} sub="إجمالي طلاب أسرتك"
         />
         <AttendanceCard
-          label="حضور الأسرة اليوم" present={myPresent} absent={myAbsent}
+          label="حضور الأسرة اليوم" present={myPresent} late={myLate} absent={myAbsent}
           percent={myPct} color="#12B3D5"
         />
         <SmallCard accent="#f59e0b"
@@ -384,8 +387,9 @@ function QuickInfoCards({ roles, isAdmin, isFinanceRole, isAttendanceRole, isPoi
   if (isStageRole) {
     const ss = stats?.stageStats;
     const sp = ss?.attendanceToday?.present ?? 0;
+    const sl = ss?.attendanceToday?.late ?? 0;
     const sa = ss?.attendanceToday?.absent ?? 0;
-    const st = sp + sa;
+    const st = sp + sl + sa;
     const spct = st > 0 ? Math.round(sp / st * 100) : 0;
     return (
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -394,7 +398,7 @@ function QuickInfoCards({ roles, isAdmin, isFinanceRole, isAttendanceRole, isPoi
           label={`طلاب مرحلة ${ss?.stageName ?? ''} المقبولين`} value={ss?.approvedCount ?? 0} sub="طالب مقبول في مرحلتك"
         />
         <AttendanceCard
-          label="حضور المرحلة اليوم" present={sp} absent={sa}
+          label="حضور المرحلة اليوم" present={sp} late={sl} absent={sa}
           percent={spct} color="#103F91"
         />
         <div className="card p-5 relative overflow-hidden">

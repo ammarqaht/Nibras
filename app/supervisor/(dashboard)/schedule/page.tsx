@@ -96,9 +96,10 @@ export default function SchedulePage() {
   }, [user]);
 
   const isAdmin = userRoles.includes('admin');
-  // Only committee supervisors (social/cultural/scientific/sports) can add/edit programs
-  const canManageSchedule = isAdmin || userRoles.some(r => COMMITTEE_ROLES.includes(r));
-  const availableRoles = isAdmin
+  const isAdministrative = userRoles.includes('administrative_supervisor');
+  // Admins and administrative supervisors can manage all schedules; committee supervisors manage their own
+  const canManageSchedule = isAdmin || isAdministrative || userRoles.some(r => COMMITTEE_ROLES.includes(r));
+  const availableRoles = (isAdmin || isAdministrative)
     ? ROLES.filter(r => COMMITTEE_ROLES.includes(r.key))
     : ROLES.filter(r => userRoles.includes(r.key) && COMMITTEE_ROLES.includes(r.key));
 
@@ -321,110 +322,87 @@ export default function SchedulePage() {
                 </div>
                 
                 <div className="overflow-x-auto scroll-soft rounded-lg border border-ink-100">
-                  <table className="w-full border-collapse text-right min-w-[500px] table-fixed">
+                  <table className="w-full border-collapse text-right min-w-[560px] table-fixed">
                     <thead>
                       <tr className="bg-cream-50/50 border-b border-ink-200">
+                        <th className="w-[60px] md:w-[72px] p-1.5 md:p-2 text-ink-700 font-bold border-l border-ink-200 text-center text-[9px] md:text-[11px]">المرحلة</th>
                         <th className="p-2 md:p-3 text-ink-900 font-bold border-l border-ink-200 text-center text-xs md:text-sm">الفقرة الأولى<br/><span className="text-[9px] md:text-[11px] font-normal text-ink-500">04:30 م - 05:30 م</span></th>
                         <th className="p-2 md:p-3 text-ink-900 font-bold border-l border-ink-200 text-center text-xs md:text-sm">الفقرة الثانية<br/><span className="text-[9px] md:text-[11px] font-normal text-ink-500">05:30 م - 06:30 م</span></th>
                         <th className="p-2 md:p-3 text-ink-900 font-bold text-center text-xs md:text-sm">الفقرة الثالثة<br/><span className="text-[9px] md:text-[11px] font-normal text-ink-500">07:30 م - 08:45 م</span></th>
                       </tr>
                     </thead>
                     <tbody>
-                      {(() => {
-                        const stageSchedules = daySchedules;
-
+                      {[
+                        { key: 'ابتدائي', label: 'ابتدائي', color: '#12B3D5' },
+                        { key: 'متوسط', label: 'متوسط', color: '#103F91' },
+                        { key: 'ثانوي', label: 'ثانوي', color: '#E52E25' },
+                      ].map(({ key, label, color }) => {
+                        const rowPrograms = daySchedules.filter(s => {
+                          const stageList = (s.stage || 'الكل').split(',').map((x: string) => x.trim());
+                          return stageList.includes('الكل') || stageList.includes(key);
+                        });
                         return (
-                          <tr className="border-b border-ink-100 last:border-0">
+                          <tr key={key} className="border-b border-ink-100 last:border-0">
+                            <td className="border-l border-ink-100 p-1 align-middle">
+                              <div className="flex items-center justify-center min-h-[50px]">
+                                <span className="text-[8px] md:text-[10px] font-bold writing-mode-vertical text-center leading-tight" style={{ color }}>{label}</span>
+                              </div>
+                            </td>
                             <td colSpan={3} className="p-1 md:p-2 align-top">
-                              <div className="grid grid-cols-3 gap-2 md:gap-2.5 relative min-h-[75px] md:min-h-[80px] w-full">
-                                {/* خطوط تقسيم الفقرات الخلفية */}
+                              <div className="grid grid-cols-3 gap-2 md:gap-2.5 relative min-h-[55px] md:min-h-[65px] w-full">
                                 <div className="absolute inset-0 grid grid-cols-3 pointer-events-none z-0">
                                   <div className="border-l border-dashed border-ink-200/30 h-full"></div>
                                   <div className="border-l border-dashed border-ink-200/30 h-full"></div>
                                   <div className="h-full"></div>
                                 </div>
-
-                                {stageSchedules.length > 0 ? (
-                                  stageSchedules.map(s => {
+                                {rowPrograms.length > 0 ? (
+                                  rowPrograms.map(s => {
                                     const canEdit = canManageSchedule && (user?.role === 'admin' || userRoles.includes(s.role));
                                     const programSlots = getProgramSlots(s);
-                                    
                                     const startCol = programSlots.length > 0 ? (Math.min(...programSlots) + 1) : 1;
                                     const spanWidth = programSlots.length > 0 ? (Math.max(...programSlots) - Math.min(...programSlots) + 1) : 3;
-                                    
                                     return (
-                                      <div 
-                                        key={s.id} 
+                                      <div
+                                        key={s.id}
                                         onClick={() => openDetailsModal(s)}
                                         className={`p-1.5 md:p-2 rounded-lg border text-[10px] md:text-xs relative z-10 group ${getRoleStyle(s.role)} shadow-sm flex flex-col justify-between cursor-pointer`}
                                         style={{ gridColumn: `${startCol} / span ${spanWidth}` }}
                                       >
                                         {canEdit && (
                                           <div className="absolute top-1 left-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button 
-                                              onClick={(e) => { e.stopPropagation(); openEditModal(s); }} 
-                                              className="text-brand-600 hover:text-brand-800 bg-white/95 border border-ink-200 rounded p-0.5 shadow-sm cursor-pointer"
-                                              title="تعديل"
-                                            >
-                                              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                                              </svg>
+                                            <button onClick={(e) => { e.stopPropagation(); openEditModal(s); }} className="text-brand-600 hover:text-brand-800 bg-white/95 border border-ink-200 rounded p-0.5 shadow-sm cursor-pointer" title="تعديل">
+                                              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                                             </button>
-                                            <button 
-                                              onClick={(e) => { e.stopPropagation(); removeSchedule(s.id); }} 
-                                              className="text-nred-600 hover:text-nred-800 bg-white/95 border border-ink-200 rounded p-0.5 shadow-sm cursor-pointer"
-                                              title="حذف"
-                                            >
-                                              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                                <polyline points="3 6 5 6 21 6" />
-                                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                                              </svg>
+                                            <button onClick={(e) => { e.stopPropagation(); removeSchedule(s.id); }} className="text-nred-600 hover:text-nred-800 bg-white/95 border border-ink-200 rounded p-0.5 shadow-sm cursor-pointer" title="حذف">
+                                              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
                                             </button>
                                           </div>
                                         )}
                                         <div>
-                                          <div className="font-bold pe-8 text-ink-900 break-words line-clamp-2 text-[11px] md:text-xs" title={s.title}>
-                                            {s.title}
-                                          </div>
+                                          <div className="font-bold pe-8 text-ink-900 break-words line-clamp-2 text-[11px] md:text-xs" title={s.title}>{s.title}</div>
                                           <div className="text-[8px] md:text-[9px] font-semibold opacity-85 mt-0.5">{getRoleLabel(s.role)}</div>
                                         </div>
-                                        
                                         {s.notes ? (
                                           <div className="text-[9px] md:text-[10px] text-ink-600 mt-1 bg-white/50 px-1.5 py-0.5 rounded border border-black/5 italic flex items-center justify-between gap-1 overflow-hidden">
-                                            <span className="truncate flex-1 text-right" title={s.notes}>
-                                              {s.notes.split('\n')[0]}
-                                            </span>
-                                            <button 
-                                              onClick={(e) => { e.stopPropagation(); openDetailsModal(s); }}
-                                              className="text-brand-700 hover:text-brand-900 hover:underline font-bold text-[8px] md:text-[9px] whitespace-nowrap shrink-0 cursor-pointer"
-                                            >
-                                              التفاصيل
-                                            </button>
+                                            <span className="truncate flex-1 text-right" title={s.notes}>{s.notes.split('\n')[0]}</span>
+                                            <button onClick={(e) => { e.stopPropagation(); openDetailsModal(s); }} className="text-brand-700 hover:text-brand-900 hover:underline font-bold text-[8px] md:text-[9px] whitespace-nowrap shrink-0 cursor-pointer">التفاصيل</button>
                                           </div>
                                         ) : (
                                           <div className="flex justify-end mt-1">
-                                            <button 
-                                              onClick={(e) => { e.stopPropagation(); openDetailsModal(s); }}
-                                              className="text-brand-700 hover:text-brand-900 hover:underline font-bold text-[8px] md:text-[9px] cursor-pointer"
-                                            >
-                                              التفاصيل
-                                            </button>
+                                            <button onClick={(e) => { e.stopPropagation(); openDetailsModal(s); }} className="text-brand-700 hover:text-brand-900 hover:underline font-bold text-[8px] md:text-[9px] cursor-pointer">التفاصيل</button>
                                           </div>
                                         )}
                                       </div>
                                     );
                                   })
                                 ) : (
-                                  <div className="col-span-3 flex items-center justify-center text-[10px] md:text-xs text-ink-300 py-4 select-none z-10 bg-white/60 backdrop-blur-[1px]">
-                                    — لا توجد برامج مسجلة اليوم لهذه المرحلة —
-                                  </div>
+                                  <div className="col-span-3 flex items-center justify-center text-[9px] text-ink-200 py-3 select-none z-10">—</div>
                                 )}
                               </div>
                             </td>
                           </tr>
                         );
-                      })()}
+                      })}
                     </tbody>
                   </table>
                 </div>

@@ -763,101 +763,93 @@ export default function StudentsPage() {
             </div>
 
             {/* mobile: tappable cards (no horizontal scroll) */}
-            <ul className="lg:hidden divide-y divide-ink-200">
+            <ul className="lg:hidden divide-y divide-ink-100">
               {filtered.map((s, idx) => {
                 const pp = paymentPill(s);
-                const groupName = groups.find((g) => g.id === s.groupId)?.name || 'بدون مجموعة';
+                const groupName = s.groupId ? (groups.find((g) => g.id === s.groupId)?.name ?? null) : null;
                 return (
                   <li
                     key={s.id}
                     onClick={() => setSelected(s)}
-                    className="py-3 px-4 flex items-center gap-3 active:bg-cream-100 cursor-pointer text-right"
+                    className="py-3.5 px-4 flex items-start gap-2.5 active:bg-cream-100 cursor-pointer text-right"
                     dir="rtl"
                   >
                     {visibleCols.index && (
-                      <div className="text-ink-400 font-mono text-sm shrink-0 min-w-[1.5rem] text-center">
+                      <div className="text-ink-300 font-mono text-xs shrink-0 pt-1 min-w-[1.5rem] text-center">
                         {idx + 1}
                       </div>
                     )}
-                    <div className="min-w-0 flex-1 space-y-1">
-                        <div className="font-semibold text-ink-900 truncate">
-                          {s.studentName}
-                          {s.hasCondition && (
-                            <span title="حالة صحية" className="mr-1 inline-flex items-center text-red-600">
-                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
-                                <line x1="12" y1="9" x2="12" y2="13" />
-                                <line x1="12" y1="17" x2="12.01" y2="17" />
-                              </svg>
-                            </span>
-                          )}
-                        </div>
-                      
-                      <div className="text-xs text-ink-500 flex flex-wrap gap-x-2 gap-y-1">
+                    <div className="min-w-0 flex-1">
+                      {/* Name row */}
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <span className="font-bold text-ink-900 truncate text-sm leading-snug">{s.studentName}</span>
+                        {s.hasCondition && (
+                          <svg className="w-3.5 h-3.5 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                            <line x1="12" y1="9" x2="12" y2="13" />
+                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                          </svg>
+                        )}
+                      </div>
+                      {/* Badges row: membership + stage + group */}
+                      <div className="flex flex-wrap gap-1.5 mb-1.5">
                         {visibleCols.membershipNo && (
-                          <span dir="ltr" className="font-mono">#{s.membershipNo}</span>
+                          <span dir="ltr" className="text-[10px] font-mono text-ink-400 bg-ink-50 border border-ink-200 px-1.5 py-0.5 rounded leading-none">#{s.membershipNo}</span>
                         )}
                         {visibleCols.stage && (
-                          <>
-                            {visibleCols.membershipNo && <span className="text-ink-300">·</span>}
-                            <span>{s.stage} — {s.grade}</span>
-                          </>
+                          <span className="text-[10px] text-ink-600 bg-cream-100 px-1.5 py-0.5 rounded leading-none">{s.stage} · {s.grade}</span>
                         )}
-                        {visibleCols.group && (
-                          <>
-                            {(visibleCols.membershipNo || visibleCols.stage) && <span className="text-ink-300">·</span>}
-                            <span>{groupName}</span>
-                          </>
+                        {visibleCols.group && groupName && (
+                          <span className="text-[10px] text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded leading-none">{groupName}</span>
+                        )}
+                        {visibleCols.group && !groupName && (
+                          <span className="text-[10px] text-ink-300 px-1 leading-none">بدون أسرة</span>
                         )}
                       </div>
-
-                      <div className="text-xs text-ink-500 space-y-0.5">
-                        {visibleCols.guardianPhone && (
-                          <div>
-                            <span className="text-ink-400">ولي الأمر: </span>
-                            <span dir="ltr">{s.guardianPhone}</span>
-                          </div>
-                        )}
-                        {visibleCols.studentPhone && s.studentPhone && (
-                          <div>
-                            <span className="text-ink-400">جوال الطالب: </span>
-                            <span dir="ltr">{s.studentPhone}</span>
-                          </div>
-                        )}
-                        {visibleCols.nationalId && (
-                          <div>
-                            <span className="text-ink-400">رقم الهوية: </span>
-                            <span dir="ltr">{s.nationalId}</span>
-                          </div>
-                        )}
-                        {visibleCols.neighborhood && (
-                          <div>
-                            <span className="text-ink-400">الحي: </span>
-                            <span>{s.neighborhood}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {(visibleCols.paymentStatus && isGlobal || (visibleCols.hasCondition && s.hasCondition)) && (
-                        <div className="flex flex-wrap gap-1.5 pt-1">
-                          {visibleCols.paymentStatus && isGlobal && (
-                            <span className={`pill ${pp.cls}`}>{pp.label}</span>
+                      {/* Contact info row */}
+                      {(visibleCols.guardianPhone || (visibleCols.studentPhone && s.studentPhone) || visibleCols.nationalId || visibleCols.neighborhood) && (
+                        <div className="text-[11px] text-ink-500 space-y-0.5">
+                          {visibleCols.guardianPhone && (
+                            <div className="flex items-center gap-1">
+                              <span className="text-ink-400">ولي الأمر:</span>
+                              <span dir="ltr" className="font-mono">{s.guardianPhone}</span>
+                            </div>
                           )}
-
+                          {visibleCols.studentPhone && s.studentPhone && (
+                            <div className="flex items-center gap-1">
+                              <span className="text-ink-400">الطالب:</span>
+                              <span dir="ltr" className="font-mono">{s.studentPhone}</span>
+                            </div>
+                          )}
+                          {visibleCols.nationalId && (
+                            <div className="flex items-center gap-1">
+                              <span className="text-ink-400">الهوية:</span>
+                              <span dir="ltr" className="font-mono">{s.nationalId}</span>
+                            </div>
+                          )}
+                          {visibleCols.neighborhood && (
+                            <div className="flex items-center gap-1">
+                              <span className="text-ink-400">الحي:</span>
+                              <span>{s.neighborhood}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {/* Status pills */}
+                      {((visibleCols.paymentStatus && isGlobal) || (visibleCols.hasCondition && s.hasCondition)) && (
+                        <div className="flex flex-wrap gap-1.5 mt-1.5">
+                          {visibleCols.paymentStatus && isGlobal && (
+                            <span className={`pill ${pp.cls} text-[10px]`}>{pp.label}</span>
+                          )}
                           {visibleCols.hasCondition && s.hasCondition && (
-                            <span className="pill pill-red inline-flex items-center gap-1">
-                              <svg className="w-3 h-3 text-red-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
-                                <line x1="12" y1="9" x2="12" y2="13" />
-                                <line x1="12" y1="17" x2="12.01" y2="17" />
-                              </svg>
-                              <span>{s.conditionNote || 'حالة صحية'}</span>
-                            </span>
+                            <span className="pill pill-red text-[10px]">{s.conditionNote || 'حالة صحية'}</span>
                           )}
                         </div>
                       )}
                     </div>
-                    <span className="text-ink-300 text-xl shrink-0">‹</span>
+                    <svg className="w-4 h-4 text-ink-200 shrink-0 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="15 18 9 12 15 6" />
+                    </svg>
                   </li>
                 );
               })}

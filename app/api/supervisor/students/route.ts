@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { getStudents, updateStudent, getSupervisorByEmail, createStudentManually, deleteStudent, getGroups, getAccessibleGroupIds } from '@/lib/services';
+import { getStudents, updateStudent, getSupervisorByEmail, createStudentManually, deleteStudent, getGroups, getAccessibleGroupIds, FULL_STUDENT_DATA_ROLES, GLOBAL_ROLES } from '@/lib/services';
 
 export async function GET(req: NextRequest) {
   try {
@@ -26,27 +26,49 @@ export async function GET(req: NextRequest) {
 
     let students = await getStudents();
 
-    // Role-based scoping: supervisor only sees their group's students if they are not in a global role.
     const roles = supervisor.role.split(',').map(r => r.trim());
-    const isGlobal = roles.some(r =>
-      ['admin', 'finance', 'finance_supervisor', 'media_supervisor', 'cultural_supervisor', 'social_supervisor', 'general_supervisor', 'attendance_supervisor'].includes(r)
-    );
+    const isGlobal = roles.some(r => GLOBAL_ROLES.includes(r));
+    const isStage = roles.includes('stage_supervisor');
+    const hasFullData = roles.some(r => FULL_STUDENT_DATA_ROLES.includes(r));
 
-    if (scope === 'all') {
-      if (!isGlobal) {
-        students = students.map(s => ({
-          ...s,
-          guardianPhone: '',
-          studentPhone: '',
-          paymentStatus: ''
-        }));
-      }
-    } else {
-      if (!isGlobal) {
+    // Scope students: non-global supervisors only see their group/stage students
+    if (scope !== 'all') {
+      if (!isGlobal && !isStage) {
+        const groups = await getGroups();
+        const allowedGroupIds = getAccessibleGroupIds(supervisor, groups);
+        students = students.filter(s => s.groupId !== null && allowedGroupIds.includes(s.groupId));
+      } else if (isStage && !isGlobal) {
         const groups = await getGroups();
         const allowedGroupIds = getAccessibleGroupIds(supervisor, groups);
         students = students.filter(s => s.groupId !== null && allowedGroupIds.includes(s.groupId));
       }
+    }
+
+    // Strip sensitive fields for restricted roles
+    if (!hasFullData) {
+      students = students.map(s => ({
+        id: s.id,
+        membershipNo: s.membershipNo,
+        studentName: s.studentName,
+        stage: s.stage,
+        grade: s.grade,
+        groupId: s.groupId,
+        registrationStatus: s.registrationStatus,
+        hasCondition: s.hasCondition,
+        conditionNote: s.conditionNote,
+        // Sensitive fields hidden
+        nationalId: '',
+        guardianPhone: '',
+        studentPhone: null,
+        neighborhood: '',
+        locationLat: null,
+        locationLng: null,
+        mapLink: null,
+        paymentStatus: '',
+        paymentType: '',
+        paymentReceipt: null,
+        createdAt: s.createdAt,
+      }));
     }
 
 

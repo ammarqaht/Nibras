@@ -42,8 +42,8 @@ const getRoleLabel = (roleStr: string) => {
 const LINKS: NavLink[] = [
   { id: 'home', href: '/supervisor', label: 'الرئيسية' },
   { id: 'students', href: '/supervisor/students', label: 'الطلاب' },
-  { id: 'attendance', href: '/supervisor/attendance', label: 'الحضور', roles: ['attendance_supervisor', 'general_supervisor'] },
-  { id: 'points', href: '/supervisor/points', label: 'النقاط', roles: ['social_supervisor', 'cultural_supervisor', 'general_supervisor'] },
+  { id: 'attendance', href: '/supervisor/attendance', label: 'الحضور', roles: ['attendance_supervisor', 'groups_supervisor', 'stage_supervisor'] },
+  { id: 'points', href: '/supervisor/points', label: 'النقاط', roles: ['social_supervisor', 'cultural_supervisor', 'sports_supervisor', 'scientific_supervisor', 'groups_supervisor', 'stage_supervisor'] },
   { id: 'tasks', href: '/supervisor/tasks', label: 'المهام', roles: ['general_supervisor'] },
   { id: 'schedule', href: '/supervisor/schedule', label: 'الجدول' },
   { id: 'groups', href: '/supervisor/groups', label: 'المجموعات', roles: ['groups_supervisor', 'general_supervisor', 'stage_supervisor'] },

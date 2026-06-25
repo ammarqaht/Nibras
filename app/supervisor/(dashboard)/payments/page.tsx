@@ -43,6 +43,8 @@ export default function PaymentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>('all');
+  const [stageFilter, setStageFilter] = useState('');
+  const [neighborhoodFilter, setNeighborhoodFilter] = useState('');
   const [busyId, setBusyId] = useState<number | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [expandedIds, setExpandedIds] = useState<Record<number, boolean>>({});
@@ -58,15 +60,21 @@ export default function PaymentsPage() {
   }
   useEffect(() => { if (allowed) load(); else setLoading(false); }, [allowed]);
 
+  const neighborhoods = useMemo(() => {
+    const set = new Set(students.map(s => s.neighborhood).filter(Boolean));
+    return Array.from(set).sort();
+  }, [students]);
+
   const filtered = useMemo(() => {
     return students.filter((s) => {
-      if (tab === 'all') return true;
+      if (stageFilter && s.stage !== stageFilter) return false;
+      if (neighborhoodFilter && s.neighborhood !== neighborhoodFilter) return false;
       if (tab === 'paid') return s.paymentStatus === 'paid';
       if (tab === 'exempted') return s.paymentStatus === 'exempted';
       if (tab === 'unpaid') return s.paymentStatus !== 'paid' && s.paymentStatus !== 'exempted';
       return true;
     });
-  }, [students, tab]);
+  }, [students, tab, stageFilter, neighborhoodFilter]);
 
   async function setExempted(id: number) {
     if (!window.confirm('هل أنت متأكد من إعفاء الطالب من الرسوم؟')) return;
@@ -178,6 +186,29 @@ export default function PaymentsPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-ink-900 mb-1">المدفوعات</h1>
         <p className="text-sm text-ink-500">مراجعة إيصالات التحويل وتأكيد استلام الرسوم.</p>
+      </div>
+
+      <div className="flex gap-2 mb-4 flex-wrap">
+        <select
+          className="field text-sm py-1.5 px-3 min-w-[120px]"
+          value={stageFilter}
+          onChange={(e) => setStageFilter(e.target.value)}
+        >
+          <option value="">كل المراحل</option>
+          <option value="ابتدائي">ابتدائي</option>
+          <option value="متوسط">متوسط</option>
+          <option value="ثانوي">ثانوي</option>
+        </select>
+        <select
+          className="field text-sm py-1.5 px-3 min-w-[140px]"
+          value={neighborhoodFilter}
+          onChange={(e) => setNeighborhoodFilter(e.target.value)}
+        >
+          <option value="">كل الأحياء</option>
+          {neighborhoods.map((n) => (
+            <option key={n} value={n}>{n}</option>
+          ))}
+        </select>
       </div>
 
       <div className="flex gap-2 mb-5 flex-wrap">

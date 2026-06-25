@@ -3,7 +3,7 @@ import { getSession } from '@/lib/auth';
 import {
   getStudents, getAttendance, getPoints, getTasks, getSubmissions,
   getGroups, getSupervisorByEmail, getInvoices, getGeneralExpenses,
-  getOtherRevenues, getSchedules, getSettings,
+  getOtherRevenues, getSchedules, getSettings, FINANCE_ANALYTICS_ROLES,
 } from '@/lib/services';
 import { DEPARTMENTS, CATEGORIES } from '@/lib/finance';
 
@@ -46,10 +46,19 @@ export async function GET(req: NextRequest) {
     const supervisor = await getSupervisorByEmail(session.email);
     if (!supervisor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    const roles = supervisor.role.split(',').map((r: string) => r.trim());
+    const canSeeFinance = roles.some((r: string) => FINANCE_ANALYTICS_ROLES.includes(r));
+
+    // Only fetch financial data for roles that need it
     const [students, attendance, points, tasks, submissions, groups, invoices, generalExpenses, otherRevenues, schedules, settings] =
       await Promise.all([
         getStudents(), getAttendance(), getPoints(), getTasks(), getSubmissions(),
-        getGroups(), getInvoices(), getGeneralExpenses(), getOtherRevenues(), getSchedules(), getSettings(),
+        getGroups(),
+        canSeeFinance ? getInvoices() : Promise.resolve([]),
+        canSeeFinance ? getGeneralExpenses() : Promise.resolve([]),
+        canSeeFinance ? getOtherRevenues() : Promise.resolve([]),
+        getSchedules(),
+        canSeeFinance ? getSettings() : Promise.resolve({} as any),
       ]);
 
     const today = todayStr();
@@ -134,19 +143,21 @@ export async function GET(req: NextRequest) {
       const day = attendance.filter((a: any) => a.date === date);
       const present = day.filter((a: any) => a.status === 'present').length;
       const absent  = day.filter((a: any) => a.status === 'absent').length;
-      return { date, label: weekLabel(date), present, absent,
+      const late    = day.filter((a: any) => a.status === 'late').length;
+      return { date, label: weekLabel(date), present, absent, late,
         rate: (present + absent) > 0 ? Math.round(present / (present + absent) * 100) : 0 };
     });
 
     // By stage last 14 days
-    const last14ByStage: Record<string, { date: string; label: string; present: number; absent: number; rate: number }[]> = {};
+    const last14ByStage: Record<string, { date: string; label: string; present: number; absent: number; late: number; rate: number }[]> = {};
     for (const stage of STAGES) {
       const stageIds = new Set(students.filter((s: any) => s.stage === stage).map((s: any) => s.id));
       last14ByStage[stage] = last14Dates.map((date) => {
         const day = attendance.filter((a: any) => a.date === date && stageIds.has(a.registrationId));
         const present = day.filter((a: any) => a.status === 'present').length;
         const absent  = day.filter((a: any) => a.status === 'absent').length;
-        return { date, label: weekLabel(date), present, absent,
+        const late    = day.filter((a: any) => a.status === 'late').length;
+        return { date, label: weekLabel(date), present, absent, late,
           rate: (present + absent) > 0 ? Math.round(present / (present + absent) * 100) : 0 };
       });
     }
@@ -301,18 +312,19 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       updatedAt: new Date().toISOString(),
+      canSeeFinance,
       registration: {
         total: students.length, approved: approved.length, pending: pending.length, rejected: rejected.length,
         paid: paid.length, exempted: exempted.length, pendingPayment: pendingPay.length, unpaid: unpaid.length,
         withCondition: withCondition.length, unassigned: unassigned.length,
         byStage, topNeighborhoods, conditionList,
       },
-      finance: {
+      finance: canSeeFinance ? {
         fee, studentRevenue, otherRevenueTotal, otherRevenueList, totalRevenue,
         invoiceTotalSpent, generalExpenseTotal, totalExpenses,
         netBalance: totalRevenue - totalExpenses,
         byDepartment, byCategory, pendingInvoicesCount,
-      },
+      } : null,
       attendance: {
         today: last14Overall[last14Overall.length - 1],
         last14Overall, last14ByStage, stageAvg7,

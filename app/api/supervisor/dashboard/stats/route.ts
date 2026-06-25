@@ -33,11 +33,18 @@ export async function GET(req: NextRequest) {
     }
 
     const roles = supervisor.role.split(',').map(r => r.trim());
+    // Global roles see all students' data without scoping to a group/stage
     const isGlobal = roles.some(r =>
-      ['admin', 'finance', 'finance_supervisor', 'media_supervisor', 'cultural_supervisor', 'social_supervisor', 'general_supervisor', 'attendance_supervisor'].includes(r)
+      ['admin', 'finance', 'finance_supervisor', 'media_supervisor',
+       'cultural_supervisor', 'social_supervisor', 'scientific_supervisor',
+       'sports_supervisor', 'general_supervisor', 'attendance_supervisor',
+       'administrative_supervisor'].includes(r)
     );
 
-    // Parallel fetch all data for the dashboard
+    const isFinanceRole = roles.some(r => ['finance', 'finance_supervisor', 'admin'].includes(r));
+    const isAdminRole = roles.includes('admin');
+
+    // Fetch only what this role needs — reduces DB load and cold-start time
     const [
       students,
       attendance,
@@ -52,11 +59,15 @@ export async function GET(req: NextRequest) {
       getStudents(),
       getAttendance(),
       getPoints(),
-      getTasks(),
-      getSubmissions(),
+      // Tasks/submissions only needed by roles that manage them
+      (isGlobal || roles.includes('stage_supervisor') || roles.includes('groups_supervisor'))
+        ? getTasks() : Promise.resolve([]),
+      (isGlobal || roles.includes('stage_supervisor') || roles.includes('groups_supervisor'))
+        ? getSubmissions() : Promise.resolve([]),
       getSchedules(),
       getGroups(),
-      getInvoices(),
+      // Invoices only for finance roles
+      isFinanceRole ? getInvoices() : Promise.resolve([]),
       getAnnouncements()
     ]);
 
@@ -75,11 +86,13 @@ export async function GET(req: NextRequest) {
     const todayAttendanceAll = attendance.filter(a => a.date === today);
     const presentCountAll = todayAttendanceAll.filter(a => a.status === 'present').length;
     const absentCountAll = todayAttendanceAll.filter(a => a.status === 'absent').length;
+    const lateCountAll = todayAttendanceAll.filter(a => a.status === 'late').length;
 
     // Scoped / Family calculations
     let myStudentsList: any[] = [];
     let presentCount = presentCountAll;
     let absentCount = absentCountAll;
+    let lateCount = lateCountAll;
     const activeBaseAll = Math.max(paidStudents + exemptedStudents, 1);
     let activeBase = activeBaseAll;
     let activeTasksCount = tasks.filter(t => t.isActive).length;
@@ -104,6 +117,7 @@ export async function GET(req: NextRequest) {
       const todayAttendance = attendance.filter(a => a.date === today && myStudentIds.includes(a.registrationId));
       presentCount = todayAttendance.filter(a => a.status === 'present').length;
       absentCount = todayAttendance.filter(a => a.status === 'absent').length;
+      lateCount = todayAttendance.filter(a => a.status === 'late').length;
       activeBase = Math.max(myStudents.length, 1);
 
       activeTasksCount = tasks.filter(t => t.isActive && (t.visibility === 'all' || t.visibleToIds.some(id => allowedGroupIds.includes(id)))).length;
@@ -167,7 +181,6 @@ export async function GET(req: NextRequest) {
     }));
 
     // --- Role-specific extras ---
-    const isFinanceRole = roles.some(r => ['finance', 'finance_supervisor'].includes(r));
     const isAttendanceRole = roles.includes('attendance_supervisor');
     const isStageRole = roles.includes('stage_supervisor');
     const committeeRoles = ['social_supervisor', 'cultural_supervisor', 'scientific_supervisor', 'sports_supervisor', 'media_supervisor'];
@@ -252,7 +265,7 @@ export async function GET(req: NextRequest) {
     let stageStats: {
       stageName: string;
       approvedCount: number;
-      attendanceToday: { present: number; absent: number };
+      attendanceToday: { present: number; late: number; absent: number };
       top3: { name: string; points: number }[];
     } | null = null;
     if (isStageRole && supervisor.stage) {
@@ -276,6 +289,7 @@ export async function GET(req: NextRequest) {
         approvedCount: stageApprovedCount,
         attendanceToday: {
           present: stageTodayAtt.filter((a: any) => a.status === 'present').length,
+          late: stageTodayAtt.filter((a: any) => a.status === 'late').length,
           absent: stageTodayAtt.filter((a: any) => a.status === 'absent').length
         },
         top3
@@ -288,8 +302,8 @@ export async function GET(req: NextRequest) {
         myStudents: myStudentsList,
         students: { total: totalStudents, approved: approvedStudents, pending: pendingStudents, conditions: conditionStudents },
         payments: { paid: paidStudents, exempted: exemptedStudents, pendingReview: pendingReviewPayments },
-        attendance: { presentToday: presentCount, absentToday: absentCount, activeBase },
-        attendanceOverall: { presentToday: presentCountAll, absentToday: absentCountAll, activeBase: activeBaseAll },
+        attendance: { presentToday: presentCount, absentToday: absentCount, lateToday: lateCount, activeBase },
+        attendanceOverall: { presentToday: presentCountAll, absentToday: absentCountAll, lateToday: lateCountAll, activeBase: activeBaseAll },
         points: { today: pointsToday, topGroup: topGroup, topGroupPoints: maxPoints },
         tasks: { active: activeTasksCount, pendingReview: pendingSubmissionsCount },
         schedule: { todayCount: todayScheduleCount, nextProgramTitle, todayPrograms: sortedTodaySchedules },

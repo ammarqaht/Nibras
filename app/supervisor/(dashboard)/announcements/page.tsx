@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { pushToast } from '@/components/Toast';
+import { useSupervisor } from '@/components/SupervisorShell';
 import { compressImage } from '@/lib/imageUtils';
 
 type Announcement = {
@@ -24,6 +25,10 @@ const STAGES = [
 
 
 export default function AnnouncementsPage() {
+  const { user } = useSupervisor();
+  const roles = user?.role ? user.role.split(',').map(r => r.trim()) : [];
+  const canManageAnnouncements = roles.some(r => ['admin', 'media_supervisor'].includes(r));
+
   const [items, setItems] = useState<Announcement[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
@@ -198,7 +203,7 @@ export default function AnnouncementsPage() {
           <h1 className="text-2xl font-bold text-ink-900 mb-1">الإشهار والإعلانات</h1>
           <p className="text-sm text-ink-500">نشر وتعديل الإعلانات الموجهة لطلاب وأسر النادي.</p>
         </div>
-        <button
+        {canManageAnnouncements && <button
           onClick={() => {
             cancelEdit();
             setShowFormModal(true);
@@ -210,7 +215,7 @@ export default function AnnouncementsPage() {
             <line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" />
           </svg>
           <span>إنشاء إعلان جديد</span>
-        </button>
+        </button>}
       </div>
 
       {showFormModal && (
@@ -391,32 +396,33 @@ export default function AnnouncementsPage() {
         </div>
       )}
 
-      <div className="space-y-4">
-        {/* Compact Announcements List */}
-        <div className="w-full space-y-3">
-          {loading ? (
-            <div className="card p-12 text-center text-ink-400 text-sm">جارٍ تحميل الإعلانات…</div>
-          ) : items.length === 0 ? (
-            <div className="card p-12 text-center text-ink-400 text-sm">لا توجد إعلانات منشورة حالياً.</div>
-          ) : (
-            items.map((a) => (
+      <div>
+        {loading ? (
+          <div className="card p-12 text-center text-ink-400 text-sm">جارٍ تحميل الإعلانات…</div>
+        ) : items.length === 0 ? (
+          <div className="card p-12 text-center text-ink-400 text-sm">لا توجد إعلانات منشورة حالياً.</div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {items.map((a) => (
               <div
                 key={a.id}
-                className="card bg-white border border-ink-150 hover:shadow-md transition-shadow p-3 flex gap-4 items-center"
+                className="card bg-white border border-ink-150 hover:shadow-md transition-shadow flex flex-col overflow-hidden"
               >
-                {/* Small Cover Image Thumbnail */}
+                {/* Cover image */}
                 {a.imageUrl ? (
-                  <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 border border-ink-100 bg-ink-50">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={a.imageUrl}
-                      alt={a.title}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={a.imageUrl}
+                    alt={a.title}
+                    className="w-full h-36 object-cover flex-shrink-0 cursor-pointer"
+                    onClick={() => setActiveDetails(a)}
+                  />
                 ) : (
-                  <div className="w-16 h-16 rounded-xl bg-cream-50 flex items-center justify-center flex-shrink-0 text-brand-600 border border-ink-100">
-                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <div
+                    className="w-full h-20 bg-cream-50 flex items-center justify-center flex-shrink-0 text-brand cursor-pointer border-b border-ink-100"
+                    onClick={() => setActiveDetails(a)}
+                  >
+                    <svg className="w-8 h-8 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h2" />
                       <path d="m6 9 12-6v16L6 15" />
                       <path d="M18 9h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2" />
@@ -424,37 +430,29 @@ export default function AnnouncementsPage() {
                   </div>
                 )}
 
-                {/* Text Info (Title & Short description snippet) */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                    <h3 className="font-bold text-ink-900 text-sm truncate max-w-[200px] sm:max-w-xs">{a.title}</h3>
-                    <span className="pill pill-blue text-[10px] py-0.5 px-2 truncate flex items-center gap-1" title={audLabel(a.audience)}>
-                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h2" />
-                        <path d="m6 9 12-6v16L6 15" />
-                        <path d="M18 9h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2" />
-                      </svg>
-                      {audLabel(a.audience)}
-                    </span>
-                  </div>
-                  
-                  {/* Short snippet of content */}
-                  <p className="text-xs text-ink-500 line-clamp-1 leading-relaxed pl-2">
-                    {a.body}
-                  </p>
-
-                  <div className="text-[9px] text-ink-400 mt-1" dir="ltr">
-                    {new Date(a.createdAt).toLocaleString('ar')}
+                {/* Card body */}
+                <div className="p-4 flex flex-col flex-1 gap-2 min-h-0">
+                  <span className="pill pill-blue text-[10px] py-0.5 px-2 self-start truncate max-w-full" title={audLabel(a.audience)}>
+                    {audLabel(a.audience)}
+                  </span>
+                  <h3
+                    className="font-bold text-ink-900 text-sm leading-snug line-clamp-2 cursor-pointer hover:text-brand transition-colors"
+                    onClick={() => setActiveDetails(a)}
+                  >
+                    {a.title}
+                  </h3>
+                  <p className="text-xs text-ink-500 line-clamp-2 leading-relaxed flex-1">{a.body}</p>
+                  <div className="text-[10px] text-ink-400 mt-auto" dir="ltr">
+                    {new Date(a.createdAt).toLocaleDateString('ar', { year: 'numeric', month: 'short', day: 'numeric' })}
                   </div>
                 </div>
 
-                {/* Actions */}
-                <div className="flex flex-row gap-1 flex-shrink-0 items-center">
+                {/* Actions footer */}
+                <div className="flex gap-1.5 p-3 border-t border-ink-100 bg-cream-50/50 flex-shrink-0">
                   <button
                     onClick={() => setActiveDetails(a)}
-                    className="btn btn-secondary py-1 px-2 text-[11px] font-semibold flex items-center gap-1"
+                    className="btn btn-secondary py-1.5 px-3 text-xs font-semibold flex items-center gap-1 flex-1 justify-center"
                     type="button"
-                    title="عرض كامل التفاصيل"
                   >
                     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
@@ -462,9 +460,10 @@ export default function AnnouncementsPage() {
                     </svg>
                     عرض
                   </button>
+                  {canManageAnnouncements && <>
                   <button
                     onClick={() => startEdit(a)}
-                    className="btn btn-secondary py-1 px-2 text-[11px] font-semibold flex items-center gap-1"
+                    className="btn btn-secondary py-1.5 px-3 text-xs font-semibold flex items-center gap-1 flex-1 justify-center"
                     type="button"
                   >
                     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -475,7 +474,7 @@ export default function AnnouncementsPage() {
                   </button>
                   <button
                     onClick={() => del(a.id)}
-                    className="btn btn-danger py-1 px-2.5 text-[11px] font-semibold flex items-center justify-center"
+                    className="btn btn-danger py-1.5 px-2.5 text-xs font-semibold flex items-center justify-center"
                     type="button"
                     title="حذف"
                   >
@@ -485,11 +484,12 @@ export default function AnnouncementsPage() {
                       <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
                     </svg>
                   </button>
+                  </>}
                 </div>
               </div>
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Detailed Modal for viewing full announcement */}
