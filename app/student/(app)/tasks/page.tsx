@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 type TaskItem = {
   task: {
@@ -10,8 +10,8 @@ type TaskItem = {
     maxPoints: number;
     dueDate: string;
     startDate: string | null;
-    track: string;
-    submissionMethod: string; // 'image' | 'file' | 'audio' | 'text' | 'video' | 'any'
+    track: string | null;
+    submissionMethod: string;
     resourceLink: string | null;
     imageUrl: string | null;
   };
@@ -34,11 +34,12 @@ const METHOD_LABELS: Record<string, string> = {
   any: 'أي نوع',
 };
 
-const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  pending: { label: 'قيد المراجعة', color: '#d97706', bg: '#fffbeb' },
-  approved: { label: 'مقبول ✓', color: '#16a34a', bg: '#f0fdf4' },
-  rejected: { label: 'مرفوض', color: 'var(--red)', bg: '#fef2f2' },
-};
+function statusRank(s: TaskItem) {
+  if (!s.submission) return 0; // active, not submitted → first
+  if (s.submission.status === 'pending') return 1;
+  if (s.submission.status === 'rejected') return 2;
+  return 3; // approved / graded → last
+}
 
 export default function StudentTasks() {
   const [items, setItems] = useState<TaskItem[]>([]);
@@ -94,7 +95,6 @@ export default function StudentTasks() {
       fileUrl = 'text:' + subText.trim();
     } else {
       if (!subFile) { setSubErr('الرجاء اختيار الملف'); setSubmitting(false); return; }
-      // Use base64 data URL as storage (in production this would upload to storage)
       fileUrl = subFileDataUrl;
     }
 
@@ -114,28 +114,40 @@ export default function StudentTasks() {
     }
   }
 
+  const sorted = [...items].sort((a, b) => statusRank(a) - statusRank(b) || +new Date(a.task.dueDate) - +new Date(b.task.dueDate));
   const now = new Date();
-
-  if (loading) {
-    return <div className="text-center py-20" style={{ color: 'var(--ink-soft)' }}>جارٍ التحميل...</div>;
-  }
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
-      <h1 className="text-xl font-bold mb-5" style={{ color: 'var(--ink)' }}>المهام</h1>
+      <header className="mb-5 flex items-baseline justify-between">
+        <h1 className="font-display text-2xl font-bold" style={{ color: 'var(--ink)' }}>المهام</h1>
+        <span className="text-xs" style={{ color: 'var(--ink-soft)' }}>
+          {items.length} {items.length === 1 ? 'مهمة' : 'مهام'}
+        </span>
+      </header>
 
-      {items.length === 0 ? (
+      {loading ? (
+        <div className="space-y-2">
+          {[1, 2, 3].map(i => <div key={i} className="skeleton" style={{ height: 96 }} />)}
+        </div>
+      ) : sorted.length === 0 ? (
         <div className="card p-10 text-center">
           <p className="text-4xl mb-3">📋</p>
-          <p style={{ color: 'var(--ink-soft)' }}>لا توجد مهام نشطة حالياً.</p>
+          <p className="font-display text-lg font-bold mb-1" style={{ color: 'var(--ink)' }}>لا توجد مهام نشطة</p>
+          <p className="text-sm" style={{ color: 'var(--ink-soft)' }}>سنُعلمك حين تُضاف مهمة جديدة.</p>
         </div>
       ) : (
         <div className="space-y-3">
-          {items.map(item => {
+          {sorted.map(item => {
             const due = new Date(item.task.dueDate);
             const overdue = !item.submission && due < now;
             const sub = item.submission;
-            const st = sub ? STATUS_LABELS[sub.status] : null;
+
+            let pill: { label: string; cls: string };
+            if (!sub) pill = { label: overdue ? 'منتهية' : 'لم يُسلَّم', cls: overdue ? 'pill-red' : 'pill-blue' };
+            else if (sub.status === 'pending') pill = { label: 'قيد المراجعة', cls: 'pill-yellow' };
+            else if (sub.status === 'rejected') pill = { label: 'مرفوض — أعد الإرسال', cls: 'pill-red' };
+            else pill = { label: sub.grade !== null ? `${sub.grade} / ${item.task.maxPoints}` : 'مقبول', cls: 'pill-green' };
 
             return (
               <button
@@ -146,48 +158,32 @@ export default function StudentTasks() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-sm" style={{ color: 'var(--ink)' }}>{item.task.title}</span>
+                      <span className="font-display text-base font-bold" style={{ color: 'var(--ink)' }}>{item.task.title}</span>
                       {item.task.track && (
-                        <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: '#FBF6EC', color: 'var(--accent-deep)' }}>
+                        <span className="text-[11px] px-2 py-0.5 rounded-full" style={{ background: '#FBF6EC', color: 'var(--accent-deep)' }}>
                           {item.task.track}
                         </span>
                       )}
                     </div>
                     <p className="text-xs mt-1 line-clamp-2" style={{ color: 'var(--ink-soft)' }}>{item.task.description}</p>
-                    <div className="flex items-center gap-3 mt-2 flex-wrap">
-                      <span className="text-xs" style={{ color: overdue ? 'var(--red)' : 'var(--ink-soft)' }}>
-                        ⏰ {due.toLocaleDateString('ar-SA')}
-                        {overdue && ' (منتهية)'}
-                      </span>
-                      <span className="text-xs" style={{ color: 'var(--ink-soft)' }}>
-                        🎯 {item.task.maxPoints} نقطة
-                      </span>
-                      <span className="text-xs" style={{ color: 'var(--ink-soft)' }}>
-                        📎 {METHOD_LABELS[item.task.submissionMethod] || item.task.submissionMethod}
-                      </span>
+                    <div className="flex items-center gap-3 mt-2 flex-wrap text-xs" style={{ color: overdue ? 'var(--red)' : 'var(--ink-soft)' }}>
+                      <span className="tabular-nums">⏰ <span dir="ltr">{due.toLocaleDateString('ar-SA')}</span></span>
+                      <span>🎯 {item.task.maxPoints} نقطة</span>
+                      <span>📎 {METHOD_LABELS[item.task.submissionMethod] || item.task.submissionMethod}</span>
                     </div>
                   </div>
                   <div className="shrink-0">
-                    {st ? (
-                      <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ color: st.color, background: st.bg }}>
-                        {st.label}
-                      </span>
-                    ) : (
-                      <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ color: 'var(--blue)', background: '#EEF3FC' }}>
-                        لم يُسلَّم
-                      </span>
-                    )}
+                    <span className={`pill ${pill.cls}`}>{pill.label}</span>
                   </div>
                 </div>
-                {sub?.status === 'approved' && sub.grade !== null && (
-                  <div className="mt-2 pt-2 border-t flex items-center gap-2" style={{ borderColor: 'var(--line)' }}>
-                    <span className="text-xs font-bold" style={{ color: '#16a34a' }}>الدرجة: {sub.grade} / {item.task.maxPoints}</span>
-                    {sub.feedback && <span className="text-xs" style={{ color: 'var(--ink-soft)' }}>— {sub.feedback}</span>}
+                {sub?.status === 'approved' && sub.feedback && (
+                  <div className="mt-3 pt-3 border-t text-xs" style={{ borderColor: 'var(--line)', color: 'var(--ink-soft)' }}>
+                    ملاحظة المشرف: {sub.feedback}
                   </div>
                 )}
                 {sub?.status === 'rejected' && sub.feedback && (
-                  <div className="mt-2 pt-2 border-t" style={{ borderColor: 'var(--line)' }}>
-                    <span className="text-xs" style={{ color: 'var(--ink-soft)' }}>ملاحظة المشرف: {sub.feedback}</span>
+                  <div className="mt-3 pt-3 border-t text-xs" style={{ borderColor: 'var(--line)', color: 'var(--ink-soft)' }}>
+                    ملاحظة المشرف: {sub.feedback}
                   </div>
                 )}
               </button>
@@ -198,19 +194,19 @@ export default function StudentTasks() {
 
       {/* Task detail / submission modal */}
       {selected && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
-          <div className="card w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="p-5 border-b" style={{ borderColor: 'var(--line)' }}>
+        <div className="modal-backdrop flex items-end sm:items-center justify-center p-3 sm:p-6" onClick={() => setSelected(null)}>
+          <div className="modal-panel w-full max-w-lg max-h-[92vh] overflow-y-auto scroll-soft" onClick={e => e.stopPropagation()}>
+            <div className="p-5 border-b sticky top-0 bg-white z-10" style={{ borderColor: 'var(--line)' }}>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h2 className="font-bold text-lg" style={{ color: 'var(--ink)' }}>{selected.task.title}</h2>
+                  <h2 className="font-display text-xl font-bold" style={{ color: 'var(--ink)' }}>{selected.task.title}</h2>
                   {selected.task.track && (
                     <span className="text-xs px-2 py-0.5 rounded-full mt-1 inline-block" style={{ background: '#FBF6EC', color: 'var(--accent-deep)' }}>
                       {selected.task.track}
                     </span>
                   )}
                 </div>
-                <button onClick={() => setSelected(null)} className="btn btn-ghost p-2">✕</button>
+                <button onClick={() => setSelected(null)} className="btn btn-ghost p-2" aria-label="إغلاق">✕</button>
               </div>
             </div>
 
@@ -220,11 +216,15 @@ export default function StudentTasks() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-xl p-3" style={{ background: 'var(--bg-soft)' }}>
                   <p className="text-xs mb-1" style={{ color: 'var(--ink-soft)' }}>الموعد النهائي</p>
-                  <p className="text-sm font-bold" style={{ color: 'var(--ink)' }}>{new Date(selected.task.dueDate).toLocaleDateString('ar-SA')}</p>
+                  <p className="font-display tabular-nums text-base font-bold" style={{ color: 'var(--ink)' }} dir="ltr">
+                    {new Date(selected.task.dueDate).toLocaleDateString('ar-SA')}
+                  </p>
                 </div>
                 <div className="rounded-xl p-3" style={{ background: 'var(--bg-soft)' }}>
                   <p className="text-xs mb-1" style={{ color: 'var(--ink-soft)' }}>الدرجة القصوى</p>
-                  <p className="text-sm font-bold" style={{ color: 'var(--ink)' }}>{selected.task.maxPoints} نقطة</p>
+                  <p className="font-display tabular-nums text-base font-bold" style={{ color: 'var(--ink)' }}>
+                    {selected.task.maxPoints} نقطة
+                  </p>
                 </div>
               </div>
 
@@ -245,17 +245,25 @@ export default function StudentTasks() {
                 </a>
               )}
 
-              {/* Existing submission */}
-              {selected.submission ? (
+              {selected.submission && (
                 <div className="rounded-xl p-4 border" style={{
-                  background: selected.submission.status === 'approved' ? '#f0fdf4' : selected.submission.status === 'rejected' ? '#fef2f2' : '#fffbeb',
-                  borderColor: selected.submission.status === 'approved' ? '#86efac' : selected.submission.status === 'rejected' ? '#fca5a5' : '#fde68a',
+                  background: selected.submission.status === 'approved' ? '#E7F6EC'
+                    : selected.submission.status === 'rejected' ? '#FDEAE6' : '#FEF9C3',
+                  borderColor: selected.submission.status === 'approved' ? 'rgba(27,122,67,0.25)'
+                    : selected.submission.status === 'rejected' ? 'rgba(196,41,16,0.25)' : 'rgba(133,77,14,0.25)',
                 }}>
-                  <p className="font-bold text-sm mb-2">
-                    {STATUS_LABELS[selected.submission.status]?.label || selected.submission.status}
+                  <p className="font-bold text-sm mb-1" style={{
+                    color: selected.submission.status === 'approved' ? '#1B7A43'
+                      : selected.submission.status === 'rejected' ? '#C42910' : '#854D0E',
+                  }}>
+                    {selected.submission.status === 'approved' ? 'تم القبول ✓'
+                      : selected.submission.status === 'rejected' ? 'مرفوض'
+                      : 'قيد المراجعة'}
                   </p>
                   {selected.submission.grade !== null && (
-                    <p className="text-sm" style={{ color: 'var(--ink)' }}>الدرجة: <strong>{selected.submission.grade} / {selected.task.maxPoints}</strong></p>
+                    <p className="tabular-nums text-sm" style={{ color: 'var(--ink)' }}>
+                      الدرجة: <strong>{selected.submission.grade} / {selected.task.maxPoints}</strong>
+                    </p>
                   )}
                   {selected.submission.feedback && (
                     <p className="text-sm mt-1" style={{ color: 'var(--ink-soft)' }}>ملاحظة المشرف: {selected.submission.feedback}</p>
@@ -264,12 +272,11 @@ export default function StudentTasks() {
                     <p className="text-xs mt-3" style={{ color: 'var(--ink-soft)' }}>يمكنك إعادة التسليم بعد تصحيح الملاحظات.</p>
                   )}
                 </div>
-              ) : null}
+              )}
 
-              {/* Submission form — show if not submitted or rejected */}
               {(!selected.submission || selected.submission.status === 'rejected') && (
                 <form onSubmit={submitTask} className="space-y-3 border-t pt-4" style={{ borderColor: 'var(--line)' }}>
-                  <h3 className="font-bold text-sm" style={{ color: 'var(--ink)' }}>
+                  <h3 className="font-display text-base font-bold" style={{ color: 'var(--ink)' }}>
                     {selected.submission?.status === 'rejected' ? 'إعادة التسليم' : 'تسليم المهمة'}
                   </h3>
 
@@ -302,7 +309,7 @@ export default function StudentTasks() {
                         {subFile ? (
                           <div>
                             <p className="text-sm font-bold" style={{ color: 'var(--blue)' }}>{subFile.name}</p>
-                            <p className="text-xs mt-1" style={{ color: 'var(--ink-soft)' }}>
+                            <p className="text-xs mt-1 tabular-nums" style={{ color: 'var(--ink-soft)' }}>
                               {(subFile.size / 1024 / 1024).toFixed(2)} MB
                             </p>
                           </div>
@@ -332,12 +339,12 @@ export default function StudentTasks() {
                   )}
 
                   {subErr && (
-                    <p className="text-sm rounded-md p-2" style={{ color: 'var(--red)', background: '#FDEAE6' }}>{subErr}</p>
+                    <p className="err-msg">{subErr}</p>
                   )}
 
                   <div className="flex gap-3">
                     <button type="submit" disabled={submitting} className="btn btn-primary flex-1">
-                      {submitting ? 'جارٍ الإرسال...' : 'تسليم المهمة'}
+                      {submitting ? 'جارٍ الإرسال…' : 'تسليم المهمة'}
                     </button>
                     <button type="button" onClick={() => setSelected(null)} className="btn btn-secondary">
                       إلغاء

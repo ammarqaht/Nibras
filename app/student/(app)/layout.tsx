@@ -12,6 +12,9 @@ type StudentUser = {
   stage: string;
   grade: string;
   groupId: number | null;
+  individual: number;
+  collective: number;
+  deduction: number;
   balance: number;
   rankScore: number;
 };
@@ -22,9 +25,9 @@ export const useStudent = () => useContext(StudentContext);
 const NAV = [
   { href: '/student', label: 'الرئيسية', icon: HomeIcon },
   { href: '/student/tasks', label: 'المهام', icon: TaskIcon },
+  { href: '/student/family', label: 'الأسرة', icon: GroupIcon },
   { href: '/student/leaderboard', label: 'الترتيب', icon: LeaderIcon },
-  { href: '/student/group', label: 'الأسرة', icon: GroupIcon },
-  { href: '/student/notifications', label: 'الإشعارات', icon: BellIcon },
+  { href: '/student/announcements', label: 'الإعلانات', icon: BellIcon },
 ];
 
 export default function StudentAppLayout({ children }: { children: React.ReactNode }) {
@@ -50,11 +53,11 @@ export default function StudentAppLayout({ children }: { children: React.ReactNo
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg)' }}>
-        <div className="text-center space-y-3">
+      <div className="student-body min-h-screen flex items-center justify-center" style={{ background: 'var(--bg)' }}>
+        <div className="text-center space-y-4">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={site.logos.icon} alt="" className="h-14 w-auto mx-auto animate-pulse" />
-          <p style={{ color: 'var(--ink-soft)' }} className="text-sm">جارٍ التحميل...</p>
+          <img src={site.logos.lockupVertical} alt="" className="h-24 w-auto mx-auto select-none animate-pulse" draggable={false} />
+          <div className="skeleton mx-auto" style={{ width: 160, height: 8 }} />
         </div>
       </div>
     );
@@ -62,48 +65,117 @@ export default function StudentAppLayout({ children }: { children: React.ReactNo
 
   return (
     <StudentContext.Provider value={{ user }}>
-      <div className="min-h-screen flex flex-col" style={{ background: 'var(--bg)' }}>
-        {/* Top header */}
-        <header className="card border-0 border-b sticky top-0 z-30" style={{ borderColor: 'var(--line)' }}>
-          <div className="flex items-center justify-between px-4 h-14">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={site.logos.lockupHorizontal} alt={site.clubNameAr} className="h-7 w-auto select-none" draggable={false} />
+      <div className="student-body min-h-screen flex flex-col" style={{ background: 'var(--bg)' }}>
+        {/* Desktop header */}
+        <header
+          className="hidden md:block sticky top-0 z-30"
+          style={{
+            background: 'rgba(250,250,247,0.85)',
+            backdropFilter: 'saturate(180%) blur(14px)',
+            WebkitBackdropFilter: 'saturate(180%) blur(14px)',
+            borderBottom: '1px solid var(--line)',
+          }}
+        >
+          <div className="max-w-6xl mx-auto flex items-center justify-between px-6 h-16">
+            <Link href="/student" className="flex items-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={site.logos.lockupHorizontal} alt={site.clubNameAr} className="h-8 w-auto select-none" draggable={false} />
+            </Link>
+
+            <nav className="flex items-center gap-1">
+              {NAV.map(item => {
+                const active = item.href === '/student' ? pathname === '/student' : pathname.startsWith(item.href);
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
+                    style={{
+                      color: active ? 'var(--accent-deep)' : 'var(--ink-soft)',
+                      background: active ? 'rgba(255,159,28,0.10)' : 'transparent',
+                    }}
+                  >
+                    <Icon active={active} />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+
             {user && (
               <div className="flex items-center gap-3">
-                <div className="text-right hidden sm:block">
+                <div className="text-right">
                   <p className="text-sm font-bold leading-none" style={{ color: 'var(--ink)' }}>{user.name}</p>
                   <p className="text-xs mt-0.5" style={{ color: 'var(--ink-soft)' }}>{user.stage} · {user.grade}</p>
                 </div>
-                <button onClick={logout} className="btn btn-ghost text-xs px-2 py-1" title="خروج">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                <button onClick={logout} className="btn btn-ghost px-2 py-1" title="خروج" aria-label="تسجيل الخروج">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                    <polyline points="16 17 21 12 16 7"/>
+                    <line x1="21" y1="12" x2="9" y2="12"/>
+                  </svg>
                 </button>
               </div>
             )}
           </div>
         </header>
 
+        {/* Mobile top bar */}
+        <header
+          className="md:hidden sticky top-0 z-30"
+          style={{
+            background: 'rgba(250,250,247,0.85)',
+            backdropFilter: 'saturate(180%) blur(12px)',
+            WebkitBackdropFilter: 'saturate(180%) blur(12px)',
+            borderBottom: '1px solid var(--line)',
+          }}
+        >
+          <div className="flex items-center justify-between px-4 h-14">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={site.logos.lockupHorizontal} alt={site.clubNameAr} className="h-7 w-auto select-none" draggable={false} />
+            {user && (
+              <button onClick={logout} className="btn btn-ghost text-xs px-2 py-1" title="خروج" aria-label="تسجيل الخروج">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                  <polyline points="16 17 21 12 16 7"/>
+                  <line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+              </button>
+            )}
+          </div>
+        </header>
+
         {/* Main content */}
-        <main className="flex-1 pb-24">
+        <main className="flex-1 pb-28 md:pb-12">
           {children}
         </main>
 
-        {/* Bottom navigation */}
-        <nav className="fixed bottom-0 inset-x-0 z-30 card border-0 border-t" style={{ borderColor: 'var(--line)' }}>
+        {/* Mobile bottom navigation — frosted, premium */}
+        <nav
+          className="md:hidden fixed bottom-0 inset-x-0 z-30 student-bottom-nav"
+          aria-label="التنقّل"
+        >
           <div className="flex items-stretch h-16">
             {NAV.map(item => {
-              const active = item.href === '/student'
-                ? pathname === '/student'
-                : pathname.startsWith(item.href);
+              const active = item.href === '/student' ? pathname === '/student' : pathname.startsWith(item.href);
               const Icon = item.icon;
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="flex-1 flex flex-col items-center justify-center gap-1 transition-colors"
+                  className="flex-1 flex flex-col items-center justify-center gap-1 relative transition-colors"
                   style={{ color: active ? 'var(--accent-deep)' : 'var(--ink-soft)' }}
                 >
+                  {active && (
+                    <span
+                      aria-hidden
+                      className="absolute top-0 h-0.5 rounded-full"
+                      style={{ background: 'var(--accent-deep)', width: 28 }}
+                    />
+                  )}
                   <Icon active={active} />
-                  <span className="text-xs font-medium">{item.label}</span>
+                  <span className="text-[11px] font-medium">{item.label}</span>
                 </Link>
               );
             })}
@@ -118,51 +190,42 @@ function HomeIcon({ active }: { active: boolean }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={active ? 0 : 1.8}>
       <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z"/>
-      <path d="M9 21V12h6v9" stroke="currentColor" strokeWidth={1.5} fill="none"/>
+      <path d="M9 21V12h6v9" stroke={active ? '#fff' : 'currentColor'} strokeWidth={1.5} fill="none"/>
     </svg>
   );
 }
 function TaskIcon({ active }: { active: boolean }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={active ? 0 : 1.8}>
-      <rect x="3" y="3" width="18" height="18" rx="3"/>
-      {!active && <>
-        <line x1="8" y1="9" x2="16" y2="9" stroke="currentColor" strokeWidth={1.5}/>
-        <line x1="8" y1="13" x2="16" y2="13" stroke="currentColor" strokeWidth={1.5}/>
-        <line x1="8" y1="17" x2="12" y2="17" stroke="currentColor" strokeWidth={1.5}/>
-      </>}
-      {active && <>
-        <line x1="8" y1="9" x2="16" y2="9" stroke="white" strokeWidth={1.5}/>
-        <line x1="8" y1="13" x2="16" y2="13" stroke="white" strokeWidth={1.5}/>
-        <line x1="8" y1="17" x2="12" y2="17" stroke="white" strokeWidth={1.5}/>
-      </>}
+      <rect x="3" y="3" width="18" height="18" rx="4"/>
+      <path d="M8 9h8M8 13h8M8 17h5" stroke={active ? '#fff' : 'currentColor'} strokeWidth={1.5} strokeLinecap="round"/>
     </svg>
   );
 }
 function LeaderIcon({ active }: { active: boolean }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={active ? 0 : 1.8}>
-      <path d="M8 17H4a1 1 0 0 0-1 1v3h6v-3a1 1 0 0 0-1-1z"/>
-      <path d="M14 12h-4a1 1 0 0 0-1 1v8h6v-8a1 1 0 0 0-1-1z"/>
-      <path d="M20 7h-4a1 1 0 0 0-1 1v13h6V8a1 1 0 0 0-1-1z"/>
+      <path d="M6 9V4h12v5a6 6 0 0 1-12 0z"/>
+      <path d="M4 4h2v3a2 2 0 0 1-2 2H3V5a1 1 0 0 1 1-1zM20 4h-2v3a2 2 0 0 0 2 2h1V5a1 1 0 0 0-1-1z" />
+      <path d="M9 21h6M12 16v5" stroke={active ? '#fff' : 'currentColor'} strokeWidth={1.6} strokeLinecap="round"/>
     </svg>
   );
 }
 function GroupIcon({ active }: { active: boolean }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={active ? 0 : 1.8}>
-      <circle cx="9" cy="7" r="4"/>
-      <path d="M1 21v-2a7 7 0 0 1 14 0v2"/>
-      <path d="M17 11a4 4 0 0 1 0-8"/>
-      <path d="M23 21v-2a7 7 0 0 0-5-6.7"/>
+      <circle cx="9" cy="8" r="3.5"/>
+      <path d="M2 20v-1a6 6 0 0 1 12 0v1"/>
+      <circle cx="17" cy="9" r="2.5"/>
+      <path d="M15 20v-1a5 5 0 0 1 7-4.6" />
     </svg>
   );
 }
 function BellIcon({ active }: { active: boolean }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={active ? 0 : 1.8}>
-      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-      <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+      <path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6z"/>
+      <path d="M10 19a2 2 0 0 0 4 0" stroke={active ? '#fff' : 'currentColor'} strokeWidth={1.6} fill="none"/>
     </svg>
   );
 }

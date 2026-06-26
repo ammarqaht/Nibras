@@ -35,13 +35,13 @@ export default function StudentLogin() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6 py-12 relative" style={{ background: 'var(--bg)' }}>
+    <div className="student-body min-h-screen flex items-center justify-center px-6 py-12 relative" style={{ background: 'var(--bg)' }}>
       <div
         aria-hidden
         className="absolute inset-0 pointer-events-none"
         style={{
           background:
-            'radial-gradient(50rem 30rem at 50% 25%, rgba(245,166,35,0.08), transparent 60%), radial-gradient(40rem 28rem at 80% 80%, rgba(43,175,217,0.06), transparent 60%)',
+            'radial-gradient(50rem 30rem at 50% 25%, rgba(245,166,35,0.10), transparent 60%), radial-gradient(40rem 28rem at 80% 80%, rgba(43,175,217,0.08), transparent 60%)',
         }}
       />
       <div className="relative w-full max-w-md">
@@ -53,19 +53,19 @@ export default function StudentLogin() {
             className="mx-auto h-28 w-auto select-none"
             draggable={false}
           />
-          <p className="mt-4 text-sm" style={{ color: 'var(--ink-soft)' }}>بوابة الطلاب</p>
+          <p className="mt-4 text-sm tracking-wide" style={{ color: 'var(--ink-soft)' }}>بوابة الطلاب</p>
         </div>
 
-        <form onSubmit={submit} className="card p-8 space-y-5">
+        <form onSubmit={submit} className="card p-8 space-y-5 pop-in">
           <div>
-            <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--ink)' }}>تسجيل الدخول</h1>
+            <h1 className="font-display text-3xl font-bold mb-1" style={{ color: 'var(--ink)' }}>تسجيل الدخول</h1>
             <p className="text-sm" style={{ color: 'var(--ink-soft)' }}>أدخل رقم عضويتك ورقم هويتك للمتابعة.</p>
           </div>
 
           <div>
             <label className="label">رقم العضوية</label>
             <input
-              className="field"
+              className="field tabular-nums"
               type="number"
               inputMode="numeric"
               value={membershipNo}
@@ -78,7 +78,7 @@ export default function StudentLogin() {
           <div>
             <label className="label">رقم الهوية</label>
             <input
-              className="field"
+              className="field tabular-nums"
               type="password"
               inputMode="numeric"
               value={nationalId}
@@ -99,7 +99,7 @@ export default function StudentLogin() {
           )}
 
           <button type="submit" disabled={busy} className="btn btn-primary btn-lg w-full">
-            {busy ? 'جارٍ التحقق...' : 'دخول'}
+            {busy ? 'جارٍ التحقق…' : 'دخول'}
           </button>
         </form>
       </div>

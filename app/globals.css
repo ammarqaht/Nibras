@@ -26,6 +26,33 @@
   font-weight: 900; font-style: normal; font-display: swap;
 }
 
+/* Thmanyah Display — serif display used by the student portal headings */
+@font-face {
+  font-family: "Thmanyah Display";
+  src: url("/fonts/title/thmanyahserifdisplay-Light.otf") format("opentype");
+  font-weight: 300; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Thmanyah Display";
+  src: url("/fonts/title/thmanyahserifdisplay-Regular.otf") format("opentype");
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Thmanyah Display";
+  src: url("/fonts/title/thmanyahserifdisplay-Medium.otf") format("opentype");
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Thmanyah Display";
+  src: url("/fonts/title/thmanyahserifdisplay-Bold.otf") format("opentype");
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Thmanyah Display";
+  src: url("/fonts/title/thmanyahserifdisplay-Black.otf") format("opentype");
+  font-weight: 900; font-style: normal; font-display: swap;
+}
+
 @font-face {
   font-family: "Thmanyah Sans";
   src: url("/fonts/body/thmanyahsans-Light.otf") format("opentype");
@@ -397,6 +424,126 @@ body::after {
 .supervisor-body code,
 .supervisor-body pre {
   font-family: ui-monospace, 'SFMono-Regular', 'Menlo', 'Monaco', monospace !important;
+}
+
+/* Student portal — overrides --font-display to Thmanyah Display serif (scoped only) */
+.student-body {
+  --font-display: "Thmanyah Display", "Times New Roman", serif;
+  font-family: var(--font-body);
+}
+.student-body h1,
+.student-body h2,
+.student-body h3,
+.student-body h4,
+.student-body h5,
+.student-body h6 {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+.student-body .font-display {
+  font-family: var(--font-display);
+}
+
+/* Premium tabular numeric for student stats */
+.student-body .tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Membership-card hero — premium tactile feel */
+.membership-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  padding: 1.5rem;
+  color: #fff;
+  background:
+    radial-gradient(120% 80% at 100% 0%, rgba(255,159,28,0.22) 0%, rgba(255,159,28,0) 55%),
+    radial-gradient(80% 60% at 0% 100%, rgba(18,179,213,0.18) 0%, rgba(18,179,213,0) 60%),
+    linear-gradient(135deg, #0B2A66 0%, #103F91 45%, #1A5BB5 100%);
+  box-shadow:
+    0 18px 50px -18px rgba(16,63,145,0.55),
+    0 1px 0 0 rgba(255,255,255,0.08) inset,
+    0 -1px 0 0 rgba(0,0,0,0.20) inset;
+}
+.membership-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  opacity: 0.05;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+}
+.membership-card::after {
+  content: "";
+  position: absolute;
+  right: -30%;
+  top: -40%;
+  width: 80%;
+  height: 80%;
+  background: radial-gradient(closest-side, rgba(255,183,82,0.40), transparent 70%);
+  pointer-events: none;
+}
+.membership-card .mc-watermark {
+  position: absolute;
+  inset-inline-start: -1rem;
+  bottom: -1rem;
+  width: 11rem;
+  height: 11rem;
+  opacity: 0.07;
+  pointer-events: none;
+}
+
+/* Premium frosted bottom-nav */
+.student-bottom-nav {
+  background: rgba(255,255,255,0.82);
+  backdrop-filter: saturate(180%) blur(14px);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Subtle skeleton shimmer */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-soft);
+  border-radius: 10px;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 35%, rgba(255,255,255,0.85) 50%, transparent 65%);
+  animation: shimmer 1.6s infinite cubic-bezier(0.4,0,0.2,1);
+}
+
+/* Jewel-like stat tile */
+.stat-tile {
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 1rem;
+  overflow: hidden;
+  transition: transform 220ms cubic-bezier(0.4,0,0.2,1), box-shadow 220ms cubic-bezier(0.4,0,0.2,1);
+  box-shadow: 0 2px 12px rgba(45,35,20,0.05);
+}
+.stat-tile::before {
+  content: "";
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  inset-inline-end: 0;
+  height: 3px;
+  background: var(--tile-accent, var(--accent));
+  border-start-start-radius: 16px;
+  border-start-end-radius: 16px;
+}
+.stat-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px -10px rgba(45,35,20,0.18);
 }
 
 

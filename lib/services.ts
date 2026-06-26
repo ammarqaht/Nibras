@@ -2439,6 +2439,90 @@ export async function getStudentGroup(groupId: number): Promise<{
   return { group, supervisor, members };
 }
 
+export type StudentFamilyMember = {
+  id: number;
+  membershipNo: number;
+  name: string;
+  grade: string;
+  rankScore: number;
+  balance: number;
+  individual: number;
+  collective: number;
+};
+
+export type StudentFamilyResponse = {
+  group: { id: number; name: string; stage: string };
+  supervisor: { id: number; name: string } | null;
+  members: StudentFamilyMember[];
+  groupTotal: number;
+  groupRank: number;
+  groupCount: number;
+} | null;
+
+/**
+ * Returns the student's family/group enriched with member point summaries,
+ * the family's total rankScore (sum of members) and the family's rank
+ * among all groups in the same stage.
+ */
+export async function getStudentFamily(groupId: number): Promise<StudentFamilyResponse> {
+  const groups = await getGroups();
+  const group = groups.find(g => g.id === groupId);
+  if (!group) return null;
+
+  const supervisors = await getAllSupervisors();
+  const supervisor = supervisors.find(s => {
+    const ids = s.groupIds.split(',').map(x => parseInt(x.trim(), 10)).filter(n => !isNaN(n));
+    return ids.includes(groupId) && s.role.split(',').map(r => r.trim()).some(r => r === 'groups_supervisor');
+  }) || null;
+
+  const students = await getStudents();
+  const allPoints = await getPoints();
+
+  // Compute per-student summaries for THIS group's members
+  const members: StudentFamilyMember[] = students
+    .filter(s => s.groupId === groupId)
+    .map(s => {
+      const pts = allPoints.filter(p => p.registrationId === s.id);
+      const sum = calcPointSummary(pts);
+      return {
+        id: s.id,
+        membershipNo: s.membershipNo,
+        name: s.studentName,
+        grade: s.grade,
+        rankScore: sum.rankScore,
+        balance: sum.balance,
+        individual: sum.individual,
+        collective: sum.collective,
+      };
+    })
+    .sort((a, b) => b.rankScore - a.rankScore);
+
+  const groupTotal = members.reduce((acc, m) => acc + m.rankScore, 0);
+
+  // Rank ALL groups (in the same stage) by their members' total rankScore
+  const sameStageGroups = groups.filter(g => g.stage === group.stage);
+  const groupTotals = sameStageGroups.map(g => {
+    const total = students
+      .filter(s => s.groupId === g.id)
+      .reduce((acc, s) => {
+        const pts = allPoints.filter(p => p.registrationId === s.id);
+        return acc + calcPointSummary(pts).rankScore;
+      }, 0);
+    return { id: g.id, total };
+  });
+  groupTotals.sort((a, b) => b.total - a.total);
+  const groupRank = groupTotals.findIndex(g => g.id === groupId) + 1;
+
+  return {
+    group: { id: group.id, name: group.name, stage: group.stage },
+    supervisor: supervisor ? { id: supervisor.id, name: supervisor.name } : null,
+    members,
+    groupTotal,
+    groupRank,
+    groupCount: sameStageGroups.length,
+  };
+}
+
 export async function getSetting(key: string): Promise<string | null> {
   if (hasDatabase) {
     try {
