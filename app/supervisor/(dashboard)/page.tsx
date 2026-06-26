@@ -223,7 +223,7 @@ function AttendanceGrid({ label, present, late, excused, absent, color = 'var(--
     <div className="card p-5 relative overflow-hidden">
       <div className="absolute top-0 right-0 w-1.5 h-full" style={{ backgroundColor: color }} />
       <div className="text-xs text-ink-500 font-bold mb-3">{label}</div>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-4 gap-1.5">
         <AttStatBox label="حاضر"  value={present}  color="#1B7A43"/>
         <AttStatBox label="متأخر" value={late}     color="#FF9F1C"/>
         <AttStatBox label="معتذر" value={excused}  color="#103F91"/>

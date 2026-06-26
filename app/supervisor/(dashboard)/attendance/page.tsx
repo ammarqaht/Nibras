@@ -46,13 +46,11 @@ export default function AttendancePage() {
   const isGroupsSup = !canEdit && roles.includes('groups_supervisor');
   const isStageSup  = !canEdit && !isGroupsSup && roles.includes('stage_supervisor');
 
-  /* My assigned group IDs (groups_supervisor) */
   const myGroupIds = useMemo(() => {
     if (!user?.groupIds) return new Set<number>();
     return new Set(user.groupIds.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n)));
   }, [user]);
 
-  /* My assigned stage (stage_supervisor) */
   const myStage = user?.stage ?? '';
 
   const [date,       setDate]       = useState(todayStr());
@@ -150,11 +148,16 @@ export default function AttendancePage() {
     }
   }
 
+  const filteredLog = useMemo(()=>{
+    if (!logSearch.trim()) return logEntries;
+    const q = logSearch.trim();
+    return logEntries.filter(e => e.studentName.includes(q) || String(e.membershipNo).includes(q) || e.groupName.includes(q));
+  }, [logEntries, logSearch]);
+
   useEffect(() => { loadStatic(); }, []);
   useEffect(() => { loadDay(date); }, [date]);
 
   async function mark(registrationId: number, status: string) {
-    const wasUnmarked = !records[registrationId];
     setRecords(prev=>({...prev,[registrationId]:status}));
     const r = await fetch('/api/supervisor/attendance',{
       method:'POST', headers:{'Content-Type':'application/json'},
@@ -164,21 +167,6 @@ export default function AttendancePage() {
       const j = await r.json().catch(()=>({}));
       pushToast('error', j.error??'فشل تسجيل الحضور');
       loadDay(date);
-      return;
-    }
-    if (wasUnmarked) {
-      const pts = status==='present' ? cfg.onTimePoints
-                : status==='late'    ? cfg.latePoints
-                : status==='excused' ? cfg.excusedPoints
-                : 0;
-      if (pts > 0) {
-        await fetch('/api/supervisor/points',{
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ registrationId, delta: pts,
-            reason: status==='present' ? 'حضور بالوقت' : status==='late' ? 'حضور متأخر' : 'اعتذار',
-            category:'attendance', pointType:'individual' }),
-        });
-      }
     }
   }
 
@@ -186,11 +174,18 @@ export default function AttendancePage() {
     const ids = list.filter(s=>!records[s.id]).map(s=>s.id);
     if (ids.length===0) { pushToast('info','جميع الطلاب تم تسجيلهم مسبقاً'); return; }
     setRecords(prev=>{ const n={...prev}; ids.forEach(id=>{ n[id]='absent'; }); return n; });
-    await Promise.all(ids.map(id=>fetch('/api/supervisor/attendance',{
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ registrationId:id, date, status:'absent' }),
-    })));
-    pushToast('success', `تم تغييب ${ids.length} طالب لم يُسجَّل`);
+    // Send as a single batch request — processed sequentially server-side to avoid file race conditions
+    const r = await fetch('/api/supervisor/attendance', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ registrationIds: ids, date, status: 'absent' }),
+    });
+    if (r.ok) {
+      pushToast('success', `تم تغييب ${ids.length} طالب لم يُسجَّل`);
+    } else {
+      const j = await r.json().catch(()=>({}));
+      pushToast('error', j.error ?? 'فشل التغييب الجماعي');
+      loadDay(date);
+    }
   }
 
   async function quickPresent(e: React.FormEvent) {
@@ -198,8 +193,6 @@ export default function AttendancePage() {
     const mNo = quick.trim();
     if (!mNo||submitting) return;
     setSubmitting(true);
-    const s = students.find(st=>String(st.membershipNo)===mNo);
-    const wasUnmarked = s ? !records[s.id] : true;
     const r = await fetch('/api/supervisor/attendance',{
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ membershipNo:mNo, date, status:'present' }),
@@ -208,24 +201,14 @@ export default function AttendancePage() {
     setSubmitting(false);
     if (!r.ok) { pushToast('error', j.error??'لم يتم العثور على الطالب'); }
     else {
+      const s = students.find(st=>String(st.membershipNo)===mNo);
       if (s) setRecords(prev=>({...prev,[s.id]:'present'}));
-      if (wasUnmarked) {
-        const rId = s?.id ?? j.attendance?.registrationId;
-        if (rId) {
-          await fetch('/api/supervisor/points',{
-            method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ registrationId:rId, delta:cfg.onTimePoints,
-              reason:'حضور بالوقت', category:'attendance', pointType:'individual' }),
-          });
-        }
-      }
       pushToast('success','تم تسجيل الحضور');
     }
     setQuick('');
     quickRef.current?.focus();
   }
 
-  /* filtered list based on role */
   const list = useMemo(()=>{
     return students.filter(s=>
       (!fGroup||String(s.groupId)===fGroup) &&
@@ -251,7 +234,6 @@ export default function AttendancePage() {
     ? Math.round(((counts.present+counts.late)/list.length)*100)
     : 0;
 
-  /* For stage_supervisor: group the list by family/group */
   const stageGroups = useMemo(()=>{
     if (!isStageSup) return [];
     const groupMap = new Map<number, { group: Group; students: Student[] }>();
@@ -269,17 +251,6 @@ export default function AttendancePage() {
     if (ungrouped.length>0) result.push({ group: { id:0, name:'بدون أسرة', stage:'' }, students: ungrouped });
     return result;
   }, [isStageSup, list, groups]);
-
-  const filteredLog = useMemo(()=>{
-    if (!logSearch.trim()) return logEntries;
-    const q = logSearch.trim();
-    return logEntries.filter(e => e.studentName.includes(q) || String(e.membershipNo).includes(q) || e.groupName.includes(q));
-  }, [logEntries, logSearch]);
-
-  const logPresentCnt = logEntries.filter(e=>e.status==='present').length;
-  const logLateCnt    = logEntries.filter(e=>e.status==='late').length;
-  const logAbsentCnt  = logEntries.filter(e=>e.status==='absent').length;
-  const logExcusedCnt = logEntries.filter(e=>e.status==='excused').length;
 
   return (
     <div className="space-y-4">
@@ -347,10 +318,10 @@ export default function AttendancePage() {
               <div>
                 <h2 className="font-bold text-ink-900">سجل الحضور — {date}</h2>
                 <div className="flex flex-wrap gap-2 mt-1">
-                  <span className="pill pill-green text-xs">حاضر {logPresentCnt}</span>
-                  {logLateCnt>0   && <span className="pill pill-yellow text-xs">متأخر {logLateCnt}</span>}
-                  {logExcusedCnt>0 && <span className="pill pill-blue text-xs">معتذر {logExcusedCnt}</span>}
-                  {logAbsentCnt>0  && <span className="pill pill-red text-xs">غائب {logAbsentCnt}</span>}
+                  {logEntries.filter(e=>e.status==='present').length > 0 && <span className="pill pill-green text-xs">حاضر {logEntries.filter(e=>e.status==='present').length}</span>}
+                  {logEntries.filter(e=>e.status==='late').length > 0    && <span className="pill pill-yellow text-xs">متأخر {logEntries.filter(e=>e.status==='late').length}</span>}
+                  {logEntries.filter(e=>e.status==='excused').length > 0 && <span className="pill pill-blue text-xs">معتذر {logEntries.filter(e=>e.status==='excused').length}</span>}
+                  {logEntries.filter(e=>e.status==='absent').length > 0  && <span className="pill pill-red text-xs">غائب {logEntries.filter(e=>e.status==='absent').length}</span>}
                 </div>
               </div>
               <button onClick={()=>setLogOpen(false)} className="p-1.5 rounded-lg text-ink-300 hover:text-ink-600">
@@ -425,7 +396,6 @@ export default function AttendancePage() {
             </svg>
             السجل
           </button>
-          {/* Settings — canEdit only */}
           {canEdit && (
             <button onClick={()=>{ setCfgDraft(cfg); setCfgOpen(true); }}
               className="btn btn-ghost text-sm py-2 px-3 flex items-center gap-1.5">
@@ -436,7 +406,6 @@ export default function AttendancePage() {
               إعدادات
             </button>
           )}
-          {/* Kiosk link — canEdit only */}
           {canEdit && (
             <Link href="/supervisor/attendance/kiosk"
               className="btn btn-primary text-sm py-2 px-4 flex items-center gap-2">
@@ -456,7 +425,6 @@ export default function AttendancePage() {
           <input type="date" className="field" dir="ltr" value={date}
             onChange={e=>setDate(e.target.value)}/>
         </div>
-        {/* Stage filter: hidden for groups_supervisor & stage_supervisor (auto-filtered) */}
         {!isGroupsSup && !isStageSup && (
           <div>
             <label className="label">المرحلة</label>
@@ -469,7 +437,6 @@ export default function AttendancePage() {
             </select>
           </div>
         )}
-        {/* Group filter: hidden for groups_supervisor (auto-filtered) */}
         {!isGroupsSup && !isStageSup && (
           <div>
             <label className="label">المجموعة</label>
@@ -521,7 +488,6 @@ export default function AttendancePage() {
       ) : list.length===0 ? (
         <div className="card p-16 text-center text-ink-400 text-sm">لا يوجد طلاب.</div>
       ) : isStageSup ? (
-        /* Stage supervisor: grouped by family */
         <div className="space-y-4">
           {stageGroups.map(({ group, students: groupStudents }) => (
             <div key={group.id} className="card p-0 overflow-hidden">
@@ -555,7 +521,6 @@ export default function AttendancePage() {
           ))}
         </div>
       ) : isGroupsSup ? (
-        /* Groups supervisor: simple read-only list */
         <div className="card p-0 overflow-hidden">
           <ul className="divide-y divide-ink-200">
             {list.map(s=>{
@@ -581,7 +546,6 @@ export default function AttendancePage() {
           </ul>
         </div>
       ) : !canEdit ? (
-        /* Read-only view for all other supervisors (committee, general, etc.) */
         <div className="card p-0 overflow-hidden">
           <ul className="divide-y divide-ink-200">
             {list.map(s=>{

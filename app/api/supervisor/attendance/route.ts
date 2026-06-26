@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { getAttendance, logAttendance, deleteAttendance, getStudents } from '@/lib/services';
+import {
+  getAttendance, logAttendance, deleteAttendance, getStudents,
+  getSettings, deleteAttendancePointsByDate, addPointsRecord,
+} from '@/lib/services';
 
 export async function GET(req: NextRequest) {
   try {
@@ -47,7 +50,40 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'البيانات غير كاملة (التاريخ والحالة مطلوبان)' }, { status: 400 });
     }
 
-    // Resolve membershipNo if provided instead of registrationId
+    // ── Batch mode: registrationIds[] processed sequentially to avoid file race conditions ──
+    if (Array.isArray(body.registrationIds) && body.registrationIds.length > 0) {
+      const cfg = await getSettings();
+      const onTimePoints  = Number(cfg.att_onTimePoints  ?? '2');
+      const latePoints    = Number(cfg.att_latePoints    ?? '1');
+      const excusedPoints = Number(cfg.att_excusedPoints ?? '0');
+
+      let count = 0;
+      for (const rawId of body.registrationIds) {
+        const bid = parseInt(String(rawId), 10);
+        if (isNaN(bid)) continue;
+        await logAttendance(bid, date, status, session.name);
+        await deleteAttendancePointsByDate(bid, date);
+        const pts = status === 'present' ? onTimePoints
+                  : status === 'late'    ? latePoints
+                  : status === 'excused' ? excusedPoints
+                  : 0;
+        if (pts > 0) {
+          const label = status === 'present' ? 'حضور بالوقت'
+                      : status === 'late'    ? 'حضور متأخر'
+                      : 'اعتذار';
+          await addPointsRecord({
+            registrationId: bid, delta: pts,
+            reason: `${label} | ${date}`, category: 'attendance',
+            pointType: 'individual', recordedBy: session.name,
+          });
+        }
+        count++;
+      }
+      return NextResponse.json({ success: true, count });
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // Resolve membershipNo → registrationId if needed
     let resolvedStudent: any = null;
     if (!registrationId && membershipNo) {
       const students = await getStudents();
@@ -64,7 +100,37 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'معرّف الطالب غير صحيح' }, { status: 400 });
     }
 
+    // Save attendance (upsert)
     const record = await logAttendance(id, date, status, session.name);
+
+    // ── Point adjustment ──────────────────────────────────────────────────────
+    const s = await getSettings();
+    const onTimePoints  = Number(s.att_onTimePoints  ?? '2');
+    const latePoints    = Number(s.att_latePoints    ?? '1');
+    const excusedPoints = Number(s.att_excusedPoints ?? '0');
+
+    await deleteAttendancePointsByDate(id, date);
+
+    const pts = status === 'present' ? onTimePoints
+              : status === 'late'    ? latePoints
+              : status === 'excused' ? excusedPoints
+              : 0;
+
+    if (pts > 0) {
+      const label = status === 'present' ? 'حضور بالوقت'
+                  : status === 'late'    ? 'حضور متأخر'
+                  : 'اعتذار';
+      await addPointsRecord({
+        registrationId: id,
+        delta: pts,
+        reason: `${label} | ${date}`,
+        category: 'attendance',
+        pointType: 'individual',
+        recordedBy: session.name,
+      });
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     return NextResponse.json({ success: true, attendance: record, student: resolvedStudent });
   } catch (error) {
     console.error('attendance POST error', error);
@@ -86,6 +152,8 @@ export async function DELETE(req: NextRequest) {
     }
 
     await deleteAttendance(registrationId, date);
+    // Also remove attendance points for that student+date
+    await deleteAttendancePointsByDate(registrationId, date);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('attendance DELETE error', error);
