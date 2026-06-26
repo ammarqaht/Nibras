@@ -206,18 +206,29 @@ function SmallCard({ accent, icon, label, value, sub }: { accent: string; icon: 
   );
 }
 
-function AttendanceCard({ label, present, late = 0, absent, percent, color, sub }: { label: string; present: number; late?: number; absent: number; percent: number; color: string; sub?: string }) {
+function AttStatBox({ label, value, color }: { label: string; value: number; color: string }) {
   return (
-    <div className="card p-5 flex items-center justify-between relative overflow-hidden">
+    <div className="flex flex-col items-center gap-0.5 rounded-xl py-2 px-1"
+      style={{background:`${color}12`, border:`1px solid ${color}25`}}>
+      <span className="text-sm font-bold" style={{color}}>{value}</span>
+      <span className="text-[9px] text-ink-400">{label}</span>
+    </div>
+  );
+}
+
+function AttendanceGrid({ label, present, late, excused, absent, color = 'var(--accent)' }: {
+  label: string; present: number; late: number; excused: number; absent: number; color?: string;
+}) {
+  return (
+    <div className="card p-5 relative overflow-hidden">
       <div className="absolute top-0 right-0 w-1.5 h-full" style={{ backgroundColor: color }} />
-      <div className="space-y-1 min-w-0">
-        <div className="text-xs text-ink-500 font-bold">{label}</div>
-        <div className="text-xl font-bold text-green-600">{present} <span className="text-sm text-ink-400 font-medium">حاضر</span></div>
-        <div className="text-sm font-semibold text-amber-500">{late} <span className="text-xs text-ink-400 font-medium">معتذر</span></div>
-        <div className="text-sm font-semibold text-red-500">{absent} <span className="text-xs text-ink-400 font-medium">غائب</span></div>
-        {sub && <div className="text-[10px] text-ink-400 font-semibold">{sub}</div>}
+      <div className="text-xs text-ink-500 font-bold mb-3">{label}</div>
+      <div className="grid grid-cols-2 gap-2">
+        <AttStatBox label="حاضر"  value={present}  color="#1B7A43"/>
+        <AttStatBox label="متأخر" value={late}     color="#FF9F1C"/>
+        <AttStatBox label="معتذر" value={excused}  color="#103F91"/>
+        <AttStatBox label="غائب"  value={absent}   color="#E52E25"/>
       </div>
-      <AttendanceRing percent={percent} color={color} />
     </div>
   );
 }
@@ -257,9 +268,10 @@ function QuickInfoCards({ roles, isAdmin, isFinanceRole, isAttendanceRole, isPoi
   isGroupsRole: boolean; isGeneralRole: boolean; isStageRole: boolean; isMediaRole: boolean;
   stats: any; attendancePercent: number; groupAttendancePercent: number;
 }) {
-  const overallPresent = stats?.attendanceOverall?.presentToday ?? 0;
-  const overallLate = stats?.attendanceOverall?.lateToday ?? 0;
-  const overallAbsent = stats?.attendanceOverall?.absentToday ?? 0;
+  const overallPresent  = stats?.attendanceOverall?.presentToday  ?? 0;
+  const overallLate    = stats?.attendanceOverall?.lateToday     ?? 0;
+  const overallExcused = stats?.attendanceOverall?.excusedToday  ?? 0;
+  const overallAbsent  = stats?.attendanceOverall?.absentToday   ?? 0;
 
   // Admin / General supervisor
   if (isAdmin) {
@@ -272,10 +284,9 @@ function QuickInfoCards({ roles, isAdmin, isFinanceRole, isAttendanceRole, isPoi
           value={stats?.students?.approved ?? 0}
           sub={`من إجمالي ${stats?.students?.total ?? 0} مسجّل`}
         />
-        <AttendanceCard
+        <AttendanceGrid
           label="حضور اليوم"
-          present={overallPresent} late={overallLate} absent={overallAbsent}
-          percent={attendancePercent} color="var(--accent)"
+          present={overallPresent} late={overallLate} excused={overallExcused} absent={overallAbsent}
         />
       </div>
     );
@@ -284,10 +295,9 @@ function QuickInfoCards({ roles, isAdmin, isFinanceRole, isAttendanceRole, isPoi
   if (isGeneralRole) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-1 gap-4 max-w-sm">
-        <AttendanceCard
+        <AttendanceGrid
           label="حضور اليوم"
-          present={overallPresent} late={overallLate} absent={overallAbsent}
-          percent={attendancePercent} color="var(--accent)"
+          present={overallPresent} late={overallLate} excused={overallExcused} absent={overallAbsent}
         />
       </div>
     );
@@ -323,9 +333,9 @@ function QuickInfoCards({ roles, isAdmin, isFinanceRole, isAttendanceRole, isPoi
     const as = stats?.attendanceStats;
     return (
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <AttendanceCard
-          label="حضور اليوم" present={overallPresent} late={overallLate} absent={overallAbsent}
-          percent={attendancePercent} color="var(--accent)"
+        <AttendanceGrid
+          label="حضور اليوم"
+          present={overallPresent} late={overallLate} excused={overallExcused} absent={overallAbsent}
         />
         <SmallCard accent="#12B3D5"
           icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 14.25v2.25m3-4.5v4.5m3-6.75v6.75m3-9v9M6 20.25h12A2.25 2.25 0 0 0 20.25 18V6A2.25 2.25 0 0 0 18 3.75H6A2.25 2.25 0 0 0 3.75 6v12A2.25 2.25 0 0 0 6 20.25Z" /></svg>}
@@ -343,9 +353,9 @@ function QuickInfoCards({ roles, isAdmin, isFinanceRole, isAttendanceRole, isPoi
   if (isPointsRole) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <AttendanceCard
-          label="حضور اليوم" present={overallPresent} late={overallLate} absent={overallAbsent}
-          percent={attendancePercent} color="var(--accent)"
+        <AttendanceGrid
+          label="حضور اليوم"
+          present={overallPresent} late={overallLate} excused={overallExcused} absent={overallAbsent}
         />
         <NextProgramCard program={stats?.nextCommitteeProgram ?? null} />
       </div>
@@ -356,19 +366,21 @@ function QuickInfoCards({ roles, isAdmin, isFinanceRole, isAttendanceRole, isPoi
   if (isGroupsRole) {
     const gs = stats?.groupStats;
     const myPresent = stats?.attendance?.presentToday ?? 0;
-    const myLate = stats?.attendance?.lateToday ?? 0;
-    const myAbsent = stats?.attendance?.absentToday ?? 0;
-    const myTotal = myPresent + myLate + myAbsent;
-    const myPct = myTotal > 0 ? Math.round(myPresent / myTotal * 100) : 0;
+    const myLate    = stats?.attendance?.lateToday    ?? 0;
+    const myAbsent  = stats?.attendance?.absentToday  ?? 0;
+    const myExcused = stats?.attendance?.excusedToday ?? 0;
+    const myTotal = myPresent + myLate + myAbsent + myExcused;
+    const myPct = myTotal > 0 ? Math.round((myPresent + myLate) / myTotal * 100) : 0;
     return (
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <SmallCard accent="#22c55e"
           icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.7199m0 0-.003-.031a6.062 6.062 0 0 1 3.518-5.563 3 3 0 1 1 4.966 0 6.062 6.062 0 0 1 3.518 5.563" /></svg>}
           label="طلاب الأسرة" value={stats?.myStudents?.length ?? 0} sub="إجمالي طلاب أسرتك"
         />
-        <AttendanceCard
-          label="حضور الأسرة اليوم" present={myPresent} late={myLate} absent={myAbsent}
-          percent={myPct} color="#12B3D5"
+        <AttendanceGrid
+          label="حضور الأسرة اليوم"
+          present={myPresent} late={myLate} excused={myExcused} absent={myAbsent}
+          color="#12B3D5"
         />
         <SmallCard accent="#f59e0b"
           icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" /></svg>}
@@ -386,19 +398,21 @@ function QuickInfoCards({ roles, isAdmin, isFinanceRole, isAttendanceRole, isPoi
   if (isStageRole) {
     const ss = stats?.stageStats;
     const sp = ss?.attendanceToday?.present ?? 0;
-    const sl = ss?.attendanceToday?.late ?? 0;
-    const sa = ss?.attendanceToday?.absent ?? 0;
-    const st = sp + sl + sa;
-    const spct = st > 0 ? Math.round(sp / st * 100) : 0;
+    const sl = ss?.attendanceToday?.late    ?? 0;
+    const se = ss?.attendanceToday?.excused ?? 0;
+    const sa = ss?.attendanceToday?.absent  ?? 0;
+    const st = sp + sl + se + sa;
+    const spct = st > 0 ? Math.round((sp + sl) / st * 100) : 0;
     return (
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <SmallCard accent="#22c55e"
           icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.7199m0 0-.003-.031a6.062 6.062 0 0 1 3.518-5.563 3 3 0 1 1 4.966 0 6.062 6.062 0 0 1 3.518 5.563" /></svg>}
           label={`طلاب مرحلة ${ss?.stageName ?? ''} المقبولين`} value={ss?.approvedCount ?? 0} sub="طالب مقبول في مرحلتك"
         />
-        <AttendanceCard
-          label="حضور المرحلة اليوم" present={sp} late={sl} absent={sa}
-          percent={spct} color="#103F91"
+        <AttendanceGrid
+          label="حضور المرحلة اليوم"
+          present={sp} late={sl} excused={se} absent={sa}
+          color="#103F91"
         />
         <div className="card p-5 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-1.5 h-full bg-amber-400" />
@@ -602,6 +616,10 @@ export default function DashboardHome() {
   // Announcement details modal
   const [selectedAnn, setSelectedAnn] = useState<any>(null);
 
+  // Leaderboard toggle (stage supervisors)
+  const [leaderboardDisabled, setLeaderboardDisabled] = useState(false);
+  const [leaderboardBusy, setLeaderboardBusy] = useState(false);
+
   const perms = user?.permissions || [];
   const hasPerm = (p: string) => perms.includes('*') || perms.includes(p);
 
@@ -643,6 +661,7 @@ export default function DashboardHome() {
         // Only allow awarding points to approved students
         setStudents(studentsJson.students.filter((s: any) => s.registrationStatus === 'approved'));
       }
+
     } catch (err) {
       console.error(err);
     } finally {
@@ -653,6 +672,17 @@ export default function DashboardHome() {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (!isStageRole || !user?.stage) return;
+    fetch('/api/supervisor/leaderboard-settings')
+      .then(r => r.json())
+      .then(d => {
+        const stages: string[] = d.disabledStages || [];
+        setLeaderboardDisabled(stages.includes(user.stage || ''));
+      })
+      .catch(() => {});
+  }, [isStageRole, user?.stage]);
 
   // Click outside listener for student search dropdown
   useEffect(() => {
@@ -773,14 +803,14 @@ export default function DashboardHome() {
 
   const attendancePercent = useMemo(() => {
     if (!stats?.attendanceOverall) return 0;
-    const { presentToday, activeBase } = stats.attendanceOverall;
-    return Math.round((presentToday / Math.max(activeBase, 1)) * 100);
+    const { presentToday, lateToday = 0, activeBase } = stats.attendanceOverall;
+    return Math.round(((presentToday + lateToday) / Math.max(activeBase, 1)) * 100);
   }, [stats]);
 
   const groupAttendancePercent = useMemo(() => {
     if (!stats?.attendance) return 0;
-    const { presentToday, activeBase } = stats.attendance;
-    return Math.round((presentToday / Math.max(activeBase, 1)) * 100);
+    const { presentToday, lateToday = 0, activeBase } = stats.attendance;
+    return Math.round(((presentToday + lateToday) / Math.max(activeBase, 1)) * 100);
   }, [stats]);
 
   const welcomeBannerStyle = {
@@ -832,6 +862,45 @@ export default function DashboardHome() {
             attendancePercent={attendancePercent}
             groupAttendancePercent={groupAttendancePercent}
           />
+
+          {/* Leaderboard toggle — stage supervisors only */}
+          {isStageRole && user?.stage && (
+            <div className="card p-5 flex items-center justify-between gap-4">
+              <div>
+                <p className="font-bold text-ink-900 text-sm">ترتيب الطلاب في بوابة الطلاب</p>
+                <p className="text-xs text-ink-500 mt-0.5">
+                  {leaderboardDisabled
+                    ? `الترتيب مخفي عن طلاب مرحلة ${user.stage} حالياً`
+                    : `الترتيب ظاهر لطلاب مرحلة ${user.stage} حالياً`}
+                </p>
+              </div>
+              <button
+                disabled={leaderboardBusy}
+                onClick={async () => {
+                  setLeaderboardBusy(true);
+                  try {
+                    const r = await fetch('/api/supervisor/leaderboard-settings', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ stage: user.stage, disabled: !leaderboardDisabled }),
+                    });
+                    if (r.ok) setLeaderboardDisabled(!leaderboardDisabled);
+                  } finally {
+                    setLeaderboardBusy(false);
+                  }
+                }}
+                className={`relative inline-flex h-7 w-13 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${leaderboardDisabled ? 'bg-ink-300' : 'bg-green-500'}`}
+                style={{ width: '3.25rem' }}
+                role="switch"
+                aria-checked={!leaderboardDisabled}
+              >
+                <span
+                  className="inline-block h-6 w-6 transform rounded-full bg-white shadow-md transition-transform duration-200"
+                  style={{ transform: leaderboardDisabled ? 'translateX(0)' : 'translateX(1.25rem)' }}
+                />
+              </button>
+            </div>
+          )}
 
           {/* Main Content Layout Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

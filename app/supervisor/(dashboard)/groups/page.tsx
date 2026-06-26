@@ -481,6 +481,7 @@ export default function GroupsPage() {
               onClick={() => {
                 setName('');
                 setCheckedNewGroupStudentIds([]);
+                setStage(isStage && supervisorStage ? supervisorStage : stages[0].key);
                 setShowCreateGroupModal(true);
               }}
               className="btn btn-primary py-2 px-4 text-sm flex items-center gap-2 shadow-sm"
@@ -946,7 +947,7 @@ export default function GroupsPage() {
       )}
 
       {/* قسم الطلاب غير المعينين في أسرة */}
-      {(canManageGroups || isGlobal || isStage) && (
+      {canManageGroups && (
         <div className="card p-6 mt-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
             <div>
@@ -1098,12 +1099,16 @@ export default function GroupsPage() {
               </div>
               <div>
                 <label className="label font-semibold">المرحلة</label>
-                <select className="field" value={stage} onChange={(e) => {
-                  setStage(e.target.value);
-                  setCheckedNewGroupStudentIds([]);
-                }}>
-                  {stages.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
-                </select>
+                {isStage ? (
+                  <div className="field bg-ink-50 text-ink-500 cursor-not-allowed select-none">{supervisorStage}</div>
+                ) : (
+                  <select className="field" value={stage} onChange={(e) => {
+                    setStage(e.target.value);
+                    setCheckedNewGroupStudentIds([]);
+                  }}>
+                    {stages.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+                  </select>
+                )}
               </div>
               
               {/* Checklist of unassigned students of selected stage */}

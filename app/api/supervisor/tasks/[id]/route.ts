@@ -29,9 +29,13 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         patch.maxPoints = maxPtsVal;
       }
     }
+    if (body.startDate !== undefined) {
+      patch.startDate = body.startDate ? new Date(body.startDate).toISOString() : null;
+    }
     if (body.dueDate !== undefined) {
       patch.dueDate = new Date(body.dueDate).toISOString();
     }
+    if (body.track !== undefined) patch.track = body.track;
 
     const updated = await updateTask(id, patch);
     if (!updated) {

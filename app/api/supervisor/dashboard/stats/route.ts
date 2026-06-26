@@ -84,14 +84,16 @@ export async function GET(req: NextRequest) {
     // 2. Attendance (Global)
     const todayAttendanceAll = attendance.filter(a => a.date === today);
     const presentCountAll = todayAttendanceAll.filter(a => a.status === 'present').length;
-    const absentCountAll = todayAttendanceAll.filter(a => a.status === 'absent').length;
-    const lateCountAll = todayAttendanceAll.filter(a => a.status === 'late').length;
+    const absentCountAll  = todayAttendanceAll.filter(a => a.status === 'absent').length;
+    const lateCountAll    = todayAttendanceAll.filter(a => a.status === 'late').length;
+    const excusedCountAll = todayAttendanceAll.filter(a => a.status === 'excused').length;
 
     // Scoped / Family calculations
     let myStudentsList: any[] = [];
     let presentCount = presentCountAll;
-    let absentCount = absentCountAll;
-    let lateCount = lateCountAll;
+    let absentCount  = absentCountAll;
+    let lateCount    = lateCountAll;
+    let excusedCount = excusedCountAll;
     const activeBaseAll = Math.max(paidStudents + exemptedStudents, 1);
     let activeBase = activeBaseAll;
     let activeTasksCount = tasks.filter(t => t.isActive).length;
@@ -115,8 +117,9 @@ export async function GET(req: NextRequest) {
       const myStudentIds = myStudents.map(s => s.id);
       const todayAttendance = attendance.filter(a => a.date === today && myStudentIds.includes(a.registrationId));
       presentCount = todayAttendance.filter(a => a.status === 'present').length;
-      absentCount = todayAttendance.filter(a => a.status === 'absent').length;
-      lateCount = todayAttendance.filter(a => a.status === 'late').length;
+      absentCount  = todayAttendance.filter(a => a.status === 'absent').length;
+      lateCount    = todayAttendance.filter(a => a.status === 'late').length;
+      excusedCount = todayAttendance.filter(a => a.status === 'excused').length;
       activeBase = Math.max(myStudents.length, 1);
 
       activeTasksCount = tasks.filter(t => t.isActive && (t.visibility === 'all' || t.visibleToIds.some(id => allowedGroupIds.includes(id)))).length;
@@ -208,7 +211,7 @@ export async function GET(req: NextRequest) {
       }
       const dayRates = last7.map(day => {
         const recs = attendance.filter((a: any) => a.date === day);
-        const p = recs.filter((a: any) => a.status === 'present').length;
+        const p = recs.filter((a: any) => a.status === 'present' || a.status === 'late').length;
         return recs.length > 0 ? (p / recs.length) * 100 : null;
       }).filter((v): v is number => v !== null);
       const avg7DayAttendance = dayRates.length > 0
@@ -264,7 +267,7 @@ export async function GET(req: NextRequest) {
     let stageStats: {
       stageName: string;
       approvedCount: number;
-      attendanceToday: { present: number; late: number; absent: number };
+      attendanceToday: { present: number; late: number; excused: number; absent: number };
       top3: { name: string; points: number }[];
     } | null = null;
     if (isStageRole && supervisor.stage) {
@@ -288,8 +291,9 @@ export async function GET(req: NextRequest) {
         approvedCount: stageApprovedCount,
         attendanceToday: {
           present: stageTodayAtt.filter((a: any) => a.status === 'present').length,
-          late: stageTodayAtt.filter((a: any) => a.status === 'late').length,
-          absent: stageTodayAtt.filter((a: any) => a.status === 'absent').length
+          late:    stageTodayAtt.filter((a: any) => a.status === 'late').length,
+          excused: stageTodayAtt.filter((a: any) => a.status === 'excused').length,
+          absent:  stageTodayAtt.filter((a: any) => a.status === 'absent').length
         },
         top3
       };
@@ -301,8 +305,8 @@ export async function GET(req: NextRequest) {
         myStudents: myStudentsList,
         students: { total: totalStudents, approved: approvedStudents, pending: pendingStudents, conditions: conditionStudents },
         payments: { paid: paidStudents, exempted: exemptedStudents, pendingReview: pendingReviewPayments },
-        attendance: { presentToday: presentCount, absentToday: absentCount, lateToday: lateCount, activeBase },
-        attendanceOverall: { presentToday: presentCountAll, absentToday: absentCountAll, lateToday: lateCountAll, activeBase: activeBaseAll },
+        attendance: { presentToday: presentCount, absentToday: absentCount, lateToday: lateCount, excusedToday: excusedCount, activeBase },
+        attendanceOverall: { presentToday: presentCountAll, absentToday: absentCountAll, lateToday: lateCountAll, excusedToday: excusedCountAll, activeBase: activeBaseAll },
         points: { today: pointsToday, topGroup: topGroup, topGroupPoints: maxPoints },
         tasks: { active: activeTasksCount, pendingReview: pendingSubmissionsCount },
         schedule: { todayCount: todayScheduleCount, nextProgramTitle, todayPrograms: sortedTodaySchedules },

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { getTasks, createTask } from '@/lib/services';
+import { getTasks, createTask, getSettings, saveSetting } from '@/lib/services';
 
 export async function GET(req: NextRequest) {
   try {
@@ -17,7 +17,19 @@ export async function GET(req: NextRequest) {
       list = list.filter(t => t.isActive);
     }
 
-    return NextResponse.json({ tasks: list });
+    // tasks_supervisor only sees tasks assigned to them
+    const roles = (session.role || '').split(',').map((r: string) => r.trim());
+    const isTasksSupervisor = roles.includes('tasks_supervisor') && !roles.includes('scientific_supervisor') && !roles.includes('admin');
+    if (isTasksSupervisor) {
+      const supervisorId = String(session.id);
+      list = list.filter(t => t.assignedAdmins.includes(supervisorId));
+    }
+
+    // Return task categories from settings
+    const settings = await getSettings();
+    const categories: string[] = JSON.parse(settings.task_categories ?? '["عام","ديني","علمي","رياضي","ثقافي","اجتماعي"]');
+
+    return NextResponse.json({ tasks: list, categories });
   } catch (error) {
     console.error('tasks GET error', error);
     return NextResponse.json({ error: 'حدث خطأ أثناء تحميل المهام' }, { status: 500 });
@@ -31,8 +43,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'غير مصرح بالدخول' }, { status: 401 });
     }
 
+    // Only scientific_supervisor and admin can create tasks
+    const roles = (session.role || '').split(',').map((r: string) => r.trim());
+    if (!roles.some((r: string) => ['scientific_supervisor', 'admin'].includes(r))) {
+      return NextResponse.json({ error: 'غير مصرح لك بإنشاء المهام' }, { status: 403 });
+    }
+
     const body = await req.json();
-    const { title, description, maxPoints, dueDate, submissionMethod, assignedAdmins, imageUrl, resourceLink, visibility, visibleToIds } = body;
+
+    // Handle category save
+    if (body.action === 'save_categories') {
+      const cats = Array.isArray(body.categories) ? body.categories : [];
+      await saveSetting('task_categories', JSON.stringify(cats));
+      return NextResponse.json({ success: true });
+    }
+
+    const { title, description, maxPoints, startDate, dueDate, track, submissionMethod, assignedAdmins, imageUrl, resourceLink, visibility, visibleToIds } = body;
 
     if (!title || !description || !maxPoints || !dueDate) {
       return NextResponse.json({ error: 'البيانات غير كاملة' }, { status: 400 });
@@ -43,7 +69,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'الحد الأقصى للنقاط يجب أن يكون رقماً أكبر من صفر' }, { status: 400 });
     }
 
-    // Check duplicates: title + date
     const tasks = await getTasks();
     const isDuplicate = tasks.some(t => t.title.trim() === title.trim() && t.dueDate.split('T')[0] === dueDate.split('T')[0]);
     if (isDuplicate) {
@@ -54,8 +79,9 @@ export async function POST(req: NextRequest) {
       title: title.trim(),
       description: description.trim(),
       maxPoints: maxPtsVal,
+      startDate: startDate ? new Date(startDate).toISOString() : null,
       dueDate: new Date(dueDate).toISOString(),
-      track: 'عام', // hardcoded 'عام' in Nibras to ignore/omit the track path
+      track: track?.trim() || 'عام',
       isActive: true,
       submissionMethod: submissionMethod || 'رفع ملف',
       assignedAdmins: Array.isArray(assignedAdmins) ? assignedAdmins.map(String) : [],

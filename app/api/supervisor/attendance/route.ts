@@ -48,14 +48,15 @@ export async function POST(req: NextRequest) {
     }
 
     // Resolve membershipNo if provided instead of registrationId
+    let resolvedStudent: any = null;
     if (!registrationId && membershipNo) {
       const students = await getStudents();
       const mNo = parseInt(membershipNo, 10);
-      const student = students.find(s => s.membershipNo === mNo);
-      if (!student) {
+      resolvedStudent = students.find(s => s.membershipNo === mNo) ?? null;
+      if (!resolvedStudent) {
         return NextResponse.json({ error: 'لم يتم العثور على طالب برقم العضوية هذا' }, { status: 404 });
       }
-      registrationId = student.id;
+      registrationId = resolvedStudent.id;
     }
 
     const id = parseInt(registrationId, 10);
@@ -64,7 +65,7 @@ export async function POST(req: NextRequest) {
     }
 
     const record = await logAttendance(id, date, status, session.name);
-    return NextResponse.json({ success: true, attendance: record });
+    return NextResponse.json({ success: true, attendance: record, student: resolvedStudent });
   } catch (error) {
     console.error('attendance POST error', error);
     return NextResponse.json({ error: 'حدث خطأ أثناء تسجيل التحضير' }, { status: 500 });

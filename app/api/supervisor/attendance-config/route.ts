@@ -7,6 +7,7 @@ const DEFAULTS = {
   lateAfter:       '08:15',
   onTimePoints:    '2',
   latePoints:      '1',
+  excusedPoints:   '0',
 };
 
 export async function GET(req: NextRequest) {
@@ -15,10 +16,11 @@ export async function GET(req: NextRequest) {
 
   const s = await getSettings();
   return NextResponse.json({
-    attendanceStart: s.att_attendanceStart ?? DEFAULTS.attendanceStart,
-    lateAfter:       s.att_lateAfter       ?? DEFAULTS.lateAfter,
-    onTimePoints:    Number(s.att_onTimePoints ?? DEFAULTS.onTimePoints),
-    latePoints:      Number(s.att_latePoints   ?? DEFAULTS.latePoints),
+    attendanceStart: s.att_attendanceStart  ?? DEFAULTS.attendanceStart,
+    lateAfter:       s.att_lateAfter        ?? DEFAULTS.lateAfter,
+    onTimePoints:    Number(s.att_onTimePoints  ?? DEFAULTS.onTimePoints),
+    latePoints:      Number(s.att_latePoints    ?? DEFAULTS.latePoints),
+    excusedPoints:   Number(s.att_excusedPoints ?? DEFAULTS.excusedPoints),
   });
 }
 
@@ -35,12 +37,13 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { attendanceStart, lateAfter, onTimePoints, latePoints } = body;
+  const { attendanceStart, lateAfter, onTimePoints, latePoints, excusedPoints } = body;
 
-  if (attendanceStart !== undefined) await saveSetting('att_attendanceStart', attendanceStart);
-  if (lateAfter       !== undefined) await saveSetting('att_lateAfter',       lateAfter);
-  if (onTimePoints    !== undefined) await saveSetting('att_onTimePoints',     String(onTimePoints));
-  if (latePoints      !== undefined) await saveSetting('att_latePoints',       String(latePoints));
+  if (attendanceStart !== undefined) await saveSetting('att_attendanceStart',  attendanceStart);
+  if (lateAfter       !== undefined) await saveSetting('att_lateAfter',        lateAfter);
+  if (onTimePoints    !== undefined) await saveSetting('att_onTimePoints',      String(onTimePoints));
+  if (latePoints      !== undefined) await saveSetting('att_latePoints',        String(latePoints));
+  if (excusedPoints   !== undefined) await saveSetting('att_excusedPoints',     String(excusedPoints));
 
   return NextResponse.json({ success: true });
 }

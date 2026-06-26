@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 type Student = {
@@ -51,7 +51,7 @@ function fmtTime(iso: string) {
 
 type Flash =
   | { kind:'ok';  student:Student; groupName:string; pts:ReturnType<typeof calcPts>; status:'present'|'late' }
-  | { kind:'dup'; name:string }
+  | { kind:'dup'; student:Student; groupName:string; prevStatus:string }
   | { kind:'early' }
   | { kind:'err'; msg:string };
 
@@ -111,7 +111,7 @@ export default function KioskPage() {
     const cj = await cr.json().catch(()=>({}));
 
     const approved: Student[] = (sj.students??[]).filter((s: Student) =>
-      s.registrationStatus==='approved' && (s.paymentStatus==='paid'||s.paymentStatus==='exempted')
+      s.registrationStatus==='approved'
     );
     setStudents(approved);
     setGroups(gj.groups??[]);
@@ -171,7 +171,8 @@ export default function KioskPage() {
 
     const student = students.find(s=>String(s.membershipNo)===mNo);
     if (student && todayRecs[student.id]) {
-      showFlash({ kind:'dup', name:student.studentName }); return;
+      const groupName = student.groupId ? groups.find(g=>g.id===student.groupId)?.name??'—' : '—';
+      showFlash({ kind:'dup', student, groupName, prevStatus: todayRecs[student.id] }); return;
     }
 
     const status = getStatus(cfg);
@@ -185,8 +186,8 @@ export default function KioskPage() {
 
     if (!ar.ok) { setBusy(false); showFlash({ kind:'err', msg:aj.error??'لم يتم العثور على الطالب' }); return; }
 
-    const found = students.find(s=>String(s.membershipNo)===mNo) ?? aj.student as Student|undefined;
-    if (!found) { setBusy(false); showFlash({ kind:'err', msg:'الطالب غير موجود' }); return; }
+    const found = students.find(s=>String(s.membershipNo)===mNo) ?? (aj.student as Student|undefined);
+    if (!found) { setBusy(false); showFlash({ kind:'err', msg:'الطالب غير موجود في القائمة' }); return; }
 
     const pts = status==='present' ? cfg.onTimePoints : cfg.latePoints;
     await fetch('/api/supervisor/points', {
@@ -213,6 +214,17 @@ export default function KioskPage() {
     e.preventDefault();
     await doCheckIn(input.trim());
   }
+
+  const todayCounts = useMemo(() => {
+    const c = { present:0, late:0, excused:0, absent:0 };
+    Object.values(todayRecs).forEach(s => {
+      if (s==='present') c.present++;
+      else if (s==='late') c.late++;
+      else if (s==='excused') c.excused++;
+      else if (s==='absent') c.absent++;
+    });
+    return c;
+  }, [todayRecs]);
 
   if (!ready) return (
     <div className="min-h-dvh flex items-center justify-center">
@@ -276,11 +288,11 @@ export default function KioskPage() {
                 type="text" inputMode="numeric"
                 value={input}
                 onChange={e => {
-                  const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                  const val = e.target.value.replace(/\D/g, '');
                   setInput(val);
-                  if (val.length === 4 && !busy) doCheckIn(val);
+                  if (val && !busy && students.find(s => String(s.membershipNo) === val)) doCheckIn(val);
                 }}
-                disabled={busy} autoFocus autoComplete="off" dir="ltr" placeholder="0000"
+                disabled={busy} autoFocus autoComplete="off" dir="ltr" placeholder="رقم العضوية"
                 className="w-full text-center rounded-2xl border-2 border-ink-200 focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/15 transition-all bg-white placeholder:text-ink-200 py-5 text-5xl font-bold tracking-[0.2em]"
                 style={{fontFamily:'ui-monospace,monospace'}}
               />
@@ -311,8 +323,31 @@ export default function KioskPage() {
 
       {/* ══ LOWER CARD ══ */}
       <div className="bg-white rounded-3xl shadow-lg border border-ink-100 w-full max-w-md p-5">
-        <div className="flex items-center gap-3 min-h-[60px] mb-4">
+        <div className="min-h-[60px] mb-4">
           {flash?.kind==='ok' ? (
+            <div className="flex flex-col gap-2 fade-in">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-white text-base font-bold shrink-0"
+                  style={{background: STAGE_CLR[flash.student.stage]??'var(--accent)'}}>
+                  {flash.student.studentName.charAt(0)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-ink-900 text-sm truncate">{flash.student.studentName}</div>
+                  <div className="text-[11px] text-ink-400 mt-0.5">
+                    <span dir="ltr" className="font-mono">#{flash.student.membershipNo}</span>
+                    {flash.groupName!=='—' && <> · {flash.groupName}</>}
+                    · {flash.student.stage}
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-4 gap-1.5">
+                <PtMini label="فردية"  value={flash.pts.individual} color="#1B7A43"/>
+                <PtMini label="جماعية" value={flash.pts.collective} color="#103F91"/>
+                <PtMini label="رصيد"   value={flash.pts.balance}   color="#FF9F1C"/>
+                <PtMini label="إجمالي" value={flash.pts.total}     color="#E52E25"/>
+              </div>
+            </div>
+          ) : flash?.kind==='dup' ? (
             <>
               <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white text-xl font-bold shrink-0"
                 style={{background: STAGE_CLR[flash.student.stage]??'var(--accent)'}}>
@@ -325,19 +360,10 @@ export default function KioskPage() {
                   {flash.groupName!=='—' && <> · {flash.groupName}</>}
                   · {flash.student.stage}
                 </div>
+                <div className="text-xs text-yellow-700 mt-0.5">تم تسجيل حضوره مسبقاً اليوم</div>
               </div>
-              <span className={`pill shrink-0 ${flash.status==='present' ? 'pill-green' : 'pill-late'}`}>
-                {flash.status==='present' ? '✓ حاضر' : '⏰ متأخر'}
-              </span>
+              <span className="pill pill-yellow shrink-0 text-xs">سبق تسجيله</span>
             </>
-          ) : flash?.kind==='dup' ? (
-            <div className="flex items-center gap-3 w-full bg-yellow-50 rounded-2xl px-4 py-3 fade-in">
-              <span className="text-yellow-500 text-xl">⚠</span>
-              <div>
-                <div className="font-bold text-ink-900 text-sm">{flash.name}</div>
-                <div className="text-xs text-yellow-700">تم تسجيل حضورك مسبقاً اليوم</div>
-              </div>
-            </div>
           ) : flash?.kind==='early' ? (
             <div className="flex items-center gap-3 w-full bg-blue-50 rounded-2xl px-4 py-3 fade-in">
               <span className="text-blue-500 text-xl">🕐</span>
@@ -358,12 +384,12 @@ export default function KioskPage() {
           )}
         </div>
 
-        {/* 4 point boxes */}
+        {/* 4 attendance-status boxes */}
         <div className="grid grid-cols-4 gap-2 border-t border-ink-100 pt-4">
-          <PtBox label="فردية"    value={flash?.kind==='ok' ? flash.pts.individual : null} color="#103F91"/>
-          <PtBox label="جماعية"   value={flash?.kind==='ok' ? flash.pts.collective : null} color="#12B3D5"/>
-          <PtBox label="الرصيد"   value={flash?.kind==='ok' ? flash.pts.balance    : null} color="#FF9F1C"/>
-          <PtBox label="الإجمالي" value={flash?.kind==='ok' ? flash.pts.total      : null} color="#1B7A43"/>
+          <StatBox label="حاضر"  value={todayCounts.present}  color="#1B7A43"/>
+          <StatBox label="متأخر" value={todayCounts.late}     color="#FF9F1C"/>
+          <StatBox label="معتذر" value={todayCounts.excused}  color="#103F91"/>
+          <StatBox label="غائب"  value={todayCounts.absent}   color="#E52E25"/>
         </div>
       </div>
 
@@ -371,14 +397,22 @@ export default function KioskPage() {
   );
 }
 
-function PtBox({ label, value, color }: { label:string; value:number|null; color:string }) {
+function StatBox({ label, value, color }: { label:string; value:number; color:string }) {
   return (
-    <div className="flex flex-col items-center gap-1 rounded-xl py-3 px-1"
+    <div className="flex flex-col items-center gap-0.5 rounded-xl py-2 px-1"
       style={{background:`${color}12`, border:`1px solid ${color}25`}}>
-      <span className="text-lg font-bold" style={{color: value===null ? '#C4BDB4' : color}}>
-        {value===null ? '—' : value}
-      </span>
-      <span className="text-[10px] text-ink-400">{label}</span>
+      <span className="text-sm font-bold" style={{color}}>{value}</span>
+      <span className="text-[9px] text-ink-400">{label}</span>
+    </div>
+  );
+}
+
+function PtMini({ label, value, color }: { label:string; value:number; color:string }) {
+  return (
+    <div className="flex flex-col items-center gap-0.5 rounded-lg py-1.5 px-1"
+      style={{background:`${color}10`, border:`1px solid ${color}20`}}>
+      <span className="text-xs font-bold" style={{color}}>{value}</span>
+      <span className="text-[9px] text-ink-400">{label}</span>
     </div>
   );
 }

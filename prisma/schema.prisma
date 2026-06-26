@@ -129,6 +129,7 @@ model Task {
   title            String
   description      String
   maxPoints        Int
+  startDate        DateTime?
   dueDate          DateTime
   createdAt        DateTime     @default(now())
   track            String?      @default("عام")
@@ -140,6 +141,21 @@ model Task {
   visibility       String       @default("all")
   visibleToIds     Int[]        @default([])
   submissions      Submission[]
+}
+
+model Notification {
+  id            String   @id @default(cuid())
+  type          String   // 'student_graded' | 'supervisor_new_submission'
+  targetType    String   // 'student' | 'supervisor'
+  targetId      Int
+  title         String
+  body          String
+  isRead        Boolean  @default(false)
+  relatedTaskId String?
+  relatedSubId  String?
+  createdAt     DateTime @default(now())
+
+  @@index([targetType, targetId])
 }
 
 model Submission {

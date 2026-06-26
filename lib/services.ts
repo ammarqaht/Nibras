@@ -141,7 +141,8 @@ export const GLOBAL_ROLES = [
   'media_supervisor',
   'general_supervisor', 'attendance_supervisor',
   'cultural_supervisor', 'sports_supervisor',
-  'scientific_supervisor', 'social_supervisor'
+  'scientific_supervisor', 'social_supervisor',
+  'tasks_supervisor'
 ];
 
 export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
@@ -154,6 +155,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
   general_supervisor:       ['students', 'analytics', 'invoices', 'groups', 'attendance', 'points'],
   media_supervisor:         ['announcements', 'schedule', 'students', 'analytics', 'points'],
   stage_supervisor:         ['groups', 'students', 'points', 'attendance', 'analytics'],
+  tasks_supervisor:         ['tasks', 'students', 'analytics'],
 };
 
 /**
@@ -275,6 +277,7 @@ export async function seedDefaultAdminIfNeeded(): Promise<void> {
     { email: '9',  role: 'scientific_supervisor',    name: 'تجربة مشرف علمية' },
     { email: '10', role: 'sports_supervisor',        name: 'تجربة مشرف رياضية' },
     { email: '11', role: 'stage_supervisor',         name: 'تجربة مشرف مرحلة' },
+    { email: '12', role: 'tasks_supervisor',         name: 'تجربة مشرف مهام' },
   ] : [];
   const devHash = hashPassword('a');
 
@@ -1415,6 +1418,7 @@ export type TaskInfo = {
   title: string;
   description: string;
   maxPoints: number;
+  startDate: string | null;
   dueDate: string;
   createdAt: string;
   track: string | null;
@@ -1453,6 +1457,7 @@ export async function getTasks(): Promise<TaskInfo[]> {
       title: t.title,
       description: t.description,
       maxPoints: t.maxPoints,
+      startDate: t.startDate ? t.startDate.toISOString() : null,
       dueDate: t.dueDate.toISOString(),
       createdAt: t.createdAt.toISOString(),
       track: t.track,
@@ -1471,6 +1476,7 @@ export async function getTasks(): Promise<TaskInfo[]> {
       title: String(t.title),
       description: String(t.description),
       maxPoints: Number(t.maxPoints),
+      startDate: t.startDate || null,
       dueDate: String(t.dueDate),
       createdAt: String(t.createdAt || new Date().toISOString()),
       track: t.track || 'عام',
@@ -1508,6 +1514,7 @@ export async function createTask(data: Omit<TaskInfo, 'id' | 'createdAt'>): Prom
         title: task.title,
         description: task.description,
         maxPoints: task.maxPoints,
+        startDate: task.startDate ? new Date(task.startDate) : null,
         dueDate: new Date(task.dueDate),
         track: task.track,
         isActive: task.isActive,
@@ -1531,13 +1538,14 @@ export async function createTask(data: Omit<TaskInfo, 'id' | 'createdAt'>): Prom
 export async function updateTask(id: string, patch: Partial<Omit<TaskInfo, 'id' | 'createdAt'>>): Promise<TaskInfo | null> {
   const dbData: any = {};
   const allowedKeys = [
-    'title', 'description', 'maxPoints', 'dueDate', 'track', 'isActive',
+    'title', 'description', 'maxPoints', 'startDate', 'dueDate', 'track', 'isActive',
     'submissionMethod', 'assignedAdmins', 'imageUrl', 'resourceLink', 'visibility', 'visibleToIds'
   ] as const;
 
   for (const k of allowedKeys) {
     if (patch[k] !== undefined) dbData[k] = patch[k];
   }
+  if (patch.startDate !== undefined) dbData.startDate = patch.startDate ? new Date(patch.startDate) : null;
   if (patch.dueDate !== undefined) dbData.dueDate = new Date(patch.dueDate);
 
   if (hasDatabase) {
@@ -1552,6 +1560,7 @@ export async function updateTask(id: string, patch: Partial<Omit<TaskInfo, 'id' 
         title: updated.title,
         description: updated.description,
         maxPoints: updated.maxPoints,
+        startDate: (updated as any).startDate ? (updated as any).startDate.toISOString() : null,
         dueDate: updated.dueDate.toISOString(),
         createdAt: updated.createdAt.toISOString(),
         track: updated.track,
@@ -2185,5 +2194,263 @@ export async function deleteOtherRevenue(id: number): Promise<boolean> {
     list.splice(index, 1);
     await writeJsonFile(FILE_OTHER_REVENUES, list);
     return true;
+  }
+}
+
+// ==================== NOTIFICATION SERVICES ====================
+
+export type NotificationInfo = {
+  id: string;
+  type: string;
+  targetType: string; // 'student' | 'supervisor'
+  targetId: number;
+  title: string;
+  body: string;
+  isRead: boolean;
+  relatedTaskId: string | null;
+  relatedSubId: string | null;
+  createdAt: string;
+};
+
+const FILE_NOTIFICATIONS = path.join(DATA_DIR, 'notifications.json');
+
+export async function createNotification(data: Omit<NotificationInfo, 'id' | 'createdAt' | 'isRead'>): Promise<NotificationInfo> {
+  const createdAt = new Date().toISOString();
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    const row = await (prisma as any).notification.create({
+      data: {
+        type: data.type,
+        targetType: data.targetType,
+        targetId: data.targetId,
+        title: data.title,
+        body: data.body,
+        relatedTaskId: data.relatedTaskId || null,
+        relatedSubId: data.relatedSubId || null,
+      }
+    });
+    return {
+      id: row.id,
+      type: row.type,
+      targetType: row.targetType,
+      targetId: row.targetId,
+      title: row.title,
+      body: row.body,
+      isRead: row.isRead,
+      relatedTaskId: row.relatedTaskId,
+      relatedSubId: row.relatedSubId,
+      createdAt: row.createdAt.toISOString(),
+    };
+  } else {
+    const list = await readJsonFile<NotificationInfo[]>(FILE_NOTIFICATIONS, []);
+    const n: NotificationInfo = {
+      id: Math.random().toString(36).slice(2),
+      ...data,
+      isRead: false,
+      createdAt,
+    };
+    list.push(n);
+    await writeJsonFile(FILE_NOTIFICATIONS, list);
+    return n;
+  }
+}
+
+export async function getNotifications(targetType: string, targetId: number): Promise<NotificationInfo[]> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    const list = await (prisma as any).notification.findMany({
+      where: { targetType, targetId },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+    return list.map((r: any) => ({
+      id: r.id,
+      type: r.type,
+      targetType: r.targetType,
+      targetId: r.targetId,
+      title: r.title,
+      body: r.body,
+      isRead: r.isRead,
+      relatedTaskId: r.relatedTaskId,
+      relatedSubId: r.relatedSubId,
+      createdAt: r.createdAt.toISOString(),
+    }));
+  } else {
+    const list = await readJsonFile<NotificationInfo[]>(FILE_NOTIFICATIONS, []);
+    return list
+      .filter(n => n.targetType === targetType && n.targetId === targetId)
+      .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
+      .slice(0, 50);
+  }
+}
+
+export async function markNotificationsRead(targetType: string, targetId: number): Promise<void> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    await (prisma as any).notification.updateMany({
+      where: { targetType, targetId, isRead: false },
+      data: { isRead: true },
+    });
+  } else {
+    const list = await readJsonFile<NotificationInfo[]>(FILE_NOTIFICATIONS, []);
+    list.forEach(n => {
+      if (n.targetType === targetType && n.targetId === targetId) n.isRead = true;
+    });
+    await writeJsonFile(FILE_NOTIFICATIONS, list);
+  }
+}
+
+// ==================== STUDENT PORTAL SERVICES ====================
+
+export async function getStudentByCredentials(membershipNo: number, nationalId: string): Promise<StudentInfo | null> {
+  const students = await getStudents();
+  return students.find(s => s.membershipNo === membershipNo && s.nationalId === nationalId) || null;
+}
+
+export async function getStudentScheduleToday(stage: string): Promise<ScheduleInfo[]> {
+  const schedules = await getSchedules();
+  const today = new Date().toISOString().split('T')[0];
+  return schedules.filter(s => s.date === today && (s.stage === stage || s.stage === 'الكل'));
+}
+
+export async function getStudentPoints(registrationId: number): Promise<PointInfo[]> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    const list = await prisma.point.findMany({
+      where: { registrationId },
+      orderBy: { createdAt: 'desc' }
+    });
+    return list.map(p => ({
+      id: p.id,
+      registrationId: p.registrationId,
+      delta: p.delta,
+      reason: p.reason,
+      category: p.category,
+      pointType: (p.pointType || 'individual') as 'individual' | 'collective' | 'deduction',
+      recordedBy: p.recordedBy,
+      createdAt: p.createdAt.toISOString()
+    }));
+  } else {
+    const list = await readJsonFile<PointInfo[]>(FILE_POINTS, []);
+    return list
+      .filter(p => p.registrationId === registrationId)
+      .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+  }
+}
+
+export async function getStudentAttendance(registrationId: number): Promise<AttendanceInfo[]> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    const list = await prisma.attendance.findMany({
+      where: { registrationId },
+      orderBy: { date: 'desc' }
+    });
+    return list.map(a => ({
+      id: a.id,
+      registrationId: a.registrationId,
+      date: a.date,
+      status: a.status,
+      recordedBy: a.recordedBy,
+      createdAt: a.createdAt.toISOString()
+    }));
+  } else {
+    const list = await readJsonFile<AttendanceInfo[]>(FILE_ATTENDANCE, []);
+    return list
+      .filter(a => a.registrationId === registrationId)
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }
+}
+
+export async function getStudentTasksWithSubmissions(registrationId: number, stage: string): Promise<{
+  task: TaskInfo;
+  submission: SubmissionInfo | null;
+}[]> {
+  const tasks = await getTasks();
+  const submissions = await getSubmissions();
+
+  const activeTasks = tasks.filter(t => {
+    if (!t.isActive) return false;
+    if (t.visibility === 'specific') {
+      return t.visibleToIds.includes(registrationId);
+    }
+    return true;
+  });
+
+  return activeTasks.map(task => ({
+    task,
+    submission: submissions.find(s => s.taskId === task.id && s.registrationId === registrationId) || null
+  }));
+}
+
+export async function getStageLeaderboard(stage: string): Promise<{
+  rank: number;
+  registrationId: number;
+  studentName: string;
+  grade: string;
+  rankScore: number;
+  balance: number;
+}[]> {
+  const students = await getStudents();
+  const stageStudents = students.filter(s => s.stage === stage);
+
+  const allPoints = hasDatabase
+    ? await (async () => {
+        const prisma = getPrisma()!;
+        const list = await prisma.point.findMany({
+          where: { registrationId: { in: stageStudents.map(s => s.id) } }
+        });
+        return list.map(p => ({
+          id: p.id, registrationId: p.registrationId, delta: p.delta,
+          reason: p.reason, category: p.category,
+          pointType: (p.pointType || 'individual') as 'individual' | 'collective' | 'deduction',
+          recordedBy: p.recordedBy, createdAt: p.createdAt.toISOString()
+        }));
+      })()
+    : await readJsonFile<PointInfo[]>(FILE_POINTS, []);
+
+  const ranked = stageStudents.map(student => {
+    const pts = allPoints.filter(p => p.registrationId === student.id);
+    const { rankScore, balance } = calcPointSummary(pts);
+    return { registrationId: student.id, studentName: student.studentName, grade: student.grade, rankScore, balance };
+  });
+
+  ranked.sort((a, b) => b.rankScore - a.rankScore);
+  return ranked.map((s, i) => ({ rank: i + 1, ...s }));
+}
+
+export async function getStudentGroup(groupId: number): Promise<{
+  group: GroupInfo;
+  supervisor: SupervisorInfo | null;
+  members: StudentInfo[];
+} | null> {
+  const groups = await getGroups();
+  const group = groups.find(g => g.id === groupId);
+  if (!group) return null;
+
+  const supervisors = await getAllSupervisors();
+  const supervisor = supervisors.find(s => {
+    const ids = s.groupIds.split(',').map(x => parseInt(x.trim(), 10)).filter(n => !isNaN(n));
+    return ids.includes(groupId) && s.role.split(',').map(r => r.trim()).some(r => r === 'groups_supervisor');
+  }) || null;
+
+  const students = await getStudents();
+  const members = students.filter(s => s.groupId === groupId);
+
+  return { group, supervisor, members };
+}
+
+export async function getSetting(key: string): Promise<string | null> {
+  if (hasDatabase) {
+    try {
+      const prisma = getPrisma()!;
+      const s = await (prisma as any).setting.findUnique({ where: { key } });
+      return s ? s.value : null;
+    } catch {
+      return null;
+    }
+  } else {
+    const list = await readJsonFile<SettingInfo[]>(FILE_SETTINGS, []);
+    const s = list.find(x => x.key === key);
+    return s ? s.value : null;
   }
 }

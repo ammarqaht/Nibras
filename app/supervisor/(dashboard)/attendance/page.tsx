@@ -14,7 +14,7 @@ type Group  = { id: number; name: string; stage: string };
 type AttRec = { registrationId: number; date: string; status: string; createdAt?: string };
 type LogEntry = {
   registrationId: number; studentName: string; membershipNo: number;
-  groupName: string; checkinTime: string; status: 'present' | 'late';
+  groupName: string; checkinTime: string; status: 'present' | 'late' | 'absent' | 'excused';
 };
 
 const STATUSES = [
@@ -34,8 +34,8 @@ function fmtTime(iso: string) {
   catch { return '—'; }
 }
 
-type AttCfg = { attendanceStart: string; lateAfter: string; onTimePoints: number; latePoints: number };
-const CFG0: AttCfg = { attendanceStart: '07:30', lateAfter: '08:15', onTimePoints: 2, latePoints: 1 };
+type AttCfg = { attendanceStart: string; lateAfter: string; onTimePoints: number; latePoints: number; excusedPoints: number };
+const CFG0: AttCfg = { attendanceStart: '07:30', lateAfter: '08:15', onTimePoints: 2, latePoints: 1, excusedPoints: 0 };
 
 export default function AttendancePage() {
   const { user } = useSupervisor();
@@ -87,10 +87,7 @@ export default function AttendancePage() {
     const sj = await sr.json().catch(()=>({students:[]}));
     const gj = await gr.json().catch(()=>({groups:[]}));
     const cj = await cr.json().catch(()=>({}));
-    setStudents((sj.students??[]).filter((s:Student) =>
-      s.registrationStatus==='approved' &&
-      (!s.paymentStatus || s.paymentStatus==='paid' || s.paymentStatus==='exempted')
-    ));
+    setStudents((sj.students??[]).filter((s:Student) => s.registrationStatus==='approved'));
     setGroups(gj.groups??[]);
     if (cj.lateAfter) { setCfg(cj); setCfgDraft(cj); }
   }
@@ -125,7 +122,6 @@ export default function AttendancePage() {
     const sMap = new Map(students.map(s => [s.id, s]));
     const gMap = new Map(groups.map(g => [g.id, g.name]));
     const entries: LogEntry[] = (j.attendance as AttRec[])
-      .filter(rec => rec.status==='present' || rec.status==='late')
       .sort((a,b) => (b.createdAt??'').localeCompare(a.createdAt??''))
       .flatMap(rec => {
         const s = sMap.get(rec.registrationId);
@@ -136,7 +132,7 @@ export default function AttendancePage() {
           membershipNo: s.membershipNo,
           groupName: s.groupId ? (gMap.get(s.groupId)??'—') : '—',
           checkinTime: rec.createdAt ? fmtTime(rec.createdAt) : '—',
-          status: rec.status as 'present'|'late',
+          status: rec.status as LogEntry['status'],
         }];
       });
     setLogEntries(entries);
@@ -158,6 +154,7 @@ export default function AttendancePage() {
   useEffect(() => { loadDay(date); }, [date]);
 
   async function mark(registrationId: number, status: string) {
+    const wasUnmarked = !records[registrationId];
     setRecords(prev=>({...prev,[registrationId]:status}));
     const r = await fetch('/api/supervisor/attendance',{
       method:'POST', headers:{'Content-Type':'application/json'},
@@ -167,17 +164,33 @@ export default function AttendancePage() {
       const j = await r.json().catch(()=>({}));
       pushToast('error', j.error??'فشل تسجيل الحضور');
       loadDay(date);
+      return;
+    }
+    if (wasUnmarked) {
+      const pts = status==='present' ? cfg.onTimePoints
+                : status==='late'    ? cfg.latePoints
+                : status==='excused' ? cfg.excusedPoints
+                : 0;
+      if (pts > 0) {
+        await fetch('/api/supervisor/points',{
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ registrationId, delta: pts,
+            reason: status==='present' ? 'حضور بالوقت' : status==='late' ? 'حضور متأخر' : 'اعتذار',
+            category:'attendance', pointType:'individual' }),
+        });
+      }
     }
   }
 
-  async function markAll(status: string) {
-    const ids = list.map(s=>s.id);
-    setRecords(prev=>{ const n={...prev}; ids.forEach(id=>{ n[id]=status; }); return n; });
+  async function markUnregisteredAbsent() {
+    const ids = list.filter(s=>!records[s.id]).map(s=>s.id);
+    if (ids.length===0) { pushToast('info','جميع الطلاب تم تسجيلهم مسبقاً'); return; }
+    setRecords(prev=>{ const n={...prev}; ids.forEach(id=>{ n[id]='absent'; }); return n; });
     await Promise.all(ids.map(id=>fetch('/api/supervisor/attendance',{
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ registrationId:id, date, status }),
+      body: JSON.stringify({ registrationId:id, date, status:'absent' }),
     })));
-    pushToast('success', status==='present' ? 'تم تسجيل حضور الكل' : 'تم تسجيل غياب الكل');
+    pushToast('success', `تم تغييب ${ids.length} طالب لم يُسجَّل`);
   }
 
   async function quickPresent(e: React.FormEvent) {
@@ -185,6 +198,8 @@ export default function AttendancePage() {
     const mNo = quick.trim();
     if (!mNo||submitting) return;
     setSubmitting(true);
+    const s = students.find(st=>String(st.membershipNo)===mNo);
+    const wasUnmarked = s ? !records[s.id] : true;
     const r = await fetch('/api/supervisor/attendance',{
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ membershipNo:mNo, date, status:'present' }),
@@ -193,8 +208,17 @@ export default function AttendancePage() {
     setSubmitting(false);
     if (!r.ok) { pushToast('error', j.error??'لم يتم العثور على الطالب'); }
     else {
-      const s = students.find(s=>String(s.membershipNo)===mNo);
       if (s) setRecords(prev=>({...prev,[s.id]:'present'}));
+      if (wasUnmarked) {
+        const rId = s?.id ?? j.attendance?.registrationId;
+        if (rId) {
+          await fetch('/api/supervisor/points',{
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ registrationId:rId, delta:cfg.onTimePoints,
+              reason:'حضور بالوقت', category:'attendance', pointType:'individual' }),
+          });
+        }
+      }
       pushToast('success','تم تسجيل الحضور');
     }
     setQuick('');
@@ -254,6 +278,8 @@ export default function AttendancePage() {
 
   const logPresentCnt = logEntries.filter(e=>e.status==='present').length;
   const logLateCnt    = logEntries.filter(e=>e.status==='late').length;
+  const logAbsentCnt  = logEntries.filter(e=>e.status==='absent').length;
+  const logExcusedCnt = logEntries.filter(e=>e.status==='excused').length;
 
   return (
     <div className="space-y-4">
@@ -283,7 +309,7 @@ export default function AttendancePage() {
                 <input type="time" className="field text-sm py-2" value={cfgDraft.lateAfter}
                   onChange={e=>setCfgDraft(d=>({...d,lateAfter:e.target.value}))}/>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label className="label text-xs">نقاط الحضور</label>
                   <input type="number" min={0} max={99} className="field text-sm py-2" value={cfgDraft.onTimePoints}
@@ -293,6 +319,11 @@ export default function AttendancePage() {
                   <label className="label text-xs">نقاط التأخر</label>
                   <input type="number" min={0} max={99} className="field text-sm py-2" value={cfgDraft.latePoints}
                     onChange={e=>setCfgDraft(d=>({...d,latePoints:Number(e.target.value)}))}/>
+                </div>
+                <div>
+                  <label className="label text-xs">نقاط الاعتذار</label>
+                  <input type="number" min={0} max={99} className="field text-sm py-2" value={cfgDraft.excusedPoints}
+                    onChange={e=>setCfgDraft(d=>({...d,excusedPoints:Number(e.target.value)}))}/>
                 </div>
               </div>
             </div>
@@ -315,9 +346,11 @@ export default function AttendancePage() {
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-ink-100 shrink-0">
               <div>
                 <h2 className="font-bold text-ink-900">سجل الحضور — {date}</h2>
-                <div className="flex gap-2 mt-1">
+                <div className="flex flex-wrap gap-2 mt-1">
                   <span className="pill pill-green text-xs">حاضر {logPresentCnt}</span>
-                  {logLateCnt>0 && <span className="pill pill-yellow text-xs">متأخر {logLateCnt}</span>}
+                  {logLateCnt>0   && <span className="pill pill-yellow text-xs">متأخر {logLateCnt}</span>}
+                  {logExcusedCnt>0 && <span className="pill pill-blue text-xs">معتذر {logExcusedCnt}</span>}
+                  {logAbsentCnt>0  && <span className="pill pill-red text-xs">غائب {logAbsentCnt}</span>}
                 </div>
               </div>
               <button onClick={()=>setLogOpen(false)} className="p-1.5 rounded-lg text-ink-300 hover:text-ink-600">
@@ -351,8 +384,12 @@ export default function AttendancePage() {
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="text-xs font-mono text-ink-500 tabular-nums">{e.checkinTime}</span>
-                    <span className={`pill text-[11px] py-0.5 px-2 ${e.status==='present' ? 'pill-green' : 'pill-yellow'}`}>
-                      {e.status==='present' ? 'حاضر' : 'متأخر'}
+                    <span className={`pill text-[11px] py-0.5 px-2 ${
+                      e.status==='present' ? 'pill-green' :
+                      e.status==='late'    ? 'pill-yellow' :
+                      e.status==='absent'  ? 'pill-red' : 'pill-blue'
+                    }`}>
+                      {e.status==='present' ? 'حاضر' : e.status==='late' ? 'متأخر' : e.status==='absent' ? 'غائب' : 'معتذر'}
                     </span>
                     {canEdit && (
                       <button onClick={()=>cancelLogEntry(e.registrationId)}
@@ -471,12 +508,10 @@ export default function AttendancePage() {
         <div className="flex items-center gap-2">
           <input type="text" className="field py-1.5 px-3 text-xs w-40" placeholder="بحث بالاسم..."
             value={nameSearch} onChange={e=>setNameSearch(e.target.value)}/>
-          {canEdit && <>
-            <button className="btn btn-ghost text-xs py-1.5 px-3 text-green-600 border-green-200 hover:bg-green-50"
-              onClick={()=>markAll('present')}>حضور الكل</button>
+          {canEdit && (
             <button className="btn btn-ghost text-xs py-1.5 px-3 text-red-600 border-red-200 hover:bg-red-50"
-              onClick={()=>markAll('absent')}>غياب الكل</button>
-          </>}
+              onClick={markUnregisteredAbsent}>تغييب من لم يُسجَّل</button>
+          )}
         </div>
       </div>
 
