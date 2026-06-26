@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useState, createContext, useContext } from 'react';
+import { useCallback, useEffect, useRef, useState, createContext, useContext } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { site } from '@/content';
+
+const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
 
 type StudentUser = {
   id: number;
@@ -46,10 +48,35 @@ export default function StudentAppLayout({ children }: { children: React.ReactNo
       .finally(() => setLoading(false));
   }, [router]);
 
-  async function logout() {
-    await fetch('/api/student/auth', { method: 'DELETE' });
+  const logout = useCallback(async () => {
+    try { await fetch('/api/student/auth', { method: 'DELETE' }); } catch {}
     router.replace('/student/login');
-  }
+  }, [router]);
+
+  // Auto-logout after IDLE_TIMEOUT_MS of no interaction. Resets on any user
+  // gesture (pointer / key / touch / scroll) and when the tab regains focus.
+  const idleTimer = useRef<number | null>(null);
+  useEffect(() => {
+    if (loading || !user) return;
+
+    const resetTimer = () => {
+      if (idleTimer.current !== null) window.clearTimeout(idleTimer.current);
+      idleTimer.current = window.setTimeout(() => { void logout(); }, IDLE_TIMEOUT_MS);
+    };
+    const onVisibility = () => { if (document.visibilityState === 'visible') resetTimer(); };
+
+    const EVENTS: (keyof WindowEventMap)[] = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'wheel'];
+    EVENTS.forEach(ev => window.addEventListener(ev, resetTimer, { passive: true }));
+    document.addEventListener('visibilitychange', onVisibility);
+
+    resetTimer();
+
+    return () => {
+      EVENTS.forEach(ev => window.removeEventListener(ev, resetTimer));
+      document.removeEventListener('visibilitychange', onVisibility);
+      if (idleTimer.current !== null) window.clearTimeout(idleTimer.current);
+    };
+  }, [loading, user, logout]);
 
   if (loading) {
     return (
