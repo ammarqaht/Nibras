@@ -241,6 +241,11 @@ const FILE_SUBMISSIONS = path.join(DATA_DIR, 'submissions.json');
 const FILE_SCHEDULES = path.join(DATA_DIR, 'schedules.json');
 const FILE_GENERAL_EXPENSES = path.join(DATA_DIR, 'general_expenses.json');
 const FILE_OTHER_REVENUES = path.join(DATA_DIR, 'other_revenues.json');
+const FILE_SPORT_LEAGUES   = path.join(DATA_DIR, 'sport_leagues.json');
+const FILE_SPORT_MATCHES   = path.join(DATA_DIR, 'sport_matches.json');
+const FILE_SPORT_GOALS     = path.join(DATA_DIR, 'sport_goals.json');
+const FILE_SPORT_CARDS     = path.join(DATA_DIR, 'sport_cards.json');
+const FILE_SPORT_BEHAVIORS = path.join(DATA_DIR, 'sport_behaviors.json');
 
 async function readJsonFile<T>(filePath: string, defaultVal: T): Promise<T> {
   try {
@@ -721,6 +726,28 @@ export async function deleteAttendance(registrationId: number, date: string): Pr
   } else {
     const list = await readJsonFile<AttendanceInfo[]>(FILE_ATTENDANCE, []);
     await writeJsonFile(FILE_ATTENDANCE, list.filter(a => !(a.registrationId === registrationId && a.date === date)));
+  }
+}
+
+// Delete attendance-linked point records for a student on a specific date.
+// Points created by the attendance route embed the date as " | YYYY-MM-DD" in the reason.
+export async function deleteAttendancePointsByDate(registrationId: number, date: string): Promise<void> {
+  const dateSuffix = ` | ${date}`;
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    await (prisma as any).point.deleteMany({
+      where: {
+        registrationId,
+        category: 'attendance',
+        reason: { endsWith: dateSuffix },
+      },
+    });
+  } else {
+    const list = await readJsonFile<PointInfo[]>(FILE_POINTS, []);
+    await writeJsonFile(
+      FILE_POINTS,
+      list.filter(p => !(p.registrationId === registrationId && p.category === 'attendance' && p.reason.endsWith(dateSuffix)))
+    );
   }
 }
 
@@ -2536,5 +2563,610 @@ export async function getSetting(key: string): Promise<string | null> {
     const list = await readJsonFile<SettingInfo[]>(FILE_SETTINGS, []);
     const s = list.find(x => x.key === key);
     return s ? s.value : null;
+  }
+}
+
+// ==================== SPORTS LEAGUE SERVICES ====================
+
+export type SportLeagueInfo = {
+  id: number;
+  stage: string;
+  title: string;
+  status: string;        // 'setup' | 'active' | 'finished' | 'archived'
+  pointsEnabled: boolean;
+  winPoints: number;
+  drawPoints: number;
+  lossPoints: number;
+  createdAt: string;
+};
+
+export type SportMatchInfo = {
+  id: number;
+  leagueId: number;
+  matchday: number;
+  homeGroupId: number;
+  awayGroupId: number;
+  homeScore: number;
+  awayScore: number;
+  status: string;        // 'scheduled' | 'live' | 'finished'
+  matchDate: string | null;
+  notes: string | null;
+  createdAt: string;
+};
+
+export type SportGoalInfo = {
+  id: number;
+  matchId: number;
+  teamGroupId: number;
+  scorerId: number | null;
+  scorerName: string;
+  createdBy: string;
+  createdAt: string;
+};
+
+export type SportCardInfo = {
+  id: number;
+  matchId: number;
+  leagueId: number;
+  studentId: number;
+  studentName: string;
+  groupId: number;
+  cardType: string;      // 'yellow' | 'red'
+  suspensionMatches: number;
+  suspensionServed: boolean;
+  createdBy: string;
+  createdAt: string;
+};
+
+export type SportBehaviorInfo = {
+  id: number;
+  leagueId: number;
+  matchId: number | null;
+  studentId: number;
+  studentName: string;
+  groupId: number;
+  type: string;          // 'positive' | 'negative'
+  description: string;
+  createdBy: string;
+  createdAt: string;
+};
+
+export type SportStanding = {
+  groupId: number;
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDiff: number;
+  points: number;
+};
+
+function mapSportLeague(r: any): SportLeagueInfo {
+  return {
+    id: r.id, stage: r.stage, title: r.title, status: r.status || 'setup',
+    pointsEnabled: r.pointsEnabled ?? true, winPoints: r.winPoints ?? 2,
+    drawPoints: r.drawPoints ?? 1, lossPoints: r.lossPoints ?? 0,
+    createdAt: typeof r.createdAt === 'string' ? r.createdAt : r.createdAt?.toISOString?.() || new Date().toISOString(),
+  };
+}
+function mapSportMatch(r: any): SportMatchInfo {
+  return {
+    id: r.id, leagueId: r.leagueId, matchday: r.matchday ?? 1,
+    homeGroupId: r.homeGroupId, awayGroupId: r.awayGroupId,
+    homeScore: r.homeScore ?? 0, awayScore: r.awayScore ?? 0,
+    status: r.status || 'scheduled', matchDate: r.matchDate ?? null, notes: r.notes ?? null,
+    createdAt: typeof r.createdAt === 'string' ? r.createdAt : r.createdAt?.toISOString?.() || new Date().toISOString(),
+  };
+}
+function mapSportGoal(r: any): SportGoalInfo {
+  return {
+    id: r.id, matchId: r.matchId, teamGroupId: r.teamGroupId,
+    scorerId: r.scorerId ?? null, scorerName: r.scorerName,
+    createdBy: r.createdBy,
+    createdAt: typeof r.createdAt === 'string' ? r.createdAt : r.createdAt?.toISOString?.() || new Date().toISOString(),
+  };
+}
+function mapSportCard(r: any): SportCardInfo {
+  return {
+    id: r.id, matchId: r.matchId, leagueId: r.leagueId,
+    studentId: r.studentId, studentName: r.studentName, groupId: r.groupId,
+    cardType: r.cardType, suspensionMatches: r.suspensionMatches ?? 0,
+    suspensionServed: r.suspensionServed ?? false, createdBy: r.createdBy,
+    createdAt: typeof r.createdAt === 'string' ? r.createdAt : r.createdAt?.toISOString?.() || new Date().toISOString(),
+  };
+}
+function mapSportBehavior(r: any): SportBehaviorInfo {
+  return {
+    id: r.id, leagueId: r.leagueId, matchId: r.matchId ?? null,
+    studentId: r.studentId, studentName: r.studentName, groupId: r.groupId,
+    type: r.type, description: r.description, createdBy: r.createdBy,
+    createdAt: typeof r.createdAt === 'string' ? r.createdAt : r.createdAt?.toISOString?.() || new Date().toISOString(),
+  };
+}
+
+// ─── LEAGUES ─────────────────────────────────────────────────────────────────
+
+export async function getSportLeagues(stage?: string): Promise<SportLeagueInfo[]> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    const list = await (prisma as any).sportLeague.findMany({
+      where: stage ? { stage } : undefined,
+      orderBy: { createdAt: 'desc' },
+    });
+    return list.map(mapSportLeague);
+  } else {
+    let list = await readJsonFile<any[]>(FILE_SPORT_LEAGUES, []);
+    if (stage) list = list.filter((l: any) => l.stage === stage);
+    return list.sort((a: any, b: any) => b.id - a.id).map(mapSportLeague);
+  }
+}
+
+export async function getSportLeagueById(id: number): Promise<SportLeagueInfo | null> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    const r = await (prisma as any).sportLeague.findUnique({ where: { id } });
+    return r ? mapSportLeague(r) : null;
+  } else {
+    const list = await readJsonFile<any[]>(FILE_SPORT_LEAGUES, []);
+    const r = list.find((l: any) => l.id === id);
+    return r ? mapSportLeague(r) : null;
+  }
+}
+
+export async function createSportLeague(data: {
+  stage: string; title: string; pointsEnabled: boolean;
+  winPoints: number; drawPoints: number; lossPoints: number;
+}): Promise<SportLeagueInfo> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    const r = await (prisma as any).sportLeague.create({ data: { ...data, status: 'setup' } });
+    return mapSportLeague(r);
+  } else {
+    const list = await readJsonFile<any[]>(FILE_SPORT_LEAGUES, []);
+    const newRec = {
+      id: list.length > 0 ? Math.max(...list.map((l: any) => l.id)) + 1 : 1,
+      ...data, status: 'setup', createdAt: new Date().toISOString(),
+    };
+    list.push(newRec);
+    await writeJsonFile(FILE_SPORT_LEAGUES, list);
+    return mapSportLeague(newRec);
+  }
+}
+
+export async function updateSportLeague(id: number, patch: Partial<{
+  title: string; status: string; pointsEnabled: boolean;
+  winPoints: number; drawPoints: number; lossPoints: number;
+}>): Promise<SportLeagueInfo | null> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    try {
+      const r = await (prisma as any).sportLeague.update({ where: { id }, data: patch });
+      return mapSportLeague(r);
+    } catch { return null; }
+  } else {
+    const list = await readJsonFile<any[]>(FILE_SPORT_LEAGUES, []);
+    const idx = list.findIndex((l: any) => l.id === id);
+    if (idx === -1) return null;
+    list[idx] = { ...list[idx], ...patch };
+    await writeJsonFile(FILE_SPORT_LEAGUES, list);
+    return mapSportLeague(list[idx]);
+  }
+}
+
+export async function deleteSportLeague(id: number): Promise<boolean> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    try {
+      const matches = await (prisma as any).sportMatch.findMany({ where: { leagueId: id } });
+      for (const m of matches) {
+        await (prisma as any).sportGoal.deleteMany({ where: { matchId: m.id } });
+        await (prisma as any).sportCard.deleteMany({ where: { matchId: m.id } });
+      }
+      await (prisma as any).sportMatch.deleteMany({ where: { leagueId: id } });
+      await (prisma as any).sportBehavior.deleteMany({ where: { leagueId: id } });
+      await (prisma as any).sportLeague.delete({ where: { id } });
+      return true;
+    } catch { return false; }
+  } else {
+    const leagues = await readJsonFile<any[]>(FILE_SPORT_LEAGUES, []);
+    const idx = leagues.findIndex((l: any) => l.id === id);
+    if (idx === -1) return false;
+    leagues.splice(idx, 1);
+    await writeJsonFile(FILE_SPORT_LEAGUES, leagues);
+    const allMatches = await readJsonFile<any[]>(FILE_SPORT_MATCHES, []);
+    const matchIds = allMatches.filter((m: any) => m.leagueId === id).map((m: any) => m.id);
+    await writeJsonFile(FILE_SPORT_MATCHES, allMatches.filter((m: any) => m.leagueId !== id));
+    const goals = await readJsonFile<any[]>(FILE_SPORT_GOALS, []);
+    await writeJsonFile(FILE_SPORT_GOALS, goals.filter((g: any) => !matchIds.includes(g.matchId)));
+    const cards = await readJsonFile<any[]>(FILE_SPORT_CARDS, []);
+    await writeJsonFile(FILE_SPORT_CARDS, cards.filter((c: any) => c.leagueId !== id));
+    const behaviors = await readJsonFile<any[]>(FILE_SPORT_BEHAVIORS, []);
+    await writeJsonFile(FILE_SPORT_BEHAVIORS, behaviors.filter((b: any) => b.leagueId !== id));
+    return true;
+  }
+}
+
+// ─── MATCHES ─────────────────────────────────────────────────────────────────
+
+export async function getSportMatches(leagueId: number): Promise<SportMatchInfo[]> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    const list = await (prisma as any).sportMatch.findMany({
+      where: { leagueId },
+      orderBy: [{ matchday: 'asc' }, { id: 'asc' }],
+    });
+    return list.map(mapSportMatch);
+  } else {
+    const list = await readJsonFile<any[]>(FILE_SPORT_MATCHES, []);
+    return list
+      .filter((m: any) => m.leagueId === leagueId)
+      .sort((a: any, b: any) => a.matchday - b.matchday || a.id - b.id)
+      .map(mapSportMatch);
+  }
+}
+
+export async function getSportMatchById(id: number): Promise<SportMatchInfo | null> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    const r = await (prisma as any).sportMatch.findUnique({ where: { id } });
+    return r ? mapSportMatch(r) : null;
+  } else {
+    const list = await readJsonFile<any[]>(FILE_SPORT_MATCHES, []);
+    const r = list.find((m: any) => m.id === id);
+    return r ? mapSportMatch(r) : null;
+  }
+}
+
+export async function createSportMatch(data: {
+  leagueId: number; matchday: number; homeGroupId: number; awayGroupId: number;
+  matchDate?: string | null; notes?: string | null;
+}): Promise<SportMatchInfo> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    const r = await (prisma as any).sportMatch.create({
+      data: { ...data, homeScore: 0, awayScore: 0, status: 'scheduled',
+               matchDate: data.matchDate ?? null, notes: data.notes ?? null },
+    });
+    return mapSportMatch(r);
+  } else {
+    const list = await readJsonFile<any[]>(FILE_SPORT_MATCHES, []);
+    const newRec = {
+      id: list.length > 0 ? Math.max(...list.map((m: any) => m.id)) + 1 : 1,
+      leagueId: data.leagueId, matchday: data.matchday,
+      homeGroupId: data.homeGroupId, awayGroupId: data.awayGroupId,
+      matchDate: data.matchDate ?? null, notes: data.notes ?? null,
+      homeScore: 0, awayScore: 0, status: 'scheduled', createdAt: new Date().toISOString(),
+    };
+    list.push(newRec);
+    await writeJsonFile(FILE_SPORT_MATCHES, list);
+    return mapSportMatch(newRec);
+  }
+}
+
+export async function updateSportMatch(id: number, patch: Partial<{
+  homeScore: number; awayScore: number; status: string;
+  matchday: number; matchDate: string | null; notes: string | null;
+}>): Promise<SportMatchInfo | null> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    try {
+      const r = await (prisma as any).sportMatch.update({ where: { id }, data: patch });
+      return mapSportMatch(r);
+    } catch { return null; }
+  } else {
+    const list = await readJsonFile<any[]>(FILE_SPORT_MATCHES, []);
+    const idx = list.findIndex((m: any) => m.id === id);
+    if (idx === -1) return null;
+    list[idx] = { ...list[idx], ...patch };
+    await writeJsonFile(FILE_SPORT_MATCHES, list);
+    return mapSportMatch(list[idx]);
+  }
+}
+
+export async function deleteSportMatch(id: number): Promise<boolean> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    try {
+      await (prisma as any).sportGoal.deleteMany({ where: { matchId: id } });
+      await (prisma as any).sportCard.deleteMany({ where: { matchId: id } });
+      await (prisma as any).sportMatch.delete({ where: { id } });
+      return true;
+    } catch { return false; }
+  } else {
+    const matches = await readJsonFile<any[]>(FILE_SPORT_MATCHES, []);
+    const idx = matches.findIndex((m: any) => m.id === id);
+    if (idx === -1) return false;
+    matches.splice(idx, 1);
+    await writeJsonFile(FILE_SPORT_MATCHES, matches);
+    const goals = await readJsonFile<any[]>(FILE_SPORT_GOALS, []);
+    await writeJsonFile(FILE_SPORT_GOALS, goals.filter((g: any) => g.matchId !== id));
+    const cards = await readJsonFile<any[]>(FILE_SPORT_CARDS, []);
+    await writeJsonFile(FILE_SPORT_CARDS, cards.filter((c: any) => c.matchId !== id));
+    return true;
+  }
+}
+
+// ─── GOALS ───────────────────────────────────────────────────────────────────
+
+export async function getSportGoals(matchId: number): Promise<SportGoalInfo[]> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    const list = await (prisma as any).sportGoal.findMany({
+      where: { matchId }, orderBy: { createdAt: 'asc' },
+    });
+    return list.map(mapSportGoal);
+  } else {
+    const list = await readJsonFile<any[]>(FILE_SPORT_GOALS, []);
+    return list.filter((g: any) => g.matchId === matchId).map(mapSportGoal);
+  }
+}
+
+export async function getSportGoalsByLeague(leagueId: number): Promise<SportGoalInfo[]> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    const matches = await (prisma as any).sportMatch.findMany({ where: { leagueId }, select: { id: true } });
+    const matchIds = matches.map((m: any) => m.id);
+    if (!matchIds.length) return [];
+    const list = await (prisma as any).sportGoal.findMany({
+      where: { matchId: { in: matchIds } }, orderBy: { createdAt: 'asc' },
+    });
+    return list.map(mapSportGoal);
+  } else {
+    const allMatches = await readJsonFile<any[]>(FILE_SPORT_MATCHES, []);
+    const matchIds = new Set(allMatches.filter((m: any) => m.leagueId === leagueId).map((m: any) => m.id));
+    const list = await readJsonFile<any[]>(FILE_SPORT_GOALS, []);
+    return list.filter((g: any) => matchIds.has(g.matchId)).map(mapSportGoal);
+  }
+}
+
+export async function addSportGoal(data: {
+  matchId: number; teamGroupId: number; scorerId?: number | null; scorerName: string; createdBy: string;
+}): Promise<SportGoalInfo> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    const r = await (prisma as any).sportGoal.create({ data: { ...data, scorerId: data.scorerId ?? null } });
+    return mapSportGoal(r);
+  } else {
+    const list = await readJsonFile<any[]>(FILE_SPORT_GOALS, []);
+    const newRec = {
+      id: list.length > 0 ? Math.max(...list.map((g: any) => g.id)) + 1 : 1,
+      ...data, scorerId: data.scorerId ?? null, createdAt: new Date().toISOString(),
+    };
+    list.push(newRec);
+    await writeJsonFile(FILE_SPORT_GOALS, list);
+    return mapSportGoal(newRec);
+  }
+}
+
+export async function deleteSportGoal(id: number): Promise<boolean> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    try { await (prisma as any).sportGoal.delete({ where: { id } }); return true; }
+    catch { return false; }
+  } else {
+    const list = await readJsonFile<any[]>(FILE_SPORT_GOALS, []);
+    const idx = list.findIndex((g: any) => g.id === id);
+    if (idx === -1) return false;
+    list.splice(idx, 1);
+    await writeJsonFile(FILE_SPORT_GOALS, list);
+    return true;
+  }
+}
+
+// ─── CARDS ───────────────────────────────────────────────────────────────────
+
+export async function getSportCards(filter: { matchId?: number; leagueId?: number }): Promise<SportCardInfo[]> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    const list = await (prisma as any).sportCard.findMany({
+      where: filter, orderBy: { createdAt: 'asc' },
+    });
+    return list.map(mapSportCard);
+  } else {
+    let list = await readJsonFile<any[]>(FILE_SPORT_CARDS, []);
+    if (filter.matchId  !== undefined) list = list.filter((c: any) => c.matchId  === filter.matchId);
+    if (filter.leagueId !== undefined) list = list.filter((c: any) => c.leagueId === filter.leagueId);
+    return list.map(mapSportCard);
+  }
+}
+
+export async function addSportCard(data: {
+  matchId: number; leagueId: number; studentId: number; studentName: string;
+  groupId: number; cardType: string; suspensionMatches: number; createdBy: string;
+}): Promise<SportCardInfo> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    const r = await (prisma as any).sportCard.create({ data: { ...data, suspensionServed: false } });
+    return mapSportCard(r);
+  } else {
+    const list = await readJsonFile<any[]>(FILE_SPORT_CARDS, []);
+    const newRec = {
+      id: list.length > 0 ? Math.max(...list.map((c: any) => c.id)) + 1 : 1,
+      ...data, suspensionServed: false, createdAt: new Date().toISOString(),
+    };
+    list.push(newRec);
+    await writeJsonFile(FILE_SPORT_CARDS, list);
+    return mapSportCard(newRec);
+  }
+}
+
+export async function updateSportCard(id: number, patch: { suspensionServed?: boolean; suspensionMatches?: number }): Promise<SportCardInfo | null> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    try {
+      const r = await (prisma as any).sportCard.update({ where: { id }, data: patch });
+      return mapSportCard(r);
+    } catch { return null; }
+  } else {
+    const list = await readJsonFile<any[]>(FILE_SPORT_CARDS, []);
+    const idx = list.findIndex((c: any) => c.id === id);
+    if (idx === -1) return null;
+    list[idx] = { ...list[idx], ...patch };
+    await writeJsonFile(FILE_SPORT_CARDS, list);
+    return mapSportCard(list[idx]);
+  }
+}
+
+export async function deleteSportCard(id: number): Promise<boolean> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    try { await (prisma as any).sportCard.delete({ where: { id } }); return true; }
+    catch { return false; }
+  } else {
+    const list = await readJsonFile<any[]>(FILE_SPORT_CARDS, []);
+    const idx = list.findIndex((c: any) => c.id === id);
+    if (idx === -1) return false;
+    list.splice(idx, 1);
+    await writeJsonFile(FILE_SPORT_CARDS, list);
+    return true;
+  }
+}
+
+// ─── BEHAVIORS ───────────────────────────────────────────────────────────────
+
+export async function getSportBehaviors(leagueId: number): Promise<SportBehaviorInfo[]> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    const list = await (prisma as any).sportBehavior.findMany({
+      where: { leagueId }, orderBy: { createdAt: 'desc' },
+    });
+    return list.map(mapSportBehavior);
+  } else {
+    const list = await readJsonFile<any[]>(FILE_SPORT_BEHAVIORS, []);
+    return list.filter((b: any) => b.leagueId === leagueId)
+      .sort((a: any, b: any) => b.id - a.id).map(mapSportBehavior);
+  }
+}
+
+export async function addSportBehavior(data: {
+  leagueId: number; matchId?: number | null; studentId: number; studentName: string;
+  groupId: number; type: string; description: string; createdBy: string;
+}): Promise<SportBehaviorInfo> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    const r = await (prisma as any).sportBehavior.create({
+      data: { ...data, matchId: data.matchId ?? null },
+    });
+    return mapSportBehavior(r);
+  } else {
+    const list = await readJsonFile<any[]>(FILE_SPORT_BEHAVIORS, []);
+    const newRec = {
+      id: list.length > 0 ? Math.max(...list.map((b: any) => b.id)) + 1 : 1,
+      ...data, matchId: data.matchId ?? null, createdAt: new Date().toISOString(),
+    };
+    list.push(newRec);
+    await writeJsonFile(FILE_SPORT_BEHAVIORS, list);
+    return mapSportBehavior(newRec);
+  }
+}
+
+export async function deleteSportBehavior(id: number): Promise<boolean> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    try { await (prisma as any).sportBehavior.delete({ where: { id } }); return true; }
+    catch { return false; }
+  } else {
+    const list = await readJsonFile<any[]>(FILE_SPORT_BEHAVIORS, []);
+    const idx = list.findIndex((b: any) => b.id === id);
+    if (idx === -1) return false;
+    list.splice(idx, 1);
+    await writeJsonFile(FILE_SPORT_BEHAVIORS, list);
+    return true;
+  }
+}
+
+// ─── STANDINGS ───────────────────────────────────────────────────────────────
+
+export async function getLeagueStandings(leagueId: number): Promise<SportStanding[]> {
+  const league = await getSportLeagueById(leagueId);
+  const matches = await getSportMatches(leagueId);
+  const win  = league?.winPoints  ?? 2;
+  const draw = league?.drawPoints ?? 1;
+  const loss = league?.lossPoints ?? 0;
+
+  const map = new Map<number, SportStanding>();
+  const ensure = (gid: number) => {
+    if (!map.has(gid)) {
+      map.set(gid, { groupId: gid, played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, goalDiff: 0, points: 0 });
+    }
+    return map.get(gid)!;
+  };
+
+  for (const m of matches) { ensure(m.homeGroupId); ensure(m.awayGroupId); }
+
+  for (const m of matches.filter(m => m.status === 'finished')) {
+    const home = ensure(m.homeGroupId);
+    const away = ensure(m.awayGroupId);
+    home.played++; away.played++;
+    home.goalsFor    += m.homeScore; home.goalsAgainst += m.awayScore;
+    away.goalsFor    += m.awayScore; away.goalsAgainst += m.homeScore;
+    if (m.homeScore > m.awayScore) {
+      home.won++; home.points += win;  away.lost++; away.points += loss;
+    } else if (m.homeScore < m.awayScore) {
+      away.won++; away.points += win;  home.lost++; home.points += loss;
+    } else {
+      home.drawn++; home.points += draw; away.drawn++; away.points += draw;
+    }
+  }
+
+  for (const [, s] of map) s.goalDiff = s.goalsFor - s.goalsAgainst;
+  return Array.from(map.values()).sort((a, b) => {
+    if (b.points !== a.points) return b.points - a.points;
+    if (b.goalDiff !== a.goalDiff) return b.goalDiff - a.goalDiff;
+    return b.goalsFor - a.goalsFor;
+  });
+}
+
+// ─── COLLECTIVE POINTS FOR MATCH RESULT ──────────────────────────────────────
+
+export async function applyMatchCollectivePoints(
+  match: SportMatchInfo,
+  league: SportLeagueInfo,
+  operation: 'add' | 'remove' | 'replace',
+  recordedBy: string
+): Promise<void> {
+  const REASON_PREFIX = `دوري رياضي | match:${match.id}`;
+
+  if (operation === 'remove' || operation === 'replace') {
+    if (hasDatabase) {
+      const prisma = getPrisma()!;
+      await (prisma as any).point.deleteMany({
+        where: { category: 'sports', reason: { startsWith: REASON_PREFIX } },
+      });
+    } else {
+      const pts = await readJsonFile<PointInfo[]>(FILE_POINTS, []);
+      await writeJsonFile(FILE_POINTS, pts.filter(p => !(p.category === 'sports' && p.reason.startsWith(REASON_PREFIX))));
+    }
+  }
+  if (operation === 'remove') return;
+  if (!league.pointsEnabled || match.status !== 'finished') return;
+
+  const students = await getStudents();
+  const homeStudents = students.filter(s => s.groupId === match.homeGroupId);
+  const awayStudents = students.filter(s => s.groupId === match.awayGroupId);
+
+  let homePts = 0, awayPts = 0, homeReason = '', awayReason = '';
+  if (match.homeScore > match.awayScore) {
+    homePts = league.winPoints;  homeReason = `${REASON_PREFIX} | فوز`;
+    awayPts = league.lossPoints; awayReason = `${REASON_PREFIX} | خسارة`;
+  } else if (match.homeScore < match.awayScore) {
+    awayPts = league.winPoints;  awayReason = `${REASON_PREFIX} | فوز`;
+    homePts = league.lossPoints; homeReason = `${REASON_PREFIX} | خسارة`;
+  } else {
+    homePts = league.drawPoints; homeReason = `${REASON_PREFIX} | تعادل`;
+    awayPts = league.drawPoints; awayReason = `${REASON_PREFIX} | تعادل`;
+  }
+
+  const toAdd: Array<{ registrationId: number; delta: number; reason: string }> = [];
+  if (homePts > 0) for (const s of homeStudents) toAdd.push({ registrationId: s.id, delta: homePts, reason: homeReason });
+  if (awayPts > 0) for (const s of awayStudents) toAdd.push({ registrationId: s.id, delta: awayPts, reason: awayReason });
+
+  for (const item of toAdd) {
+    await addPointsRecord({
+      registrationId: item.registrationId, delta: item.delta, reason: item.reason,
+      category: 'sports', pointType: 'collective', recordedBy,
+    });
   }
 }

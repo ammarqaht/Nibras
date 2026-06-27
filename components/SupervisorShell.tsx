@@ -54,6 +54,7 @@ const LINKS: NavLink[] = [
   { id: 'analytics', href: '/supervisor/analytics', label: 'الإحصائيات' },
   { id: 'account', href: '/supervisor/account', label: 'حسابي' },
   { id: 'supervisors', href: '/supervisor/supervisors', label: 'المشرفون', roles: ['admin'] },
+  { id: 'sports-league', href: '/supervisor/sports-league', label: 'الدوري الرياضي', roles: ['sports_supervisor'] },
   { id: 'settings', href: '/supervisor/settings', label: 'الإعدادات' }
 ];
 

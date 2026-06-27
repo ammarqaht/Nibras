@@ -211,3 +211,75 @@ model OtherRevenue {
   createdAt      DateTime @default(now())
 }
 
+model SportLeague {
+  id            Int      @id @default(autoincrement())
+  stage         String
+  title         String
+  status        String   @default("setup") // 'setup' | 'active' | 'finished' | 'archived'
+  pointsEnabled Boolean  @default(true)
+  winPoints     Int      @default(2)
+  drawPoints    Int      @default(1)
+  lossPoints    Int      @default(0)
+  createdAt     DateTime @default(now())
+}
+
+model SportMatch {
+  id          Int      @id @default(autoincrement())
+  leagueId    Int
+  matchday    Int      @default(1)
+  homeGroupId Int
+  awayGroupId Int
+  homeScore   Int      @default(0)
+  awayScore   Int      @default(0)
+  status      String   @default("scheduled") // 'scheduled' | 'live' | 'finished'
+  matchDate   String?
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  @@index([leagueId])
+}
+
+model SportGoal {
+  id          Int      @id @default(autoincrement())
+  matchId     Int
+  teamGroupId Int
+  scorerId    Int?
+  scorerName  String
+  createdBy   String
+  createdAt   DateTime @default(now())
+
+  @@index([matchId])
+}
+
+model SportCard {
+  id                Int      @id @default(autoincrement())
+  matchId           Int
+  leagueId          Int
+  studentId         Int
+  studentName       String
+  groupId           Int
+  cardType          String   // 'yellow' | 'red'
+  suspensionMatches Int      @default(0)
+  suspensionServed  Boolean  @default(false)
+  createdBy         String
+  createdAt         DateTime @default(now())
+
+  @@index([leagueId])
+  @@index([matchId])
+}
+
+model SportBehavior {
+  id          Int      @id @default(autoincrement())
+  leagueId    Int
+  matchId     Int?
+  studentId   Int
+  studentName String
+  groupId     Int
+  type        String   // 'positive' | 'negative'
+  description String
+  createdBy   String
+  createdAt   DateTime @default(now())
+
+  @@index([leagueId])
+}
+

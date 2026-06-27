@@ -18,7 +18,8 @@ export async function GET(req: NextRequest) {
 
     const roles = supervisor.role.split(',').map(r => r.trim());
     const isGlobal = roles.some(r =>
-      ['admin', 'finance', 'finance_supervisor', 'media_supervisor', 'cultural_supervisor', 'social_supervisor', 'general_supervisor', 'attendance_supervisor'].includes(r)
+      ['admin', 'finance', 'finance_supervisor', 'media_supervisor', 'cultural_supervisor', 'social_supervisor',
+       'general_supervisor', 'attendance_supervisor', 'sports_supervisor', 'scientific_supervisor', 'tasks_supervisor'].includes(r)
     );
 
     if (!isGlobal) {
