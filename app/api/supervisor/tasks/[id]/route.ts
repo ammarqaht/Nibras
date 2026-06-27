@@ -36,6 +36,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       patch.dueDate = new Date(body.dueDate).toISOString();
     }
     if (body.track !== undefined) patch.track = body.track;
+    if (body.stage !== undefined) patch.stage = body.stage || null;
+    if (body.cost !== undefined) patch.cost = Math.max(0, parseInt(body.cost, 10) || 0);
+    if (body.durationHours !== undefined) patch.durationHours = body.durationHours != null && body.durationHours !== '' ? (Math.max(0, parseInt(body.durationHours, 10) || 0) || null) : null;
 
     const updated = await updateTask(id, patch);
     if (!updated) {

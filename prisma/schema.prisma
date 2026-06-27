@@ -133,8 +133,11 @@ model Task {
   dueDate          DateTime
   createdAt        DateTime     @default(now())
   track            String?      @default("عام")
+  stage            String?
+  cost             Int          @default(0)
+  durationHours    Int?
   isActive         Boolean      @default(true)
-  submissionMethod String?      @default("رفع ملف")
+  submissionMethod String?      @default("file")
   assignedAdmins   String[]     @default([])
   imageUrl         String?
   resourceLink     String?
@@ -167,6 +170,7 @@ model Submission {
   grade           Int?
   feedback        String?
   selectedAdminId String?
+  claimedAt       DateTime?
   submittedAt     DateTime     @default(now())
   task            Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
   registration    Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
@@ -261,6 +265,7 @@ model SportCard {
   cardType          String   // 'yellow' | 'red'
   suspensionMatches Int      @default(0)
   suspensionServed  Boolean  @default(false)
+  punishedAt        DateTime?
   createdBy         String
   createdAt         DateTime @default(now())
 

@@ -151,6 +151,10 @@ export default function SupervisorShell({ children }: { children: React.ReactNod
   const links = LINKS.filter((l) => {
     if (l.id === 'settings') return isAdmin; // Settings is strictly for admin
     if (l.id === 'account') return !isAdmin; // own-account page: every supervisor except admins
+    // Role-specific tools the manager doesn't need — show only to their dedicated roles
+    if (l.id === 'tasks' || l.id === 'sports-league') {
+      return l.roles ? l.roles.some((r) => userRoles.includes(r)) : false;
+    }
     if (isAdmin) return true;
     if (user?.permissions) {
       if (user.permissions.includes(l.id)) return true;

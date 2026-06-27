@@ -15,6 +15,9 @@ type Task = {
   dueDate: string;
   createdAt: string;
   track: string | null;
+  stage: string | null;
+  cost: number;
+  durationHours: number | null;
   isActive: boolean;
   submissionMethod: string | null;
   assignedAdmins: string[];
@@ -52,6 +55,53 @@ function statusBadgeClass(s: string) {
   return 'pill-yellow';
 }
 
+const STAGE_OPTIONS = ['ابتدائي', 'متوسط', 'ثانوي'];
+
+// A student is "targeted" by a task only if they pass both the visibility (restricted) and stage filters
+function isTaskTargeted(
+  s: { id: number; stage: string },
+  task: { visibility: string; visibleToIds: number[]; stage: string | null },
+) {
+  if (task.visibility === 'restricted' && !task.visibleToIds.includes(s.id)) return false;
+  if (task.stage && task.stage !== 'الكل' && s.stage !== task.stage) return false;
+  return true;
+}
+
+const SUBMISSION_METHODS: { value: string; label: string }[] = [
+  { value: 'file',  label: 'رفع ملف (صورة / مستند / فيديو)' },
+  { value: 'audio', label: 'تسجيل صوتي' },
+  { value: 'text',  label: 'إجابة نصية' },
+  { value: 'ack',   label: 'إقرار بالإنجاز فقط' },
+];
+// Map legacy Arabic values + new keys to a canonical method key
+function methodKey(m: string | null): string {
+  switch (m) {
+    case 'file': case 'رفع ملف': case 'image': case 'video': case 'any': return 'file';
+    case 'audio': return 'audio';
+    case 'text': return 'text';
+    case 'ack': case 'إقرار بالإنجاز': return 'ack';
+    default: return 'file';
+  }
+}
+// Renders whatever the student submitted: image, audio, text, acknowledgment, or a file link
+function SubmissionContent({ fileUrl }: { fileUrl: string }) {
+  if (!fileUrl) return <span className="text-xs text-ink-400">—</span>;
+  if (fileUrl.startsWith('data:image')) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={fileUrl} alt="إثبات" className="max-h-56 rounded-lg border border-ink-200 mx-auto cursor-zoom-in" onClick={() => window.open(fileUrl, '_blank')} />;
+  }
+  if (fileUrl.startsWith('data:audio') || fileUrl.startsWith('data:video/webm')) {
+    return <audio controls src={fileUrl} className="w-full" />;
+  }
+  if (fileUrl.startsWith('text:')) {
+    return <div className="whitespace-pre-wrap text-sm bg-cream-50 p-3 rounded-lg border border-ink-150 text-ink-800">{fileUrl.slice(5)}</div>;
+  }
+  if (fileUrl === 'admin://manual-mark' || fileUrl.startsWith('ack://')) {
+    return <div className="text-sm text-ink-700 inline-flex items-center gap-1.5"><span className="text-green-600">✓</span> إقرار بالإنجاز من الطالب</div>;
+  }
+  return <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="btn btn-secondary inline-flex items-center gap-1.5 text-xs py-1.5 px-3">فتح الملف المرفق</a>;
+}
+
 export default function TasksPage() {
   const { user } = useSupervisor();
 
@@ -69,6 +119,8 @@ export default function TasksPage() {
   const [categories, setCategories] = useState<string[]>(['عام']);
   const [newCategory, setNewCategory] = useState('');
   const [savingCats, setSavingCats] = useState(false);
+  const [showCatModal, setShowCatModal] = useState(false);
+  const [editingCat, setEditingCat] = useState<{ original: string; value: string } | null>(null);
 
   // Filters
   const [subSearch, setSubSearch] = useState('');
@@ -108,7 +160,10 @@ export default function TasksPage() {
   const [addStartDate, setAddStartDate] = useState('');
   const [addDeadline, setAddDeadline] = useState('');
   const [addTrack, setAddTrack] = useState('عام');
-  const [addMethod, setAddMethod] = useState('رفع ملف');
+  const [addStage, setAddStage] = useState('');
+  const [addCost, setAddCost] = useState('0');
+  const [addDuration, setAddDuration] = useState('');
+  const [addMethod, setAddMethod] = useState('file');
   const [addResourceLink, setAddResourceLink] = useState('');
   const [addImage, setAddImage] = useState<string | null>(null);
   const [addAdmins, setAddAdmins] = useState<string[]>([]);
@@ -118,6 +173,9 @@ export default function TasksPage() {
   const [inlineEditSub, setInlineEditSub] = useState<string | null>(null);
   const [inlinePoints, setInlinePoints] = useState('');
   const [inlineBusy, setInlineBusy] = useState(false);
+
+  // Accordion: which log card is expanded (only one at a time)
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
 
   async function loadData() {
     try {
@@ -156,7 +214,8 @@ export default function TasksPage() {
   }, [submissions, tasks, isScientific]);
 
   const pendingSubmissions = useMemo(() => visibleSubmissions.filter(s => s.status === 'pending'), [visibleSubmissions]);
-  const logSubmissions = useMemo(() => visibleSubmissions.filter(s => s.status !== 'pending'), [visibleSubmissions]);
+  // Only finished evaluations belong in the log (exclude claimed / cancelled / expired)
+  const logSubmissions = useMemo(() => visibleSubmissions.filter(s => s.status === 'approved' || s.status === 'rejected'), [visibleSubmissions]);
 
   const filteredPending = useMemo(() => pendingSubmissions.filter(s => {
     const q = subSearch.trim().toLowerCase();
@@ -188,10 +247,8 @@ export default function TasksPage() {
   const statsStudentList = useMemo(() => {
     if (!statsTask) return [];
     const active = students.filter(s => s.registrationStatus === 'approved');
-    const scoped = statsTask.visibility === 'restricted'
-      ? active.filter(s => statsTask.visibleToIds.includes(s.id))
-      : active;
-    const subMap = new Map(submissions.filter(s => s.taskId === statsTask.id).map(s => [s.registrationId, s]));
+    const scoped = active.filter(s => isTaskTargeted(s, statsTask));
+    const subMap = new Map(submissions.filter(s => s.taskId === statsTask.id && ['pending', 'approved', 'rejected'].includes(s.status)).map(s => [s.registrationId, s]));
     let list = scoped.map(st => ({ ...st, submitted: subMap.has(st.id), submission: subMap.get(st.id) || null }));
     const q = statsSearch.trim().toLowerCase();
     if (q) list = list.filter(i => i.studentName.toLowerCase().includes(q));
@@ -203,8 +260,8 @@ export default function TasksPage() {
   const statsCounts = useMemo(() => {
     if (!statsTask) return { total: 0, submitted: 0, missing: 0, pending: 0 };
     const active = students.filter(s => s.registrationStatus === 'approved');
-    const scoped = statsTask.visibility === 'restricted' ? active.filter(s => statsTask.visibleToIds.includes(s.id)) : active;
-    const taskSubs = submissions.filter(s => s.taskId === statsTask.id);
+    const scoped = active.filter(s => isTaskTargeted(s, statsTask));
+    const taskSubs = submissions.filter(s => s.taskId === statsTask.id && ['pending', 'approved', 'rejected'].includes(s.status));
     const submittedIds = new Set(taskSubs.map(s => s.registrationId));
     const total = scoped.length;
     const submitted = scoped.filter(s => submittedIds.has(s.id)).length;
@@ -224,7 +281,9 @@ export default function TasksPage() {
           title: addTitle.trim(), description: addDesc.trim(),
           maxPoints: parseInt(addPoints, 10),
           startDate: addStartDate || null,
-          dueDate: addDeadline, track: addTrack,
+          dueDate: addDeadline, track: addTrack, stage: addStage || null,
+          cost: parseInt(addCost, 10) || 0,
+          durationHours: addDuration ? parseInt(addDuration, 10) || null : null,
           submissionMethod: addMethod,
           assignedAdmins: addAdmins, imageUrl: addImage,
           resourceLink: addResourceLink.trim() || null,
@@ -235,8 +294,9 @@ export default function TasksPage() {
       if (!res.ok) throw new Error(data.error || 'فشل إضافة المهمة');
       pushToast('success', 'تم نشر المهمة بنجاح ✓');
       setAddTitle(''); setAddDesc(''); setAddPoints('10');
-      setAddStartDate(''); setAddDeadline(''); setAddTrack('عام');
-      setAddMethod('رفع ملف'); setAddResourceLink('');
+      setAddStartDate(''); setAddDeadline(''); setAddTrack('عام'); setAddStage('');
+      setAddCost('0'); setAddDuration('');
+      setAddMethod('file'); setAddResourceLink('');
       setAddImage(null); setAddAdmins([]);
       await loadData();
       setActiveTab('manage');
@@ -252,6 +312,9 @@ export default function TasksPage() {
     const grade = parseInt(evalPoints === '' ? String(evalSub.taskMaxPoints) : evalPoints, 10);
     if (status === 'approved' && (isNaN(grade) || grade < 0 || grade > evalSub.taskMaxPoints)) {
       return pushToast('error', `يجب أن تكون الدرجة بين 0 و ${evalSub.taskMaxPoints}`);
+    }
+    if (status === 'rejected' && !evalComment.trim()) {
+      return pushToast('error', 'يجب كتابة سبب رد المهمة في خانة التعليق');
     }
     setEvalBusy(true);
     try {
@@ -307,6 +370,9 @@ export default function TasksPage() {
           startDate: editTask.startDate || null,
           dueDate: editTask.dueDate,
           track: editTask.track,
+          stage: editTask.stage || null,
+          cost: editTask.cost ?? 0,
+          durationHours: editTask.durationHours ?? null,
           submissionMethod: editTask.submissionMethod,
           assignedAdmins: editTask.assignedAdmins,
           imageUrl: editTask.imageUrl,
@@ -385,6 +451,31 @@ export default function TasksPage() {
       setCategories(cats);
     } catch { pushToast('error', 'فشل حفظ التصنيفات'); }
     finally { setSavingCats(false); }
+  }
+
+  function addCategory() {
+    const cat = newCategory.trim();
+    if (!cat) return;
+    if (categories.includes(cat)) { pushToast('error', 'التصنيف موجود مسبقاً'); return; }
+    saveCategories([...categories, cat]);
+    setNewCategory('');
+  }
+
+  function removeCategory(cat: string) {
+    if (cat === 'عام') return;
+    saveCategories(categories.filter(c => c !== cat));
+    if (addTrack === cat) setAddTrack('عام');
+  }
+
+  function commitRename() {
+    if (!editingCat) return;
+    const next = editingCat.value.trim();
+    const original = editingCat.original;
+    if (!next || next === original) { setEditingCat(null); return; }
+    if (categories.includes(next)) { pushToast('error', 'التصنيف موجود مسبقاً'); return; }
+    saveCategories(categories.map(c => (c === original ? next : c)));
+    if (addTrack === original) setAddTrack(next);
+    setEditingCat(null);
   }
 
   if (loading) return <div className="card p-12 text-center text-ink-400 text-sm">جارٍ تحميل البيانات…</div>;
@@ -505,6 +596,8 @@ export default function TasksPage() {
               {filteredLog.map(sub => (
                 <SubmissionCard
                   key={sub.id} sub={sub} supervisors={supervisors} isLog
+                  collapsible expanded={expandedLogId === sub.id}
+                  onToggle={() => setExpandedLogId(id => (id === sub.id ? null : sub.id))}
                   inlineEditSub={inlineEditSub} inlinePoints={inlinePoints}
                   setInlineEditSub={setInlineEditSub} setInlinePoints={setInlinePoints}
                   saveInlinePoints={saveInlinePoints} inlineBusy={inlineBusy}
@@ -518,54 +611,6 @@ export default function TasksPage() {
       {/* TAB: ADD TASK (scientific only) */}
       {activeTab === 'add' && isScientific && (
         <div className="max-w-2xl mx-auto fade-in space-y-4">
-          {/* Category management */}
-          <div className="card p-4 space-y-3">
-            <h3 className="text-sm font-bold text-ink-700 border-b border-ink-150 pb-2">إدارة التصنيفات</h3>
-            <div className="flex flex-wrap gap-2">
-              {categories.map(cat => (
-                <span key={cat} className="inline-flex items-center gap-1.5 bg-brand/10 text-brand-600 text-xs font-semibold py-1 px-2.5 rounded-full">
-                  {cat}
-                  {cat !== 'عام' && (
-                    <button
-                      type="button"
-                      className="text-ink-400 hover:text-nred-600 text-base leading-none"
-                      onClick={() => {
-                        const next = categories.filter(c => c !== cat);
-                        saveCategories(next);
-                        if (addTrack === cat) setAddTrack('عام');
-                      }}
-                    >×</button>
-                  )}
-                </span>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                className="field py-1 px-3 text-sm flex-1"
-                placeholder="أضف تصنيفاً جديداً..."
-                value={newCategory}
-                onChange={e => setNewCategory(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    const cat = newCategory.trim();
-                    if (cat && !categories.includes(cat)) { saveCategories([...categories, cat]); setNewCategory(''); }
-                  }
-                }}
-              />
-              <button
-                type="button"
-                disabled={savingCats}
-                className="btn btn-secondary text-sm py-1 px-3"
-                onClick={() => {
-                  const cat = newCategory.trim();
-                  if (cat && !categories.includes(cat)) { saveCategories([...categories, cat]); setNewCategory(''); }
-                }}
-              >إضافة</button>
-            </div>
-          </div>
-
           <form onSubmit={handleAddTask} className="card p-6 space-y-4">
             <h2 className="text-lg font-bold text-ink-900 border-b border-ink-150 pb-2 mb-4">إنشاء مهمة جديدة</h2>
 
@@ -600,12 +645,31 @@ export default function TasksPage() {
               </div>
             </div>
 
-            <div>
-              <label className="label">طريقة التسليم <span className="req">*</span></label>
-              <select className="field" value={addMethod} onChange={e => setAddMethod(e.target.value)}>
-                <option value="رفع ملف">رفع ملف (صورة / مستند / فيديو)</option>
-                <option value="إقرار بالإنجاز">إقرار بالإنجاز فقط</option>
-              </select>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="label">المرحلة المعنية <span className="req">*</span></label>
+                <select className="field" value={addStage} onChange={e => setAddStage(e.target.value)}>
+                  <option value="">جميع المراحل</option>
+                  {STAGE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="label">طريقة التسليم <span className="req">*</span></label>
+                <select className="field" value={addMethod} onChange={e => setAddMethod(e.target.value)}>
+                  {SUBMISSION_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="label">مبلغ المهمة (يُخصم من رصيد الطالب عند الطلب)</label>
+                <input type="number" className="field text-center" min={0} value={addCost} onChange={e => setAddCost(e.target.value.replace(/\D/g, ''))} />
+              </div>
+              <div>
+                <label className="label">مهلة الإنجاز بالساعات (اختياري)</label>
+                <input type="number" className="field text-center" min={0} placeholder="مثال: 48" value={addDuration} onChange={e => setAddDuration(e.target.value.replace(/\D/g, ''))} />
+              </div>
             </div>
 
             <div>
@@ -659,7 +723,15 @@ export default function TasksPage() {
                 <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
             </div>
-            <div className="text-xs text-ink-400">إجمالي: {tasks.length} مهمة</div>
+            <div className="flex items-center gap-3">
+              <button type="button" className="btn btn-secondary text-sm py-1.5 px-3 flex items-center gap-1.5" onClick={() => { setShowCatModal(true); setEditingCat(null); setNewCategory(''); }}>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" /><line x1="7" y1="7" x2="7.01" y2="7" />
+                </svg>
+                <span>إدارة التصنيفات</span>
+              </button>
+              <div className="text-xs text-ink-400 whitespace-nowrap">إجمالي: {tasks.length} مهمة</div>
+            </div>
           </div>
 
           <div className="card p-0 overflow-hidden">
@@ -672,6 +744,7 @@ export default function TasksPage() {
                     <tr>
                       <th>المهمة</th>
                       <th>التصنيف</th>
+                      <th>المرحلة</th>
                       <th>النقاط</th>
                       <th>البداية</th>
                       <th>الاستحقاق</th>
@@ -687,6 +760,7 @@ export default function TasksPage() {
                           <div className="text-xs text-ink-400 truncate">{task.description}</div>
                         </td>
                         <td><span className="pill pill-gray text-xs">{task.track || 'عام'}</span></td>
+                        <td className="text-xs text-ink-500">{task.stage || 'الكل'}</td>
                         <td className="font-bold text-brand-600">{task.maxPoints} ن</td>
                         <td className="text-xs font-mono text-ink-500">{task.startDate ? task.startDate.split('T')[0] : '—'}</td>
                         <td className="text-sm font-mono">{task.dueDate.split('T')[0]}</td>
@@ -721,26 +795,22 @@ export default function TasksPage() {
               <button className="text-2xl text-ink-400" onClick={() => setEvalSub(null)}>×</button>
             </div>
             <div className="p-5 space-y-4">
-              <div className="bg-cream-50 p-3 rounded-lg border border-ink-150">
-                <div className="text-xs text-ink-400">الطالب:</div>
-                <div className="font-bold text-ink-900 text-sm">{evalSub.studentName}</div>
-                <div className="text-sm font-semibold text-brand-600 mt-1">{evalSub.taskTitle}</div>
+              <div className="bg-cream-50 p-3 rounded-lg border border-ink-150 flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs text-ink-400">الطالب:</div>
+                  <div className="font-bold text-ink-900 text-sm">{evalSub.studentName}</div>
+                  <div className="text-sm font-semibold text-brand-600 mt-1">{evalSub.taskTitle}</div>
+                </div>
+                {evalSub.taskTrack && <span className="pill pill-gray text-xs shrink-0">{evalSub.taskTrack}</span>}
               </div>
 
-              {evalSub.fileUrl && evalSub.fileUrl !== 'admin://manual-mark' && (
-                <div>
-                  <div className="label">المرفق:</div>
-                  {evalSub.fileUrl.startsWith('data:image') ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={evalSub.fileUrl} alt="إثبات" className="max-h-60 rounded-lg border border-ink-200 mx-auto" />
-                  ) : (
-                    <a href={evalSub.fileUrl} target="_blank" rel="noopener noreferrer" className="btn btn-secondary inline-flex items-center gap-1.5 text-xs py-1.5 px-3">فتح الملف</a>
-                  )}
-                </div>
-              )}
+              <div>
+                <div className="label">ما سلّمه الطالب:</div>
+                <SubmissionContent fileUrl={evalSub.fileUrl} />
+              </div>
 
               <div>
-                <label className="label">النقاط (الحد الأقصى: {evalSub.taskMaxPoints})</label>
+                <label className="label">النقاط الممنوحة (الحد الأقصى: {evalSub.taskMaxPoints})</label>
                 <div className="flex items-center gap-3">
                   <input type="number" min={0} max={evalSub.taskMaxPoints} className="field w-24 text-center font-bold text-lg"
                     value={evalPoints === '' ? evalSub.taskMaxPoints : evalPoints}
@@ -751,17 +821,23 @@ export default function TasksPage() {
                     ))}
                   </div>
                 </div>
+                <div className="mt-2 h-2 rounded-full overflow-hidden" style={{ background: '#EDEAE3' }}>
+                  <div className="h-full rounded-full transition-all" style={{
+                    width: `${Math.min(100, Math.round(((evalPoints === '' ? evalSub.taskMaxPoints : (parseInt(evalPoints, 10) || 0)) / Math.max(1, evalSub.taskMaxPoints)) * 100))}%`,
+                    background: 'linear-gradient(90deg,#34d399,#16a34a)',
+                  }} />
+                </div>
               </div>
 
               <div>
-                <label className="label">تعليق للطالب (اختياري)</label>
-                <textarea className="field" rows={2} placeholder="مثال: أحسنت، استمر في التميز!" value={evalComment} onChange={e => setEvalComment(e.target.value)} />
+                <label className="label">تعليق للطالب <span className="text-ink-400 text-xs font-normal">(مطلوب عند رد المهمة)</span></label>
+                <textarea className="field" rows={2} placeholder="مثال: أحسنت، استمر في التميز! — أو سبب الرد." value={evalComment} onChange={e => setEvalComment(e.target.value)} />
               </div>
             </div>
             <div className="flex justify-end gap-2 p-4 border-t border-ink-200">
               <button onClick={() => handleEvaluate('rejected')} disabled={evalBusy} className="btn btn-danger text-sm">رد المهمة</button>
               <button onClick={() => handleEvaluate('approved')} disabled={evalBusy} className="btn btn-primary text-sm font-bold">
-                {evalBusy ? 'جارٍ الحفظ…' : 'قبول التسليم ✓'}
+                {evalBusy ? 'جارٍ الحفظ…' : 'اعتماد وحفظ النقاط'}
               </button>
             </div>
           </div>
@@ -806,12 +882,30 @@ export default function TasksPage() {
                     <input type="date" className="field" required value={editTask.dueDate.split('T')[0]} onChange={e => setEditTask({ ...editTask, dueDate: e.target.value })} />
                   </div>
                 </div>
-                <div>
-                  <label className="label">طريقة التسليم</label>
-                  <select className="field" value={editTask.submissionMethod || 'رفع ملف'} onChange={e => setEditTask({ ...editTask, submissionMethod: e.target.value })}>
-                    <option value="رفع ملف">رفع ملف</option>
-                    <option value="إقرار بالإنجاز">إقرار بالإنجاز فقط</option>
-                  </select>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="label">المرحلة المعنية</label>
+                    <select className="field" value={editTask.stage || ''} onChange={e => setEditTask({ ...editTask, stage: e.target.value || null })}>
+                      <option value="">جميع المراحل</option>
+                      {STAGE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">طريقة التسليم</label>
+                    <select className="field" value={methodKey(editTask.submissionMethod)} onChange={e => setEditTask({ ...editTask, submissionMethod: e.target.value })}>
+                      {SUBMISSION_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="label">مبلغ المهمة (يُخصم عند الطلب)</label>
+                    <input type="number" className="field text-center" min={0} value={editTask.cost ?? 0} onChange={e => setEditTask({ ...editTask, cost: parseInt(e.target.value, 10) || 0 })} />
+                  </div>
+                  <div>
+                    <label className="label">مهلة الإنجاز بالساعات (اختياري)</label>
+                    <input type="number" className="field text-center" min={0} placeholder="مثال: 48" value={editTask.durationHours ?? ''} onChange={e => setEditTask({ ...editTask, durationHours: e.target.value ? parseInt(e.target.value, 10) || null : null })} />
+                  </div>
                 </div>
                 <div>
                   <label className="label">الصورة التوضيحية</label>
@@ -965,6 +1059,57 @@ export default function TasksPage() {
           </div>
         </div>
       )}
+
+      {/* MODAL: CATEGORY MANAGEMENT */}
+      {showCatModal && isScientific && (
+        <div className="modal-backdrop flex items-center justify-center p-4 z-50" onClick={() => setShowCatModal(false)}>
+          <div className="modal-panel w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-5 border-b border-ink-200">
+              <h3 className="text-lg font-bold text-ink-900">إدارة التصنيفات</h3>
+              <button className="text-2xl text-ink-400" onClick={() => setShowCatModal(false)}>×</button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="flex gap-2">
+                <input type="text" className="field py-1.5 px-3 text-sm flex-1" placeholder="أضف تصنيفاً جديداً..."
+                  value={newCategory} onChange={e => setNewCategory(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCategory(); } }} />
+                <button type="button" disabled={savingCats} className="btn btn-primary text-sm py-1.5 px-4" onClick={addCategory}>إضافة</button>
+              </div>
+              <div className="space-y-1.5 max-h-72 overflow-y-auto scroll-soft">
+                {categories.map(cat => (
+                  <div key={cat} className="flex items-center gap-2 bg-cream-50 border border-ink-150 rounded-lg px-3 py-2">
+                    {editingCat?.original === cat ? (
+                      <>
+                        <input autoFocus type="text" className="field py-1 px-2 text-sm flex-1"
+                          value={editingCat.value}
+                          onChange={e => setEditingCat({ original: cat, value: e.target.value })}
+                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitRename(); } if (e.key === 'Escape') setEditingCat(null); }} />
+                        <button className="btn btn-primary py-1 px-2.5 text-xs" onClick={commitRename}>حفظ</button>
+                        <button className="btn btn-secondary py-1 px-2 text-xs" onClick={() => setEditingCat(null)}>إلغاء</button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="flex-1 text-sm font-semibold text-ink-800">{cat}</span>
+                        {cat === 'عام' ? (
+                          <span className="text-[11px] text-ink-400">افتراضي</span>
+                        ) : (
+                          <>
+                            <button className="text-brand-600 hover:underline text-xs font-bold" onClick={() => setEditingCat({ original: cat, value: cat })}>تعديل</button>
+                            <button className="text-nred-600 hover:text-nred-800 text-lg leading-none px-1" onClick={() => removeCategory(cat)}>×</button>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex justify-end p-4 border-t border-ink-200">
+              <button onClick={() => setShowCatModal(false)} className="btn btn-primary text-sm font-bold">تم</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -979,9 +1124,11 @@ function TabBtn({ active, onClick, children }: { active: boolean; onClick: () =>
 
 function SubmissionCard({
   sub, supervisors, onEvaluate, isLog = false,
+  collapsible = false, expanded = false, onToggle,
   inlineEditSub, inlinePoints, setInlineEditSub, setInlinePoints, saveInlinePoints, inlineBusy,
 }: {
   sub: Submission; supervisors: SupervisorUser[]; onEvaluate?: (s: Submission) => void; isLog?: boolean;
+  collapsible?: boolean; expanded?: boolean; onToggle?: () => void;
   inlineEditSub?: string | null; inlinePoints?: string;
   setInlineEditSub?: (id: string | null) => void; setInlinePoints?: (v: string) => void;
   saveInlinePoints?: (s: Submission) => void; inlineBusy?: boolean;
@@ -989,76 +1136,90 @@ function SubmissionCard({
   const isPending = sub.status === 'pending';
   const isApproved = sub.status === 'approved';
   const isRejected = sub.status === 'rejected';
+  const showBody = !collapsible || expanded;
   const assignedLabel = sub.taskAssignedAdmins.length === 0 ? 'جميع المشرفين'
     : sub.taskAssignedAdmins.map(id => supervisors.find(s => String(s.id) === id)?.name).filter(Boolean).join('، ');
 
   return (
-    <div className="card p-5 relative overflow-hidden hover:shadow-md transition-all"
-      style={{ borderRight: `4px solid ${isPending ? '#FFA726' : isApproved ? 'var(--accent)' : '#EF4444'}` }}>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-brand/10 text-brand-600 font-extrabold flex items-center justify-center text-lg">
+    <div className={`card p-5 relative overflow-hidden transition-all ${collapsible ? 'cursor-pointer hover:shadow-md' : 'hover:shadow-md'}`}
+      style={{ borderRight: `4px solid ${isPending ? '#FFA726' : isApproved ? 'var(--accent)' : '#EF4444'}` }}
+      onClick={collapsible ? onToggle : undefined}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-full bg-brand/10 text-brand-600 font-extrabold flex items-center justify-center text-lg shrink-0">
             {sub.studentName?.charAt(0) || 'ط'}
           </div>
-          <div>
-            <h4 className="font-bold text-ink-900 text-sm">{sub.studentName}</h4>
+          <div className="min-w-0">
+            <h4 className="font-bold text-ink-900 text-sm truncate">{sub.studentName}</h4>
             <span className="text-[0.7rem] text-ink-400 font-mono">{sub.submittedAt.split('T')[0]} {sub.submittedAt.split('T')[1]?.substring(0, 5)}</span>
           </div>
         </div>
-        <span className={`pill ${isPending ? 'pill-yellow' : isApproved ? 'pill-green' : 'pill-red'} text-xs font-bold self-start sm:self-center`}>
-          {statusLabel(sub.status)}
-        </span>
-      </div>
-
-      <div className="mb-3">
-        <div className="text-xs text-ink-400 font-bold mb-0.5">المهمة:</div>
-        <div className="font-semibold text-ink-850 text-sm">{sub.taskTitle}</div>
-      </div>
-
-      {sub.fileUrl && (
-        <div className="mb-4 bg-ink-50/20 p-2.5 rounded-lg border border-ink-150/50">
-          <div className="text-xs text-ink-400 font-bold mb-1.5">المرفق:</div>
-          {sub.fileUrl.startsWith('data:image') ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={sub.fileUrl} alt="إثبات" className="max-h-48 rounded border border-ink-200 cursor-zoom-in" onClick={() => window.open(sub.fileUrl, '_blank')} />
-          ) : sub.fileUrl === 'admin://manual-mark' ? (
-            <div className="text-xs text-ink-600">إقرار يدوي من المشرف</div>
-          ) : (
-            <a href={sub.fileUrl} target="_blank" rel="noopener noreferrer" className="btn btn-secondary inline-flex items-center gap-1 text-xs py-1 px-2.5">فتح الملف</a>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className={`pill ${isPending ? 'pill-yellow' : isApproved ? 'pill-green' : 'pill-red'} text-xs font-bold`}>
+            {statusLabel(sub.status)}
+          </span>
+          {collapsible && (
+            <svg className={`w-4 h-4 text-ink-400 transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
           )}
         </div>
-      )}
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-ink-100 text-xs text-ink-500">
-        <div><span className="font-bold">المشرف الموجه:</span> <span className="font-medium text-ink-700">{assignedLabel}</span></div>
-        {!isPending && (
-          <div>
-            {isApproved && (
-              <div className="flex items-center gap-2.5 flex-wrap">
-                {inlineEditSub === sub.id ? (
-                  <div className="flex items-center gap-1.5">
-                    <input type="number" min={0} max={sub.taskMaxPoints} className="field py-0.5 px-1.5 w-16 text-center font-bold"
-                      value={inlinePoints} onChange={e => setInlinePoints?.(e.target.value.replace(/\D/g, ''))} />
-                    <button onClick={() => saveInlinePoints?.(sub)} disabled={inlineBusy} className="btn btn-primary py-0.5 px-2 text-[0.7rem]">حفظ</button>
-                    <button onClick={() => setInlineEditSub?.(null)} className="btn btn-secondary py-0.5 px-1.5 text-[0.7rem]">إلغاء</button>
-                  </div>
-                ) : (
-                  <>
-                    <span className="pill pill-green font-extrabold text-[0.75rem]">الدرجة: {sub.grade} / {sub.taskMaxPoints}</span>
-                    <button onClick={() => { setInlineEditSub?.(sub.id); setInlinePoints?.(String(sub.grade || 0)); }} className="text-brand-600 hover:underline font-bold text-[0.7rem]">تعديل</button>
-                  </>
-                )}
-              </div>
-            )}
-            {isRejected && <span className="text-nred-600 font-bold bg-nred-50 py-0.5 px-2 rounded">تم رد المهمة</span>}
-            {sub.feedback && <div className="mt-1 text-ink-400 italic">تعليق: &ldquo;{sub.feedback}&rdquo;</div>}
-          </div>
-        )}
       </div>
 
-      {isPending && onEvaluate && (
-        <div className="mt-4 flex gap-2 justify-end">
-          <button onClick={() => onEvaluate(sub)} className="btn btn-primary py-1.5 px-4 text-xs font-bold">تقييم التسليم</button>
+      {/* compact task line — always visible */}
+      <div className="mt-3 text-sm flex items-center gap-2 flex-wrap">
+        <span className="text-xs text-ink-400 font-bold">المهمة:</span>
+        <span className="font-semibold text-ink-850">{sub.taskTitle}</span>
+        {!showBody && isApproved && sub.grade !== null && <span className="pill pill-green text-[11px]">{sub.grade} / {sub.taskMaxPoints}</span>}
+      </div>
+
+      {showBody && (
+        <div className={collapsible ? 'mt-3 fade-in' : 'mt-3'} onClick={collapsible ? (e => e.stopPropagation()) : undefined}>
+          <div className="flex items-center gap-2 flex-wrap mb-3">
+            {sub.taskTrack && <span className="pill pill-gray text-[11px]">{sub.taskTrack}</span>}
+            <span className="pill pill-yellow text-[11px]">الحد الأقصى: {sub.taskMaxPoints}</span>
+          </div>
+
+          {sub.fileUrl && (
+            <div className="mb-4 bg-ink-50/20 p-2.5 rounded-lg border border-ink-150/50">
+              <div className="text-xs text-ink-400 font-bold mb-1.5">محتوى التسليم:</div>
+              <SubmissionContent fileUrl={sub.fileUrl} />
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-ink-100 text-xs text-ink-500">
+            <div><span className="font-bold">المشرف الموجه:</span> <span className="font-medium text-ink-700">{assignedLabel}</span></div>
+            {!isPending && (
+              <div>
+                {isApproved && (
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    {inlineEditSub === sub.id ? (
+                      <div className="flex items-center gap-1.5">
+                        <input type="number" min={0} max={sub.taskMaxPoints} className="field py-0.5 px-1.5 w-16 text-center font-bold"
+                          value={inlinePoints} onChange={e => setInlinePoints?.(e.target.value.replace(/\D/g, ''))} />
+                        <button onClick={() => saveInlinePoints?.(sub)} disabled={inlineBusy} className="btn btn-primary py-0.5 px-2 text-[0.7rem]">حفظ</button>
+                        <button onClick={() => setInlineEditSub?.(null)} className="btn btn-secondary py-0.5 px-1.5 text-[0.7rem]">إلغاء</button>
+                      </div>
+                    ) : (
+                      <>
+                        <span className="pill pill-green font-extrabold text-[0.75rem]">الدرجة: {sub.grade} / {sub.taskMaxPoints}</span>
+                        <button onClick={() => { setInlineEditSub?.(sub.id); setInlinePoints?.(String(sub.grade || 0)); }} className="text-brand-600 hover:underline font-bold text-[0.7rem]">تعديل</button>
+                      </>
+                    )}
+                  </div>
+                )}
+                {isRejected && <span className="text-nred-600 font-bold bg-nred-50 py-0.5 px-2 rounded">تم رد المهمة</span>}
+                {sub.feedback && <div className="mt-1 text-ink-400 italic">تعليق: &ldquo;{sub.feedback}&rdquo;</div>}
+              </div>
+            )}
+          </div>
+
+          {isPending && onEvaluate && (
+            <div className="mt-4 flex gap-2 justify-end">
+              <button onClick={() => onEvaluate(sub)} className="btn btn-danger py-1.5 px-4 text-xs">رد المهمة</button>
+              <button onClick={() => onEvaluate(sub)} className="btn btn-primary py-1.5 px-4 text-xs font-bold">قبول وتقييم النقاط</button>
+            </div>
+          )}
         </div>
       )}
     </div>

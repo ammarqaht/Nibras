@@ -1,35 +1,18 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, createContext, useContext } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { site } from '@/content';
+import { StudentContext, type StudentUser } from './context';
 
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
-
-type StudentUser = {
-  id: number;
-  membershipNo: number;
-  name: string;
-  stage: string;
-  grade: string;
-  groupId: number | null;
-  individual: number;
-  collective: number;
-  deduction: number;
-  balance: number;
-  rankScore: number;
-};
-
-const StudentContext = createContext<{ user: StudentUser | null }>({ user: null });
-export const useStudent = () => useContext(StudentContext);
 
 const NAV = [
   { href: '/student', label: 'الرئيسية', icon: HomeIcon },
   { href: '/student/tasks', label: 'المهام', icon: TaskIcon },
   { href: '/student/family', label: 'الأسرة', icon: GroupIcon },
   { href: '/student/leaderboard', label: 'الترتيب', icon: LeaderIcon },
-  { href: '/student/announcements', label: 'الإعلانات', icon: BellIcon },
 ];
 
 export default function StudentAppLayout({ children }: { children: React.ReactNode }) {
@@ -245,14 +228,6 @@ function GroupIcon({ active }: { active: boolean }) {
       <path d="M2 20v-1a6 6 0 0 1 12 0v1"/>
       <circle cx="17" cy="9" r="2.5"/>
       <path d="M15 20v-1a5 5 0 0 1 7-4.6" />
-    </svg>
-  );
-}
-function BellIcon({ active }: { active: boolean }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={active ? 0 : 1.8}>
-      <path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6z"/>
-      <path d="M10 19a2 2 0 0 0 4 0" stroke={active ? '#fff' : 'currentColor'} strokeWidth={1.6} fill="none"/>
     </svg>
   );
 }

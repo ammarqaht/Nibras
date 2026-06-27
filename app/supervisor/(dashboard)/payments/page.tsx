@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { pushToast } from '@/components/Toast';
 import { useSupervisor } from '@/components/SupervisorShell';
 import { compressImage } from '@/lib/imageUtils';
+import { StageMultiSelectDropdown, MultiSelectDropdown } from '@/components/StudentFilters';
 
 type Student = {
   id: number;
@@ -16,6 +17,9 @@ type Student = {
   grade: string;
   groupId: number | null;
   neighborhood: string;
+  locationLat: number | null;
+  locationLng: number | null;
+  mapLink: string | null;
   hasCondition: boolean;
   conditionNote: string | null;
   paymentStatus: string;
@@ -23,18 +27,26 @@ type Student = {
   paymentReceipt: string | null;
   registrationStatus: string;
 };
-type Group = { id: number; name: string };
 
-type Tab = 'unpaid' | 'paid' | 'exempted' | 'all';
-const TABS: { key: Tab; label: string }[] = [
-  { key: 'all', label: 'الكل' },
-  { key: 'paid', label: 'مدفوع' },
-  { key: 'exempted', label: 'معفي' },
-  { key: 'unpaid', label: 'غير مدفوع' }
+const PAY_STATUS_OPTIONS = [
+  { value: 'paid', label: 'مدفوع' },
+  { value: 'exempted', label: 'معفي' },
+  { value: 'unpaid', label: 'غير مدفوع' },
+  { value: 'review', label: 'بانتظار المراجعة' },
 ];
 
 function isReview(s: Student) {
   return s.paymentStatus !== 'paid' && s.paymentStatus !== 'exempted' && s.paymentType === 'now' && !!s.paymentReceipt;
+}
+
+function matchesPayStatus(s: Student, statuses: string[]) {
+  if (statuses.length === 0) return true;
+  return statuses.some((st) =>
+    st === 'paid' ? s.paymentStatus === 'paid' :
+    st === 'exempted' ? s.paymentStatus === 'exempted' :
+    st === 'unpaid' ? (s.paymentStatus !== 'paid' && s.paymentStatus !== 'exempted') :
+    st === 'review' ? isReview(s) : false
+  );
 }
 
 
@@ -43,11 +55,11 @@ export default function PaymentsPage() {
   const allowed = (user?.role ?? '').split(',').map((r) => r.trim()).some((r) => r === 'admin' || r === 'finance' || r === 'finance_supervisor');
 
   const [students, setStudents] = useState<Student[]>([]);
-  const [groups,   setGroups]   = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<Tab>('all');
-  const [stageFilter, setStageFilter] = useState('');
-  const [neighborhoodFilter, setNeighborhoodFilter] = useState('');
+  const [search, setSearch] = useState('');
+  const [fStages, setFStages] = useState<string[]>([]);
+  const [fNeighborhoods, setFNeighborhoods] = useState<string[]>([]);
+  const [fPayStatus, setFPayStatus] = useState<string[]>([]);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [expandedIds, setExpandedIds] = useState<Record<number, boolean>>({});
@@ -57,12 +69,8 @@ export default function PaymentsPage() {
   };
 
   async function load() {
-    const [sr, gr] = await Promise.all([
-      fetch('/api/supervisor/students', { cache: 'no-store' }),
-      fetch('/api/supervisor/groups',   { cache: 'no-store' }),
-    ]);
+    const sr = await fetch('/api/supervisor/students', { cache: 'no-store' });
     setStudents((await sr.json().catch(() => ({ students: [] }))).students ?? []);
-    setGroups((await gr.json().catch(() => ({ groups: [] }))).groups ?? []);
     setLoading(false);
   }
   useEffect(() => { if (allowed) load(); else setLoading(false); }, [allowed]);
@@ -73,15 +81,57 @@ export default function PaymentsPage() {
   }, [students]);
 
   const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
     return students.filter((s) => {
-      if (stageFilter && s.stage !== stageFilter) return false;
-      if (neighborhoodFilter && s.neighborhood !== neighborhoodFilter) return false;
-      if (tab === 'paid') return s.paymentStatus === 'paid';
-      if (tab === 'exempted') return s.paymentStatus === 'exempted';
-      if (tab === 'unpaid') return s.paymentStatus !== 'paid' && s.paymentStatus !== 'exempted';
+      if (q) {
+        const hit =
+          s.studentName.toLowerCase().includes(q) ||
+          s.nationalId.includes(q) ||
+          s.guardianPhone.includes(q) ||
+          (s.studentPhone ?? '').includes(q) ||
+          String(s.membershipNo).includes(q);
+        if (!hit) return false;
+      }
+      if (fStages.length > 0) {
+        const hasStageMatch = fStages.includes(`stage:${s.stage}`);
+        const hasGradeMatch = fStages.includes(`grade:${s.grade}`);
+        if (!hasStageMatch && !hasGradeMatch) return false;
+      }
+      if (fNeighborhoods.length > 0 && !fNeighborhoods.includes(s.neighborhood)) return false;
+      if (!matchesPayStatus(s, fPayStatus)) return false;
       return true;
     });
-  }, [students, tab, stageFilter, neighborhoodFilter]);
+  }, [students, search, fStages, fNeighborhoods, fPayStatus]);
+
+  function exportCsv() {
+    const headers = [
+      'رقم العضوية', 'اسم الطالب', 'رقم الهوية', 'جوال ولي الأمر', 'جوال الطالب',
+      'المرحلة', 'الصف', 'الحي', 'حالة الدفع', 'نوع الدفع', 'حالة التسجيل', 'حالة صحية', 'الموقع',
+    ];
+    const statusLabel = (s: Student) =>
+      s.paymentStatus === 'paid' ? 'مدفوع' : s.paymentStatus === 'exempted' ? 'معفي' : isReview(s) ? 'بانتظار المراجعة' : 'لم يدفع';
+    const mapLink = (s: Student) =>
+      s.mapLink ? s.mapLink : (s.locationLat != null && s.locationLng != null ? `https://www.google.com/maps?q=${s.locationLat},${s.locationLng}` : '');
+    const rows = filtered.map((s) => [
+      s.membershipNo, s.studentName, s.nationalId, s.guardianPhone, s.studentPhone ?? '',
+      s.stage, s.grade, s.neighborhood, statusLabel(s),
+      s.paymentType === 'now' ? 'فوري' : 'آجل',
+      s.registrationStatus === 'approved' ? 'مقبول' : s.registrationStatus === 'rejected' ? 'مرفوض' : 'قيد المراجعة',
+      s.hasCondition ? 'نعم' : 'لا', mapLink(s),
+    ]);
+    const esc = (v: unknown) => {
+      const str = String(v ?? '');
+      return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+    };
+    const csv = '﻿' + [headers.join(','), ...rows.map((r) => r.map(esc).join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `nibras-payments-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   async function setExempted(id: number) {
     if (!window.confirm('هل أنت متأكد من إعفاء الطالب من الرسوم؟')) return;
@@ -182,61 +232,71 @@ export default function PaymentsPage() {
     }
   }
 
-  const reviewCount = students.filter(isReview).length;
-
   if (user && !allowed) {
     return <div className="card p-10 text-center text-ink-500">هذه الصفحة متاحة للمالية والمدير العام فقط.</div>;
   }
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-ink-900 mb-1">المدفوعات</h1>
-        <p className="text-sm text-ink-500">مراجعة إيصالات التحويل وتأكيد استلام الرسوم.</p>
+      <div className="mb-6 flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-ink-900 mb-1">المدفوعات</h1>
+          <p className="text-sm text-ink-500">مراجعة إيصالات التحويل وتأكيد استلام الرسوم.</p>
+        </div>
+        <button onClick={exportCsv} className="btn btn-secondary text-sm flex items-center gap-1.5">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
+          </svg>
+          <span>تنزيل بيانات الطلاب (CSV)</span>
+        </button>
       </div>
 
-      <div className="flex gap-2 mb-4 flex-wrap">
-        <select
-          className="field text-sm py-1.5 px-3 min-w-[120px]"
-          value={stageFilter}
-          onChange={(e) => setStageFilter(e.target.value)}
-        >
-          <option value="">كل المراحل</option>
-          <option value="ابتدائي">ابتدائي</option>
-          <option value="متوسط">متوسط</option>
-          <option value="ثانوي">ثانوي</option>
-        </select>
-        <select
-          className="field text-sm py-1.5 px-3 min-w-[140px]"
-          value={neighborhoodFilter}
-          onChange={(e) => setNeighborhoodFilter(e.target.value)}
-        >
-          <option value="">كل الأحياء</option>
-          {neighborhoods.map((n) => (
-            <option key={n} value={n}>{n}</option>
-          ))}
-        </select>
-      </div>
-
-      <div className="flex gap-2 mb-5 flex-wrap">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            className={`choice text-sm ${tab === t.key ? 'is-active' : ''}`}
-            onClick={() => setTab(t.key)}
-          >
-            {t.label}
-            {t.key === 'unpaid' && reviewCount > 0 && (
-              <span className="font-bold text-amber-500 mr-1 inline-flex items-center gap-1">
-                <span>({reviewCount} مراجعة)</span>
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                  <polyline points="14 2 14 8 20 8" />
-                </svg>
-              </span>
+      {/* Filters — matching the students page layout */}
+      <div className="card p-4 mb-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Search */}
+          <div className="relative flex items-center w-full">
+            <input
+              className="field pl-8 w-full"
+              placeholder="بحث بالاسم / الهوية / الجوال / العضوية…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute left-2.5 text-ink-400 hover:text-ink-900 text-lg font-bold leading-none p-1" title="مسح البحث">×</button>
             )}
-          </button>
-        ))}
+          </div>
+
+          {/* Stages */}
+          <div className="flex items-center gap-1.5 w-full">
+            <div className="flex-1 min-w-0">
+              <StageMultiSelectDropdown selected={fStages} onChange={setFStages} />
+            </div>
+            {fStages.length > 0 && (
+              <button onClick={() => setFStages([])} className="text-ink-400 hover:text-ink-900 text-xl font-bold p-1 leading-none shrink-0" title="مسح تصفية المراحل">×</button>
+            )}
+          </div>
+
+          {/* Neighborhoods */}
+          <div className="flex items-center gap-1.5 w-full">
+            <div className="flex-1 min-w-0">
+              <MultiSelectDropdown label="تصفية الأحياء" options={neighborhoods.map((n) => ({ value: n, label: n }))} selected={fNeighborhoods} onChange={setFNeighborhoods} />
+            </div>
+            {fNeighborhoods.length > 0 && (
+              <button onClick={() => setFNeighborhoods([])} className="text-ink-400 hover:text-ink-900 text-xl font-bold p-1 leading-none shrink-0" title="مسح تصفية الأحياء">×</button>
+            )}
+          </div>
+
+          {/* Payment status */}
+          <div className="flex items-center gap-1.5 w-full">
+            <div className="flex-1 min-w-0">
+              <MultiSelectDropdown label="حالة الدفع" options={PAY_STATUS_OPTIONS} selected={fPayStatus} onChange={setFPayStatus} />
+            </div>
+            {fPayStatus.length > 0 && (
+              <button onClick={() => setFPayStatus([])} className="text-ink-400 hover:text-ink-900 text-xl font-bold p-1 leading-none shrink-0" title="مسح تصفية حالة الدفع">×</button>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="card p-0 overflow-hidden">
@@ -253,7 +313,7 @@ export default function PaymentsPage() {
                   <tr>
                     <th className="w-[18%]">الطالب</th>
                     <th className="w-[8%]">العضوية</th>
-                    <th className="w-[14%]">الموقع</th>
+                    <th className="w-[14%]">المرحلة</th>
                     <th className="w-[10%]">نوع الدفع</th>
                     <th className="w-[10%]">الإيصال</th>
                     <th className="w-[10%]">الحالة</th>
@@ -276,10 +336,7 @@ export default function PaymentsPage() {
                         )}
                       </td>
                       <td dir="ltr" className="text-right font-mono text-ink-500">#{s.membershipNo}</td>
-                      <td className="text-xs text-ink-600">
-                        <div>{s.stage} — {s.grade}</div>
-                        {s.groupId && <div className="text-ink-400">{groups.find(g=>g.id===s.groupId)?.name??''}</div>}
-                      </td>
+                      <td className="text-xs text-ink-600">{s.stage} — {s.grade}</td>
                       <td><span className="pill pill-gray">{s.paymentType === 'now' ? 'فوري' : 'آجل'}</span></td>
                       <td>
                         {s.paymentReceipt ? (
@@ -369,11 +426,6 @@ export default function PaymentsPage() {
                           <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-cream-100 text-ink-600">
                             {s.stage} — {s.grade}
                           </span>
-                          {s.groupId && (
-                            <span className="text-[10px] px-2 py-0.5 rounded bg-ink-50 text-ink-500">
-                              {groups.find(g=>g.id===s.groupId)?.name??''}
-                            </span>
-                          )}
                         </div>
                         <span dir="ltr" className="font-mono text-xs text-ink-400">#{s.membershipNo}</span>
                       </div>
@@ -508,7 +560,6 @@ export default function PaymentsPage() {
       {selectedStudent && (
         <StudentDetailsModal
           student={selectedStudent}
-          groupName={selectedStudent.groupId ? groups.find(g=>g.id===selectedStudent.groupId)?.name??'' : ''}
           busyId={busyId}
           isAdmin={user?.role === 'admin'}
           onClose={() => setSelectedStudent(null)}
@@ -524,7 +575,6 @@ export default function PaymentsPage() {
 
 function StudentDetailsModal({
   student,
-  groupName,
   busyId,
   isAdmin,
   onClose,
@@ -534,7 +584,6 @@ function StudentDetailsModal({
   onDelete
 }: {
   student: Student;
-  groupName: string;
   busyId: number | null;
   isAdmin: boolean;
   onClose: () => void;
@@ -561,6 +610,12 @@ function StudentDetailsModal({
       : student.studentPhone
     : null;
   const studentWhatsappUrl = formattedStudentPhone ? `https://wa.me/${formattedStudentPhone}` : null;
+
+  const mapsHref = student.mapLink
+    ? student.mapLink
+    : student.locationLat != null && student.locationLng != null
+    ? `https://www.google.com/maps?q=${student.locationLat},${student.locationLng}`
+    : null;
 
   async function openReceipt(receipt: string) {
     if (receipt.startsWith('data:')) {
@@ -652,10 +707,6 @@ function StudentDetailsModal({
               <span className="text-ink-900 font-semibold">{student.stage} — {student.grade}</span>
             </div>
             <div>
-              <span className="text-ink-500 text-xs block mb-1">الأسرة / المجموعة</span>
-              <span className="text-ink-900 font-semibold">{groupName || '—'}</span>
-            </div>
-            <div>
               <span className="text-ink-500 text-xs block mb-1">الحي السكني</span>
               <span className="text-ink-900 font-semibold">{student.neighborhood}</span>
             </div>
@@ -664,6 +715,33 @@ function StudentDetailsModal({
               <span className={`pill ${student.registrationStatus === 'approved' ? 'pill-green' : student.registrationStatus === 'rejected' ? 'pill-red' : student.registrationStatus === 'pending' ? 'pill-yellow' : 'pill-gray'}`}>
                 {student.registrationStatus === 'approved' ? 'مقبول' : student.registrationStatus === 'rejected' ? 'مرفوض' : student.registrationStatus === 'pending' ? 'قيد الانتظار' : 'غير محدد'}
               </span>
+            </div>
+          </div>
+
+          {/* Geographic location */}
+          <div className="border-t border-line pt-4">
+            <div className="flex items-center justify-between bg-cream-50 p-2.5 rounded-lg border border-line">
+              <div className="min-w-0">
+                <span className="text-xs text-ink-500 block">الموقع الجغرافي</span>
+                <span className="text-xs text-ink-800 font-semibold">
+                  {mapsHref ? 'موقع مسجَّل على الخريطة' : 'غير محدد'}
+                </span>
+              </div>
+              {mapsHref && (
+                <a
+                  href={mapsHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn text-white py-1.5 px-2.5 text-xs flex items-center gap-1 rounded-md shrink-0"
+                  style={{ background: '#1B7A43' }}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                    <circle cx="12" cy="10" r="3" />
+                  </svg>
+                  <span>فتح في الخرائط</span>
+                </a>
+              )}
             </div>
           </div>
 

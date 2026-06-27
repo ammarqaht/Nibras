@@ -72,6 +72,7 @@ export default function AttendancePage() {
 
   /* daily log */
   const [logOpen,    setLogOpen]    = useState(false);
+  const [logDate,    setLogDate]    = useState(todayStr());
   const [logSearch,  setLogSearch]  = useState('');
   const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
   const [logLoading, setLogLoading] = useState(false);
@@ -111,11 +112,9 @@ export default function AttendancePage() {
     else { const j=await r.json().catch(()=>({})); pushToast('error', j.error??'فشل الحفظ'); }
   }
 
-  async function openLog() {
-    setLogSearch('');
+  async function loadLogForDate(d: string) {
     setLogLoading(true);
-    setLogOpen(true);
-    const r = await fetch(`/api/supervisor/attendance?date=${date}`, { cache:'no-store' });
+    const r = await fetch(`/api/supervisor/attendance?date=${d}`, { cache:'no-store' });
     const j = await r.json().catch(()=>({attendance:[]}));
     const sMap = new Map(students.map(s => [s.id, s]));
     const gMap = new Map(groups.map(g => [g.id, g.name]));
@@ -137,14 +136,21 @@ export default function AttendancePage() {
     setLogLoading(false);
   }
 
+  async function openLog() {
+    setLogSearch('');
+    setLogDate(date);
+    setLogOpen(true);
+    await loadLogForDate(date);
+  }
+
   async function cancelLogEntry(registrationId: number) {
     const r = await fetch(
-      `/api/supervisor/attendance?registrationId=${registrationId}&date=${date}`,
+      `/api/supervisor/attendance?registrationId=${registrationId}&date=${logDate}`,
       { method: 'DELETE' }
     );
     if (r.ok) {
       setLogEntries(prev => prev.filter(e => e.registrationId !== registrationId));
-      setRecords(prev => { const n={...prev}; delete n[registrationId]; return n; });
+      if (logDate === date) setRecords(prev => { const n={...prev}; delete n[registrationId]; return n; });
     }
   }
 
@@ -312,11 +318,11 @@ export default function AttendancePage() {
       {logOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm fade-in"
           onClick={()=>setLogOpen(false)}>
-          <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl shadow-2xl border border-ink-100 pop-in flex flex-col max-h-[90dvh]"
+          <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl shadow-2xl border border-ink-100 pop-in flex flex-col h-[85dvh] sm:h-[600px]"
             onClick={e=>e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-ink-100 shrink-0">
               <div>
-                <h2 className="font-bold text-ink-900">سجل الحضور — {date}</h2>
+                <h2 className="font-bold text-ink-900">سجل الحضور</h2>
                 <div className="flex flex-wrap gap-2 mt-1">
                   {logEntries.filter(e=>e.status==='present').length > 0 && <span className="pill pill-green text-xs">حاضر {logEntries.filter(e=>e.status==='present').length}</span>}
                   {logEntries.filter(e=>e.status==='late').length > 0    && <span className="pill pill-yellow text-xs">متأخر {logEntries.filter(e=>e.status==='late').length}</span>}
@@ -330,7 +336,12 @@ export default function AttendancePage() {
                 </svg>
               </button>
             </div>
-            <div className="px-5 py-3 border-b border-ink-100 shrink-0">
+            <div className="px-5 py-3 border-b border-ink-100 shrink-0 space-y-2">
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-semibold text-ink-500 shrink-0">اليوم:</label>
+                <input type="date" className="field py-1.5 text-sm flex-1" dir="ltr" value={logDate}
+                  onChange={e=>{ setLogDate(e.target.value); loadLogForDate(e.target.value); }}/>
+              </div>
               <input type="text" className="field py-2 text-sm" placeholder="بحث بالاسم أو رقم العضوية أو المجموعة…"
                 value={logSearch} onChange={e=>setLogSearch(e.target.value)} autoFocus/>
             </div>

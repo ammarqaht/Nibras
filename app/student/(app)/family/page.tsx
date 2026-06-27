@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useStudent } from '../layout';
+import { useStudent } from '../context';
 
 type FamilyMember = {
   id: number;

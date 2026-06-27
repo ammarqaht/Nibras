@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { updateSubmission, deleteSubmission, getSubmissionById, createNotification } from '@/lib/services';
+import { updateSubmission, deleteSubmission, getSubmissionById, createNotification, refundTaskCost } from '@/lib/services';
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -11,6 +11,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const { id } = await params;
     const body = await req.json();
+
+    // Rejecting a submission requires a reason for the student
+    if (body.status === 'rejected' && !String(body.feedback ?? '').trim()) {
+      return NextResponse.json({ error: 'يجب إضافة سبب رد المهمة' }, { status: 400 });
+    }
 
     // Fetch existing submission to detect status change and get student/task info
     const existing = await getSubmissionById(id);
@@ -35,6 +40,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     // Add points when approved
     if (statusChanged && newStatus === 'approved') {
       const grade = patch.grade ?? 0;
+      // Refund the task's claim cost in full on approval
+      try { await refundTaskCost(updated.registrationId, updated.taskId); } catch { /* non-fatal */ }
       if (grade > 0) {
         try {
           await fetch(`${req.nextUrl.origin}/api/supervisor/points`, {

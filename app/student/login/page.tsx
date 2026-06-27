@@ -66,10 +66,11 @@ export default function StudentLogin() {
             <label className="label">رقم العضوية</label>
             <input
               className="field tabular-nums"
-              type="number"
+              type="text"
               inputMode="numeric"
+              pattern="[0-9]*"
               value={membershipNo}
-              onChange={e => setMembershipNo(e.target.value)}
+              onChange={e => setMembershipNo(e.target.value.replace(/\D/g, ''))}
               autoComplete="username"
               placeholder="مثال: 1001"
               required

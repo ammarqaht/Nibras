@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { site } from '@/content';
-import { useStudent } from './layout';
+import { useStudent } from './context';
 
 type ScheduleItem = { id: string; title: string; startTime: string; endTime: string; role: string; notes?: string | null };
 type AttendanceItem = { id: number; date: string; status: string };
@@ -11,8 +11,13 @@ type TaskPeek = {
   task: { id: string; title: string; description: string; maxPoints: number; dueDate: string; track: string | null };
   submission: { id: string; status: string; grade: number | null; feedback: string | null; fileUrl: string; submittedAt: string } | null;
 };
-type AnnouncementPeek = { id: number; title: string; body: string; imageUrl?: string | null; createdAt: string };
+type PointRec = { id: number; delta: number; reason: string; category: string; pointType: string; createdAt: string };
 type FamilyPeek = { group: { id: number; name: string; stage: string } | null };
+
+const CATEGORY_LABELS: Record<string, string> = {
+  attendance: 'الحضور', tasks: 'المهام', social: 'اجتماعية', cultural: 'ثقافية',
+  scientific: 'علمية', sports: 'رياضية', media: 'إعلامية', general: 'عام', behavior: 'سلوك',
+};
 
 const ROLE_LABELS: Record<string, string> = {
   social_supervisor: 'اجتماعية',
@@ -54,10 +59,17 @@ function useCountUp(target: number, duration = 900) {
   return value;
 }
 
-function StatTile({ label, value, accent, icon }: { label: string; value: number; accent: string; icon: React.ReactNode }) {
+function StatTile({ label, value, accent, icon, onClick }: { label: string; value: number; accent: string; icon: React.ReactNode; onClick?: () => void }) {
   const v = useCountUp(value);
   return (
-    <div className="stat-tile" style={{ ['--tile-accent' as any]: accent }}>
+    <div
+      className="stat-tile"
+      style={{ ['--tile-accent' as any]: accent, cursor: onClick ? 'pointer' : undefined }}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e => { if (e.key === 'Enter' || e.key === ' ') onClick(); }) : undefined}
+    >
       <div className="flex items-center justify-between mb-2">
         <span
           className="inline-flex items-center justify-center w-7 h-7 rounded-lg"
@@ -70,6 +82,7 @@ function StatTile({ label, value, accent, icon }: { label: string; value: number
       <p className="font-display tabular-nums text-3xl font-bold leading-none" style={{ color: 'var(--ink)' }}>
         {v}
       </p>
+      {onClick && <p className="text-[10px] mt-1 font-medium" style={{ color: accent }}>اضغط للتفاصيل ←</p>}
     </div>
   );
 }
@@ -86,12 +99,12 @@ export default function StudentHome() {
   const [schedule, setSchedule] = useState<ScheduleItem[]>([]);
   const [attendance, setAttendance] = useState<AttendanceItem[]>([]);
   const [tasks, setTasks] = useState<TaskPeek[]>([]);
-  const [announcements, setAnnouncements] = useState<AnnouncementPeek[]>([]);
+  const [points, setPoints] = useState<PointRec[]>([]);
   const [family, setFamily] = useState<FamilyPeek | null>(null);
+  const [showBreakdown, setShowBreakdown] = useState(false);
   const [loadingSched, setLoadingSched] = useState(true);
   const [loadingAtt, setLoadingAtt] = useState(true);
   const [loadingTasks, setLoadingTasks] = useState(true);
-  const [loadingAnn, setLoadingAnn] = useState(true);
 
   const revealRef = useRef<HTMLDivElement>(null);
 
@@ -99,7 +112,7 @@ export default function StudentHome() {
     fetch('/api/student/schedule').then(r => r.json()).then(d => setSchedule(d.schedule || [])).finally(() => setLoadingSched(false));
     fetch('/api/student/attendance').then(r => r.json()).then(d => setAttendance(d.attendance || [])).finally(() => setLoadingAtt(false));
     fetch('/api/student/tasks').then(r => r.json()).then(d => setTasks(d.tasks || [])).finally(() => setLoadingTasks(false));
-    fetch('/api/student/announcements-feed').then(r => r.json()).then(d => setAnnouncements(d.announcements || [])).finally(() => setLoadingAnn(false));
+    fetch('/api/student/points').then(r => r.json()).then(d => setPoints(d.points || []));
     fetch('/api/student/family').then(r => r.json()).then(d => setFamily(d));
   }, []);
 
@@ -124,6 +137,12 @@ export default function StudentHome() {
   const lateCount = attendance.filter(a => a.status === 'late').length;
   const totalSessions = attendance.length;
   const attendancePct = totalSessions > 0 ? Math.round(((presentCount + lateCount) / totalSessions) * 100) : 0;
+
+  // Individual points breakdown (attendance vs tasks vs other)
+  const indivAttendance = points.filter(p => p.pointType === 'individual' && p.category === 'attendance').reduce((a, p) => a + p.delta, 0);
+  const indivTasks = points.filter(p => p.pointType === 'individual' && p.category === 'tasks').reduce((a, p) => a + p.delta, 0);
+  const indivOther = (user?.individual ?? 0) - indivAttendance - indivTasks;
+  const ledger = [...points].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
 
   // Active tasks not yet submitted, ordered by due date asc
   const activeNotSubmitted = tasks
@@ -188,6 +207,7 @@ export default function StudentHome() {
               label="فردي"
               value={user.individual}
               accent="#FF9F1C"
+              onClick={() => setShowBreakdown(true)}
               icon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>}
             />
             <StatTile
@@ -308,31 +328,37 @@ export default function StudentHome() {
         )}
       </section>
 
-      {/* 5. Announcements peek */}
+      {/* 5. Balance ledger */}
       <section className="reveal">
         <div className="flex items-baseline justify-between mb-3 px-1">
-          <h2 className="font-display text-lg font-bold" style={{ color: 'var(--ink)' }}>الإعلانات</h2>
-          <Link href="/student/announcements" className="text-xs font-medium" style={{ color: 'var(--accent-deep)' }}>عرض الكل ←</Link>
+          <h2 className="font-display text-lg font-bold" style={{ color: 'var(--ink)' }}>سجل الرصيد</h2>
+          <span className="text-xs" style={{ color: 'var(--ink-soft)' }}>{ledger.length} حركة</span>
         </div>
-        {loadingAnn ? (
-          <div className="skeleton" style={{ height: 84 }} />
-        ) : announcements.length === 0 ? (
-          <div className="card p-5">
-            <EmptyState emoji="📭" line="لا توجد إعلانات حالياً." />
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {announcements.slice(0, 2).map(a => (
-              <Link key={a.id} href="/student/announcements" className="card p-4 block hover:shadow-md transition-shadow">
-                <p className="font-display text-base font-bold mb-1" style={{ color: 'var(--ink)' }}>{a.title}</p>
-                <p className="text-xs line-clamp-2" style={{ color: 'var(--ink-soft)' }}>{a.body}</p>
-                <p className="text-[11px] mt-2" style={{ color: 'var(--ink-soft)', opacity: 0.75 }}>
-                  {new Date(a.createdAt).toLocaleDateString('ar-SA', { day: 'numeric', month: 'long', year: 'numeric' })}
-                </p>
-              </Link>
-            ))}
-          </div>
-        )}
+        <div className="card p-0 overflow-hidden">
+          {ledger.length === 0 ? (
+            <div className="p-5"><EmptyState emoji="🧾" line="لا توجد حركات على رصيدك بعد." /></div>
+          ) : (
+            <ul className="divide-y" style={{ ['--tw-divide-color' as any]: 'var(--line)' }}>
+              {ledger.slice(0, 15).map(p => {
+                const positive = p.delta >= 0;
+                return (
+                  <li key={p.id} className="flex items-center gap-3 px-4 py-3">
+                    <span className="w-10 h-9 rounded-xl flex items-center justify-center text-sm font-bold tabular-nums shrink-0"
+                      style={{ background: positive ? '#E7F6EC' : '#FDEAE6', color: positive ? '#1B7A43' : '#C42910' }}>
+                      {positive ? '+' : ''}{p.delta}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate" style={{ color: 'var(--ink)' }}>{p.reason}</p>
+                      <p className="text-[11px] mt-0.5" style={{ color: 'var(--ink-soft)' }}>
+                        {CATEGORY_LABELS[p.category] || p.category} · <span dir="ltr">{new Date(p.createdAt).toLocaleDateString('ar-SA')}</span>
+                      </p>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
       </section>
 
       {/* 6. Attendance chips — subtle */}
@@ -357,6 +383,35 @@ export default function StudentHome() {
             </div>
           </div>
         </section>
+      )}
+
+      {/* Individual points breakdown */}
+      {showBreakdown && user && (
+        <div className="modal-backdrop flex items-end sm:items-center justify-center p-3 sm:p-6" onClick={() => setShowBreakdown(false)}>
+          <div className="modal-panel w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: 'var(--line)' }}>
+              <h3 className="font-display text-lg font-bold" style={{ color: 'var(--ink)' }}>تفاصيل النقاط الفردية</h3>
+              <button onClick={() => setShowBreakdown(false)} className="btn btn-ghost p-2" aria-label="إغلاق">✕</button>
+            </div>
+            <div className="p-5 space-y-3">
+              {[
+                { label: 'نقاط الحضور', value: indivAttendance, color: '#1B7A43', bg: '#E7F6EC', icon: '🕌' },
+                { label: 'نقاط المهام', value: indivTasks, color: '#FF9F1C', bg: '#FFF4E0', icon: '🎯' },
+                ...(indivOther !== 0 ? [{ label: 'نقاط أخرى', value: indivOther, color: '#103F91', bg: '#EAF0FB', icon: '⭐' }] : []),
+              ].map(row => (
+                <div key={row.label} className="flex items-center gap-3 rounded-xl p-3" style={{ background: row.bg }}>
+                  <span className="text-xl">{row.icon}</span>
+                  <span className="flex-1 text-sm font-bold" style={{ color: row.color }}>{row.label}</span>
+                  <span className="font-display tabular-nums text-xl font-bold" style={{ color: row.color }}>{row.value}</span>
+                </div>
+              ))}
+              <div className="flex items-center justify-between pt-3 border-t" style={{ borderColor: 'var(--line)' }}>
+                <span className="text-sm font-bold" style={{ color: 'var(--ink)' }}>إجمالي الفردي</span>
+                <span className="font-display tabular-nums text-2xl font-bold" style={{ color: 'var(--ink)' }}>{user.individual}</span>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

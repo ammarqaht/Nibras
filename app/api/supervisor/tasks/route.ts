@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true });
     }
 
-    const { title, description, maxPoints, startDate, dueDate, track, submissionMethod, assignedAdmins, imageUrl, resourceLink, visibility, visibleToIds } = body;
+    const { title, description, maxPoints, startDate, dueDate, track, stage, cost, durationHours, submissionMethod, assignedAdmins, imageUrl, resourceLink, visibility, visibleToIds } = body;
 
     if (!title || !description || !maxPoints || !dueDate) {
       return NextResponse.json({ error: 'البيانات غير كاملة' }, { status: 400 });
@@ -82,8 +82,11 @@ export async function POST(req: NextRequest) {
       startDate: startDate ? new Date(startDate).toISOString() : null,
       dueDate: new Date(dueDate).toISOString(),
       track: track?.trim() || 'عام',
+      stage: stage || null,
+      cost: Number.isFinite(Number(cost)) ? Math.max(0, parseInt(cost, 10) || 0) : 0,
+      durationHours: durationHours != null && durationHours !== '' ? Math.max(0, parseInt(durationHours, 10) || 0) || null : null,
       isActive: true,
-      submissionMethod: submissionMethod || 'رفع ملف',
+      submissionMethod: submissionMethod || 'file',
       assignedAdmins: Array.isArray(assignedAdmins) ? assignedAdmins.map(String) : [],
       imageUrl: imageUrl || null,
       resourceLink: resourceLink || null,

@@ -1449,6 +1449,9 @@ export type TaskInfo = {
   dueDate: string;
   createdAt: string;
   track: string | null;
+  stage?: string | null;       // المرحلة المعنية — '' / 'الكل' = all stages
+  cost?: number;               // points deducted from the student's balance when claiming
+  durationHours?: number | null; // hours the student has to finish after claiming (null = open)
   isActive: boolean;
   submissionMethod: string | null;
   assignedAdmins: string[];
@@ -1467,6 +1470,7 @@ export type SubmissionInfo = {
   grade: number | null;
   feedback: string | null;
   selectedAdminId: string | null;
+  claimedAt?: string | null;
   submittedAt: string;
   studentName?: string;
   taskTitle?: string;
@@ -1488,6 +1492,9 @@ export async function getTasks(): Promise<TaskInfo[]> {
       dueDate: t.dueDate.toISOString(),
       createdAt: t.createdAt.toISOString(),
       track: t.track,
+      stage: (t as any).stage ?? null,
+      cost: (t as any).cost ?? 0,
+      durationHours: (t as any).durationHours ?? null,
       isActive: t.isActive,
       submissionMethod: t.submissionMethod,
       assignedAdmins: t.assignedAdmins,
@@ -1507,8 +1514,11 @@ export async function getTasks(): Promise<TaskInfo[]> {
       dueDate: String(t.dueDate),
       createdAt: String(t.createdAt || new Date().toISOString()),
       track: t.track || 'عام',
+      stage: t.stage ?? null,
+      cost: Number(t.cost ?? 0),
+      durationHours: t.durationHours ?? null,
       isActive: t.isActive !== false,
-      submissionMethod: t.submissionMethod || 'رفع ملف',
+      submissionMethod: t.submissionMethod || 'file',
       assignedAdmins: Array.isArray(t.assignedAdmins) ? t.assignedAdmins : [],
       imageUrl: t.imageUrl || null,
       resourceLink: t.resourceLink || null,
@@ -1544,6 +1554,9 @@ export async function createTask(data: Omit<TaskInfo, 'id' | 'createdAt'>): Prom
         startDate: task.startDate ? new Date(task.startDate) : null,
         dueDate: new Date(task.dueDate),
         track: task.track,
+        stage: task.stage ?? null,
+        cost: task.cost ?? 0,
+        durationHours: task.durationHours ?? null,
         isActive: task.isActive,
         submissionMethod: task.submissionMethod,
         assignedAdmins: task.assignedAdmins,
@@ -1565,7 +1578,7 @@ export async function createTask(data: Omit<TaskInfo, 'id' | 'createdAt'>): Prom
 export async function updateTask(id: string, patch: Partial<Omit<TaskInfo, 'id' | 'createdAt'>>): Promise<TaskInfo | null> {
   const dbData: any = {};
   const allowedKeys = [
-    'title', 'description', 'maxPoints', 'startDate', 'dueDate', 'track', 'isActive',
+    'title', 'description', 'maxPoints', 'startDate', 'dueDate', 'track', 'stage', 'cost', 'durationHours', 'isActive',
     'submissionMethod', 'assignedAdmins', 'imageUrl', 'resourceLink', 'visibility', 'visibleToIds'
   ] as const;
 
@@ -1591,6 +1604,9 @@ export async function updateTask(id: string, patch: Partial<Omit<TaskInfo, 'id' 
         dueDate: updated.dueDate.toISOString(),
         createdAt: updated.createdAt.toISOString(),
         track: updated.track,
+        stage: (updated as any).stage ?? null,
+        cost: (updated as any).cost ?? 0,
+        durationHours: (updated as any).durationHours ?? null,
         isActive: updated.isActive,
         submissionMethod: updated.submissionMethod,
         assignedAdmins: updated.assignedAdmins,
@@ -1661,6 +1677,7 @@ export async function getSubmissions(): Promise<SubmissionInfo[]> {
         grade: s.grade,
         feedback: s.feedback,
         selectedAdminId: s.selectedAdminId,
+        claimedAt: (s as any).claimedAt ? (s as any).claimedAt.toISOString() : null,
         submittedAt: s.submittedAt.toISOString(),
         studentName: studentsMap.get(s.registrationId) || `طالب #${s.registrationId}`,
         taskTitle: task?.title || 'مهمة محذوفة',
@@ -1682,6 +1699,7 @@ export async function getSubmissions(): Promise<SubmissionInfo[]> {
         grade: s.grade !== null && s.grade !== undefined ? Number(s.grade) : null,
         feedback: s.feedback || null,
         selectedAdminId: s.selectedAdminId || null,
+        claimedAt: s.claimedAt || null,
         submittedAt: String(s.submittedAt || new Date().toISOString()),
         studentName: studentsMap.get(Number(s.registrationId)) || `طالب #${s.registrationId}`,
         taskTitle: task?.title || 'مهمة محذوفة',
@@ -1852,6 +1870,140 @@ export async function updateSubmission(id: string, patch: Partial<Omit<Submissio
       taskTrack: task?.track || null,
       taskAssignedAdmins: task?.assignedAdmins || [],
     };
+  }
+}
+
+// ─── TASK ECONOMY: claim / submit / cancel / expire ──────────────────────────
+// A student must "claim" a task (paying its cost) before submitting. Statuses:
+// claimed → pending → approved | rejected ; or cancelled | expired.
+
+export const ACTIVE_CLAIM_STATUSES = ['claimed', 'pending', 'rejected'];
+
+export async function expireStaleClaims(): Promise<void> {
+  const now = Date.now();
+  const tasks = await getTasks();
+  const taskMap = new Map(tasks.map(t => [t.id, t]));
+  const isStale = (claimedAtIso: string | null, taskId: string) => {
+    const t = taskMap.get(taskId);
+    const dur = t?.durationHours ?? null;
+    if (!dur || dur <= 0 || !claimedAtIso) return false;
+    return new Date(claimedAtIso).getTime() + dur * 3600000 < now;
+  };
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    const claimed = await prisma.submission.findMany({ where: { status: 'claimed' } });
+    for (const s of claimed) {
+      const claimedAt = (s as any).claimedAt ? (s as any).claimedAt.toISOString() : s.submittedAt.toISOString();
+      if (isStale(claimedAt, s.taskId)) {
+        await prisma.submission.update({ where: { id: s.id }, data: { status: 'expired' } });
+      }
+    }
+  } else {
+    const list = await readJsonFile<any[]>(FILE_SUBMISSIONS, []);
+    let changed = false;
+    for (const s of list) {
+      if (s.status !== 'claimed') continue;
+      const claimedAt = s.claimedAt || s.submittedAt || null;
+      if (isStale(claimedAt, String(s.taskId))) { s.status = 'expired'; changed = true; }
+    }
+    if (changed) await writeJsonFile(FILE_SUBMISSIONS, list);
+  }
+}
+
+export async function claimTask(registrationId: number, taskId: string): Promise<{ submission?: SubmissionInfo; error?: string }> {
+  await expireStaleClaims();
+  const tasks = await getTasks();
+  const task = tasks.find(t => t.id === taskId);
+  if (!task || !task.isActive) return { error: 'المهمة غير متاحة' };
+
+  const subs = await getSubmissions();
+  const mine = subs.filter(s => s.registrationId === registrationId);
+  const existing = mine.find(s => s.taskId === taskId);
+  if (existing && ACTIVE_CLAIM_STATUSES.includes(existing.status)) return { error: 'لقد طلبت هذه المهمة بالفعل' };
+  if (existing && existing.status === 'approved') return { error: 'لقد أنجزت هذه المهمة بالفعل' };
+
+  const active = mine.filter(s => ACTIVE_CLAIM_STATUSES.includes(s.status));
+  if (active.length >= 3) return { error: 'لا يمكنك طلب أكثر من ٣ مهام نشطة في آنٍ واحد' };
+  const track = task.track || 'عام';
+  if (active.some(s => (s.taskTrack || 'عام') === track)) return { error: 'لديك مهمة نشطة في نفس القسم — أنهِها أولاً' };
+
+  const crypto = await import('crypto');
+  const now = new Date();
+  const cost = task.cost ?? 0;
+
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    await prisma.submission.upsert({
+      where: { registrationId_taskId: { registrationId, taskId } },
+      update: { status: 'claimed', fileUrl: '', grade: null, feedback: null, claimedAt: now, submittedAt: now },
+      create: { id: crypto.randomUUID(), registrationId, taskId, fileUrl: '', status: 'claimed', grade: null, feedback: null, selectedAdminId: null, claimedAt: now, submittedAt: now },
+    });
+  } else {
+    const list = await readJsonFile<any[]>(FILE_SUBMISSIONS, []);
+    const idx = list.findIndex(s => Number(s.registrationId) === registrationId && String(s.taskId) === taskId);
+    const base = { registrationId, taskId, fileUrl: '', status: 'claimed', grade: null, feedback: null, selectedAdminId: null, claimedAt: now.toISOString(), submittedAt: now.toISOString() };
+    if (idx !== -1) list[idx] = { ...list[idx], ...base };
+    else list.push({ id: crypto.randomUUID(), ...base });
+    await writeJsonFile(FILE_SUBMISSIONS, list);
+  }
+
+  if (cost > 0) {
+    await addPointsRecord({ registrationId, delta: -cost, reason: `طلب مهمة: ${task.title}`, category: 'tasks', pointType: 'deduction', recordedBy: 'النظام' });
+  }
+
+  const refreshed = await getSubmissions();
+  return { submission: refreshed.find(s => s.registrationId === registrationId && s.taskId === taskId) };
+}
+
+export async function submitClaim(registrationId: number, taskId: string, fileUrl: string): Promise<{ submission?: SubmissionInfo; error?: string }> {
+  await expireStaleClaims();
+  const subs = await getSubmissions();
+  const existing = subs.find(s => s.registrationId === registrationId && s.taskId === taskId);
+  if (!existing || !['claimed', 'rejected'].includes(existing.status)) {
+    return { error: 'يجب طلب المهمة أولاً قبل تسليمها' };
+  }
+  const now = new Date();
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    await prisma.submission.update({ where: { id: existing.id }, data: { fileUrl, status: 'pending', submittedAt: now } });
+  } else {
+    const list = await readJsonFile<any[]>(FILE_SUBMISSIONS, []);
+    const idx = list.findIndex(s => String(s.id) === existing.id);
+    if (idx !== -1) { list[idx] = { ...list[idx], fileUrl, status: 'pending', submittedAt: now.toISOString() }; await writeJsonFile(FILE_SUBMISSIONS, list); }
+  }
+  const refreshed = await getSubmissions();
+  return { submission: refreshed.find(s => s.id === existing.id) };
+}
+
+export async function cancelClaim(registrationId: number, taskId: string): Promise<{ ok: boolean; error?: string }> {
+  const subs = await getSubmissions();
+  const existing = subs.find(s => s.registrationId === registrationId && s.taskId === taskId);
+  if (!existing || !ACTIVE_CLAIM_STATUSES.includes(existing.status)) return { ok: false, error: 'لا توجد مهمة نشطة لإلغائها' };
+  const tasks = await getTasks();
+  const task = tasks.find(t => t.id === taskId);
+  const cost = task?.cost ?? 0;
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    await prisma.submission.update({ where: { id: existing.id }, data: { status: 'cancelled' } });
+  } else {
+    const list = await readJsonFile<any[]>(FILE_SUBMISSIONS, []);
+    const idx = list.findIndex(s => String(s.id) === existing.id);
+    if (idx !== -1) { list[idx] = { ...list[idx], status: 'cancelled' }; await writeJsonFile(FILE_SUBMISSIONS, list); }
+  }
+  const refund = Math.floor(cost / 2);
+  if (refund > 0) {
+    await addPointsRecord({ registrationId, delta: refund, reason: `استرداد نصف مبلغ مهمة ملغاة: ${task?.title || ''}`, category: 'tasks', pointType: 'deduction', recordedBy: 'النظام' });
+  }
+  return { ok: true };
+}
+
+// On approval the full cost is returned to the student (in addition to the reward points).
+export async function refundTaskCost(registrationId: number, taskId: string): Promise<void> {
+  const tasks = await getTasks();
+  const task = tasks.find(t => t.id === taskId);
+  const cost = task?.cost ?? 0;
+  if (cost > 0) {
+    await addPointsRecord({ registrationId, delta: cost, reason: `استرداد مبلغ المهمة بعد القبول: ${task?.title || ''}`, category: 'tasks', pointType: 'deduction', recordedBy: 'النظام' });
   }
 }
 
@@ -2392,6 +2544,7 @@ export async function getStudentTasksWithSubmissions(registrationId: number, sta
   task: TaskInfo;
   submission: SubmissionInfo | null;
 }[]> {
+  await expireStaleClaims();
   const tasks = await getTasks();
   const submissions = await getSubmissions();
 
@@ -2400,6 +2553,8 @@ export async function getStudentTasksWithSubmissions(registrationId: number, sta
     if (t.visibility === 'specific') {
       return t.visibleToIds.includes(registrationId);
     }
+    // Stage targeting (المرحلة المعنية): empty / 'الكل' means all stages
+    if (t.stage && t.stage !== 'الكل' && stage && t.stage !== stage) return false;
     return true;
   });
 
@@ -2524,19 +2679,30 @@ export async function getStudentFamily(groupId: number): Promise<StudentFamilyRe
     })
     .sort((a, b) => b.rankScore - a.rankScore);
 
-  const groupTotal = members.reduce((acc, m) => acc + m.rankScore, 0);
+  // Family points = the family's COLLECTIVE points only (what committee supervisors add via
+  // "رصد جماعي للأسرة") — NOT the sum of members' individual achievements. Those collective
+  // records are written once per member, so we dedupe by event to avoid multiplying.
+  const isCollective = (p: PointInfo) =>
+    p.pointType === 'collective' || (!p.pointType && p.reason.endsWith('(رصد جماعي للأسرة)'));
+  const groupCollectiveTotal = (gid: number) => {
+    const memberIds = new Set(students.filter(s => s.groupId === gid).map(s => s.id));
+    const seen = new Set<string>();
+    let total = 0;
+    for (const p of allPoints) {
+      if (!memberIds.has(p.registrationId) || !isCollective(p)) continue;
+      const key = `${p.reason}__${p.delta}__${p.recordedBy ?? ''}__${p.createdAt.slice(0, 16)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      total += p.delta;
+    }
+    return total;
+  };
 
-  // Rank ALL groups (in the same stage) by their members' total rankScore
+  const groupTotal = groupCollectiveTotal(groupId);
+
+  // Rank ALL groups (in the same stage) by their collective points
   const sameStageGroups = groups.filter(g => g.stage === group.stage);
-  const groupTotals = sameStageGroups.map(g => {
-    const total = students
-      .filter(s => s.groupId === g.id)
-      .reduce((acc, s) => {
-        const pts = allPoints.filter(p => p.registrationId === s.id);
-        return acc + calcPointSummary(pts).rankScore;
-      }, 0);
-    return { id: g.id, total };
-  });
+  const groupTotals = sameStageGroups.map(g => ({ id: g.id, total: groupCollectiveTotal(g.id) }));
   groupTotals.sort((a, b) => b.total - a.total);
   const groupRank = groupTotals.findIndex(g => g.id === groupId) + 1;
 
@@ -2614,6 +2780,7 @@ export type SportCardInfo = {
   cardType: string;      // 'yellow' | 'red'
   suspensionMatches: number;
   suspensionServed: boolean;
+  punishedAt: string | null;  // when the violation was cleared via "تم المعاقبة"
   createdBy: string;
   createdAt: string;
 };
@@ -2673,7 +2840,9 @@ function mapSportCard(r: any): SportCardInfo {
     id: r.id, matchId: r.matchId, leagueId: r.leagueId,
     studentId: r.studentId, studentName: r.studentName, groupId: r.groupId,
     cardType: r.cardType, suspensionMatches: r.suspensionMatches ?? 0,
-    suspensionServed: r.suspensionServed ?? false, createdBy: r.createdBy,
+    suspensionServed: r.suspensionServed ?? false,
+    punishedAt: typeof r.punishedAt === 'string' ? r.punishedAt : r.punishedAt?.toISOString?.() ?? null,
+    createdBy: r.createdBy,
     createdAt: typeof r.createdAt === 'string' ? r.createdAt : r.createdAt?.toISOString?.() || new Date().toISOString(),
   };
 }
@@ -2992,7 +3161,7 @@ export async function addSportCard(data: {
   }
 }
 
-export async function updateSportCard(id: number, patch: { suspensionServed?: boolean; suspensionMatches?: number }): Promise<SportCardInfo | null> {
+export async function updateSportCard(id: number, patch: { suspensionServed?: boolean; suspensionMatches?: number; punishedAt?: string | null }): Promise<SportCardInfo | null> {
   if (hasDatabase) {
     const prisma = getPrisma()!;
     try {
