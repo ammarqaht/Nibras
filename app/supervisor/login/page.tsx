@@ -97,11 +97,9 @@ export default function SupervisorLogin() {
             {busy ? '...' : 'دخول'}
           </button>
 
-          <p className="text-xs text-ink-400 text-center pt-3 border-t border-ink-200">
-            الدخول الافتراضي للمدير: <span dir="ltr">admin / 12345</span>
-          </p>
         </form>
       </div>
+
     </div>
   );
 }

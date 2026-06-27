@@ -55,6 +55,7 @@ export default function SupervisorsPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -76,7 +77,9 @@ export default function SupervisorsPage() {
       fetch('/api/supervisor/role-permissions', { cache: 'no-store' })
     ]);
     if (r.status === 401) { setLoading(false); return; }
-    setList((await r.json().catch(() => ({ supervisors: [] }))).supervisors ?? []);
+    const supervisors = (await r.json().catch(() => ({ supervisors: [] }))).supervisors ?? [];
+    supervisors.sort((a: Sup, b: Sup) => a.email.localeCompare(b.email));
+    setList(supervisors);
     setGroups((await gr.json().catch(() => ({ groups: [] }))).groups ?? []);
     
     const prJson = await pr.json().catch(() => ({ permissions: {} }));
@@ -198,6 +201,12 @@ export default function SupervisorsPage() {
 
   const groupNames = (ids: string) =>
     ids.split(',').map((id) => groups.find((g) => String(g.id) === id.trim())?.name).filter(Boolean).join('، ');
+
+  const filteredList = list.filter((s) => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    return s.name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q);
+  });
 
   return (
     <div>
@@ -402,7 +411,18 @@ export default function SupervisorsPage() {
         </form>
 
         <div className="card p-6 lg:col-span-2">
-          <h2 className="text-lg font-bold text-ink-900 mb-4">الحسابات ({list.length})</h2>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+            <h2 className="text-lg font-bold text-ink-900">الحسابات ({filteredList.length})</h2>
+            <div className="relative w-full sm:w-64">
+              <input
+                type="text"
+                className="field text-xs py-1.5 px-3"
+                placeholder="بحث بالاسم أو اسم المستخدم..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+          </div>
           {loading ? (
             <p className="text-center py-10 text-ink-400 text-sm">جارٍ التحميل…</p>
           ) : (
@@ -413,7 +433,7 @@ export default function SupervisorsPage() {
                     <tr><th>الاسم</th><th>المستخدم</th><th>الصلاحية</th><th>المجموعات</th><th></th></tr>
                   </thead>
                   <tbody>
-                    {list.map((s) => {
+                    {filteredList.map((s) => {
                       const primary = s.email === 'admin' || s.email === 'admin@nibras.com';
                       return (
                         <tr key={s.id}>
@@ -441,7 +461,7 @@ export default function SupervisorsPage() {
               </div>
 
               <ul className="lg:hidden divide-y divide-ink-200">
-                {list.map((s) => {
+                {filteredList.map((s) => {
                   const primary = s.email === 'admin' || s.email === 'admin@nibras.com';
                   return (
                     <li key={s.id} className="py-3 flex items-start justify-between gap-3">
