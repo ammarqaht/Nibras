@@ -298,8 +298,8 @@ export default function PointsBoardPage() {
                     <tbody>
                       {stageLog.map(p => {
                         const st = studentMap.get(p.registrationId);
-                        const typeLabel = p.pointType === 'collective' ? 'جماعية' : p.pointType === 'deduction' ? 'خصم' : 'فردية';
-                        const typeCls = p.pointType === 'collective' ? 'pill-blue' : p.pointType === 'deduction' ? 'pill-red' : 'pill-green';
+                        const typeLabel = p.delta < 0 ? (p.pointType === 'deduction' ? 'خصم متجر' : 'خصم نهائي') : (p.pointType === 'collective' ? 'جماعية' : 'فردية');
+                        const typeCls = p.delta < 0 ? (p.pointType === 'deduction' ? 'pill-red bg-red-50 text-red-700 border-red-200' : 'pill-red') : (p.pointType === 'collective' ? 'pill-blue' : 'pill-green');
                         return (
                           <tr key={p.id}>
                             <td className="font-medium">{st?.studentName ?? `#${p.registrationId}`}</td>
@@ -330,7 +330,7 @@ export default function PointsBoardPage() {
                   {stageLog.map(p => {
                     const st = studentMap.get(p.registrationId);
                     const isExp = expandedIds.has(p.id);
-                    const typeLabel = p.pointType === 'collective' ? 'جماعية' : p.pointType === 'deduction' ? 'خصم' : 'فردية';
+                    const typeLabel = p.delta < 0 ? (p.pointType === 'deduction' ? 'خصم متجر' : 'خصم نهائي') : (p.pointType === 'collective' ? 'جماعية' : 'فردية');
                     return (
                       <li key={p.id} className="py-3 px-4">
                         <button

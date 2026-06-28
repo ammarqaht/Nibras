@@ -408,6 +408,16 @@ export default function AddPointsPage() {
             />
           </div>
 
+          {sign === -1 && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 space-y-1">
+              {category === 'store' ? (
+                <p>🛒 **خصم متجر**: سيتم خصم النقاط من **الرصيد القابل للشراء** فقط. لن يتأثر إجمالي نقاط الطالب أو ترتيبه في لوحة الصدارة.</p>
+              ) : (
+                <p>⚠️ **خصم نهائي (عقوبة)**: سيتم خصم النقاط من **الرصيد والإجمالي** معاً، مما يقلل ترتيب الطالب في لوحة الصدارة.</p>
+              )}
+            </div>
+          )}
+
           <button type="submit" disabled={busy || loading} className="btn btn-primary w-full">
             {busy ? '...' : mode === 'individual' && selectedIds.length > 1
               ? `رصد النقاط لـ ${selectedIds.length} طلاب`
