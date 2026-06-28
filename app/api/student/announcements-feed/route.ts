@@ -26,7 +26,15 @@ export async function GET(req: NextRequest) {
     const studentStage = student.stage.trim().toLowerCase();
     const groupName = group ? group.name.trim().toLowerCase() : '';
 
-    return targets.some(t => t === studentStage || (groupName && t === groupName));
+    return targets.some(t => {
+      if (t.startsWith('stage:')) {
+        return t === `stage:${studentStage}`;
+      }
+      if (t.startsWith('group:')) {
+        return groupName && t === `group:${groupName}`;
+      }
+      return t === studentStage || (groupName && t === groupName);
+    });
   });
 
   visible.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));

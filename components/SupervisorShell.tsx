@@ -69,7 +69,7 @@ export default function SupervisorShell({ children }: { children: React.ReactNod
     let cancelled = false;
     (async () => {
       try {
-        const r = await fetch('/api/supervisor/auth/me', { cache: 'no-store' });
+        const r = await fetch('/api/supervisor/auth/me', { cache: 'no-store', credentials: 'include' });
         if (r.status === 401) {
           router.replace('/supervisor/login');
           return;

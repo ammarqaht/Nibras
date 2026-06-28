@@ -19,6 +19,7 @@ export default function SupervisorLogin() {
       const r = await fetch('/api/supervisor/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email, password })
       });
       const j = await r.json().catch(() => ({}));

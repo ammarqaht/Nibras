@@ -127,6 +127,7 @@ export default function StudentHome() {
   const [showAttendance, setShowAttendance] = useState(false);
   const [excuseDate, setExcuseDate] = useState('');
   const [excuseReason, setExcuseReason] = useState('');
+  const [excuseForDate, setExcuseForDate] = useState<string | null>(null);
   const [excuseBusy, setExcuseBusy] = useState(false);
   const [excuseMsg, setExcuseMsg] = useState('');
   const [myExcuses, setMyExcuses] = useState<{ date: string; status: string }[]>([]);
@@ -201,6 +202,7 @@ export default function StudentHome() {
       if (!r.ok) { setExcuseMsg(j.error || 'تعذّر الإرسال'); return; }
       setExcuseMsg('تم إرسال طلب العذر لمشرف التحضير ✓');
       setExcuseReason(''); setExcuseDate('');
+      setExcuseForDate(null);
       const d = await fetch('/api/student/excuse').then(rr => rr.json()).catch(() => ({ excuses: [] }));
       setMyExcuses(d.excuses || []);
     } finally { setExcuseBusy(false); }
@@ -345,7 +347,73 @@ export default function StudentHome() {
         </div>
       </section>
 
-      {/* 4. Tasks peek */}
+      {/* 4. Attendance — last 7 days */}
+      {!loadingAtt && (
+        <section className="reveal">
+          <button onClick={() => { setShowAttendance(true); setExcuseMsg(''); }} className="card p-4 w-full text-right hover:shadow-md transition-shadow">
+            <div className="flex items-baseline justify-between mb-3">
+              <h3 className="font-display text-base font-bold" style={{ color: 'var(--ink)' }}>الحضور — آخر ٧ أيام</h3>
+              <span className="text-xs font-medium" style={{ color: 'var(--accent-deep)' }}>السجل ←</span>
+            </div>
+            <div className="flex gap-1.5">
+              {last7.map(d => {
+                const c = ATT_COLORS[d.status || 'none'];
+                const isAbsent = d.status === 'absent';
+                const hasExcuse = !!excuseStatusOf(d.date);
+                const clickable = isAbsent && !hasExcuse;
+                return (
+                  <div key={d.date} className="flex-1 text-center" style={{ position: 'relative' }}>
+                    <div
+                      className={`h-9 rounded-lg${clickable ? ' att-absent-clickable' : ''}`}
+                      style={{ background: c.bg, border: `1px solid ${c.border}`, cursor: clickable ? 'pointer' : undefined }}
+                      title={clickable ? 'اضغط لتقديم عذر' : c.label}
+                      onClick={clickable ? (e) => { e.stopPropagation(); setExcuseForDate(d.date); setExcuseReason(''); setExcuseDate(d.date); setExcuseMsg(''); } : undefined}
+                      role={clickable ? 'button' : undefined}
+                      tabIndex={clickable ? 0 : undefined}
+                    >
+                      {clickable && (
+                        <span className="att-excuse-hint">✎</span>
+                      )}
+                    </div>
+                    <p className="text-[10px] mt-1" style={{ color: 'var(--ink-soft)' }}>{d.label}</p>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex flex-wrap gap-3 mt-3 text-[10px]" style={{ color: 'var(--ink-soft)' }}>
+              {[['present', 'حاضر'], ['late', 'متأخر'], ['excused', 'معتذر'], ['absent', 'غائب']].map(([k, l]) => (
+                <span key={k} className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded" style={{ background: ATT_COLORS[k].bg, border: `1px solid ${ATT_COLORS[k].border}` }} />{l}</span>
+              ))}
+            </div>
+          </button>
+        </section>
+      )}
+
+      {/* Inline excuse popup for absent day */}
+      {excuseForDate && (
+        <div className="modal-backdrop flex items-center justify-center p-3 sm:p-6" onClick={() => setExcuseForDate(null)}>
+          <div className="modal-panel w-full max-w-xs" onClick={e => e.stopPropagation()} style={{ animation: 'excuse-pop .25s ease' }}>
+            <div className="p-4 border-b flex items-center justify-between" style={{ borderColor: 'var(--line)' }}>
+              <h3 className="font-display text-base font-bold" style={{ color: 'var(--ink)' }}>تقديم عذر غياب</h3>
+              <button onClick={() => setExcuseForDate(null)} className="btn btn-ghost p-2" aria-label="إغلاق">✕</button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--ink-soft)' }}>التاريخ</label>
+                <input type="date" dir="ltr" className="field py-1.5 text-sm w-full" value={excuseForDate} readOnly style={{ opacity: 0.7 }} />
+              </div>
+              <div>
+                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--ink-soft)' }}>سبب الغياب</label>
+                <textarea rows={3} className="field text-sm resize-none w-full" placeholder="اكتب سبب الغياب…" value={excuseReason} onChange={e => setExcuseReason(e.target.value)} />
+              </div>
+              {excuseMsg && <p className="text-xs" style={{ color: excuseMsg.includes('✓') ? '#1B7A43' : 'var(--red)' }}>{excuseMsg}</p>}
+              <button onClick={submitExcuse} disabled={excuseBusy} className="btn btn-primary w-full text-sm">{excuseBusy ? 'جارٍ الإرسال…' : 'إرسال العذر'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. Tasks peek */}
       <section className="reveal">
         <div className="flex items-baseline justify-between mb-3 px-1">
           <h2 className="font-display text-lg font-bold" style={{ color: 'var(--ink)' }}>المهام</h2>
@@ -438,27 +506,6 @@ export default function StudentHome() {
         )}
       </section>
 
-      {/* 7. Attendance — last 7 days */}
-      {!loadingAtt && (
-        <section className="reveal">
-          <button onClick={() => { setShowAttendance(true); setExcuseMsg(''); }} className="card p-4 w-full text-right hover:shadow-md transition-shadow">
-            <div className="flex items-baseline justify-between mb-3">
-              <h3 className="font-display text-base font-bold" style={{ color: 'var(--ink)' }}>الحضور — آخر ٧ أيام</h3>
-              <span className="text-xs font-medium" style={{ color: 'var(--accent-deep)' }}>السجل وتقديم عذر ←</span>
-            </div>
-            <div className="flex gap-1.5">
-              {last7.map(d => {
-                const c = ATT_COLORS[d.status || 'none'];
-                return (
-                  <div key={d.date} className="flex-1 text-center">
-                    <div className="h-9 rounded-lg" style={{ background: c.bg, border: `1px solid ${c.border}` }} title={c.label} />
-                    <p className="text-[10px] mt-1" style={{ color: 'var(--ink-soft)' }}>{d.label}</p>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="flex flex-wrap gap-3 mt-3 text-[10px]" style={{ color: 'var(--ink-soft)' }}>
-              {[['present', 'حاضر'], ['late', 'متأخر'], ['excused', 'معتذر'], ['absent', 'غائب']].map(([k, l]) => (
                 <span key={k} className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded" style={{ background: ATT_COLORS[k].bg, border: `1px solid ${ATT_COLORS[k].border}` }} />{l}</span>
               ))}
             </div>
@@ -535,13 +582,7 @@ export default function StudentHome() {
               <h3 className="font-display text-lg font-bold" style={{ color: 'var(--ink)' }}>سجل الحضور</h3>
               <button onClick={() => setShowAttendance(false)} className="btn btn-ghost p-2" aria-label="إغلاق">✕</button>
             </div>
-            <div className="p-4 border-b space-y-2" style={{ borderColor: 'var(--line)' }}>
-              <p className="text-sm font-bold" style={{ color: 'var(--ink)' }}>تقديم عذر غياب</p>
-              <input type="date" dir="ltr" className="field py-1.5 text-sm" value={excuseDate} onChange={e => setExcuseDate(e.target.value)} />
-              <textarea rows={2} className="field text-sm resize-none" placeholder="سبب الغياب…" value={excuseReason} onChange={e => setExcuseReason(e.target.value)} />
-              {excuseMsg && <p className="text-xs" style={{ color: excuseMsg.includes('✓') ? '#1B7A43' : 'var(--red)' }}>{excuseMsg}</p>}
-              <button onClick={submitExcuse} disabled={excuseBusy} className="btn btn-primary w-full text-sm">{excuseBusy ? 'جارٍ الإرسال…' : 'إرسال العذر لمشرف التحضير'}</button>
-            </div>
+
             <div className="overflow-y-auto scroll-soft flex-1">
               {attendanceSorted.length === 0 ? (
                 <div className="p-6 text-center text-sm" style={{ color: 'var(--ink-soft)' }}>لا سجل حضور بعد.</div>

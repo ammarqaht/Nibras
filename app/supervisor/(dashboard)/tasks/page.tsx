@@ -3,23 +3,20 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { pushToast } from '@/components/Toast';
 import { useSupervisor } from '@/components/SupervisorShell';
-import { compressImage } from '@/lib/imageUtils';
 
-type SupervisorUser = { id: number; name: string; email: string; role?: string };
+type Student = { id: number; membershipNo: number; studentName: string; stage: string; grade: string; registrationStatus: string };
+type SupervisorUser = { id: number; name: string; email: string };
 type Task = {
   id: string;
   title: string;
   description: string;
   maxPoints: number;
-  startDate: string | null;
   dueDate: string;
   createdAt: string;
   track: string | null;
-  stage: string | null;
-  cost: number;
-  durationHours: number | null;
   isActive: boolean;
   submissionMethod: string | null;
+  timeLimitHours: number | null;
   assignedAdmins: string[];
   imageUrl: string | null;
   resourceLink: string | null;
@@ -35,6 +32,7 @@ type Submission = {
   grade: number | null;
   feedback: string | null;
   selectedAdminId: string | null;
+  startedAt: string | null;
   submittedAt: string;
   studentName: string;
   taskTitle: string;
@@ -42,144 +40,111 @@ type Submission = {
   taskTrack: string | null;
   taskAssignedAdmins: string[];
 };
-type Student = { id: number; membershipNo: number; studentName: string; stage: string; grade: string; registrationStatus: string; paymentStatus: string };
 
-function statusLabel(s: string) {
-  if (s === 'approved') return 'مقبولة ✓';
-  if (s === 'rejected') return 'مردودة ✗';
+/* Client-side image compression */
+function compressImage(file: File, maxDim = 1200, quality = 0.7): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > height) {
+          if (width > maxDim) { height = Math.round((height * maxDim) / width); width = maxDim; }
+        } else if (height > maxDim) { width = Math.round((width * maxDim) / height); height = maxDim; }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return resolve(e.target?.result as string);
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function statusLabel(status: string) {
+  if (status === 'approved') return 'مقبولة ✓';
+  if (status === 'rejected') return 'مردودة ✗';
   return 'بانتظار المراجعة';
 }
-function statusBadgeClass(s: string) {
-  if (s === 'approved') return 'pill-green';
-  if (s === 'rejected') return 'pill-red';
-  return 'pill-yellow';
+
+function statusBadgeClass(status: string) {
+  if (status === 'approved') return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
+  if (status === 'rejected') return 'bg-nred-50 text-nred-700 border border-nred-200';
+  return 'bg-brand-50 text-brand-700 border border-brand-200';
 }
 
-const STAGE_OPTIONS = ['ابتدائي', 'متوسط', 'ثانوي'];
-
-// A student is "targeted" by a task only if they pass both the visibility (restricted) and stage filters
-function isTaskTargeted(
-  s: { id: number; stage: string },
-  task: { visibility: string; visibleToIds: number[]; stage: string | null },
-) {
-  if (task.visibility === 'restricted' && !task.visibleToIds.includes(s.id)) return false;
-  if (task.stage && task.stage !== 'الكل' && s.stage !== task.stage) return false;
-  return true;
-}
-
-const SUBMISSION_METHODS: { value: string; label: string }[] = [
-  { value: 'file',  label: 'رفع ملف (صورة / مستند / فيديو)' },
-  { value: 'audio', label: 'تسجيل صوتي' },
-  { value: 'text',  label: 'إجابة نصية' },
-  { value: 'ack',   label: 'إقرار بالإنجاز فقط' },
-];
-// Map legacy Arabic values + new keys to a canonical method key
-function methodKey(m: string | null): string {
-  switch (m) {
-    case 'file': case 'رفع ملف': case 'image': case 'video': case 'any': return 'file';
-    case 'audio': return 'audio';
-    case 'text': return 'text';
-    case 'ack': case 'إقرار بالإنجاز': return 'ack';
-    default: return 'file';
-  }
-}
-// Renders whatever the student submitted: image, audio, text, acknowledgment, or a file link
-function SubmissionContent({ fileUrl }: { fileUrl: string }) {
-  if (!fileUrl) return <span className="text-xs text-ink-400">—</span>;
-  if (fileUrl.startsWith('data:image')) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={fileUrl} alt="إثبات" className="max-h-56 rounded-lg border border-ink-200 mx-auto cursor-zoom-in" onClick={() => window.open(fileUrl, '_blank')} />;
-  }
-  if (fileUrl.startsWith('data:audio') || fileUrl.startsWith('data:video/webm')) {
-    return <audio controls src={fileUrl} className="w-full" />;
-  }
-  if (fileUrl.startsWith('text:')) {
-    return <div className="whitespace-pre-wrap text-sm bg-cream-50 p-3 rounded-lg border border-ink-150 text-ink-800">{fileUrl.slice(5)}</div>;
-  }
-  if (fileUrl === 'admin://manual-mark' || fileUrl.startsWith('ack://')) {
-    return <div className="text-sm text-ink-700 inline-flex items-center gap-1.5"><span className="text-green-600">✓</span> إقرار بالإنجاز من الطالب</div>;
-  }
-  return <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="btn btn-secondary inline-flex items-center gap-1.5 text-xs py-1.5 px-3">فتح الملف المرفق</a>;
+function getTrackPillClass(track: string | null) {
+  if (track === 'الثقافي' || track === 'ثقافي') return 'bg-yellow-50 text-yellow-700 border border-yellow-200/60';
+  if (track === 'مسار تقني' || track === 'تقني') return 'bg-ncyan-50 text-ncyan-700 border border-ncyan-200/60';
+  if (track === 'الذاكرة الحديدية') return 'bg-purple-50 text-purple-700 border border-purple-200/60';
+  if (track === 'الاجتماعي' || track === 'اجتماعي') return 'bg-emerald-50 text-emerald-700 border border-emerald-200/60';
+  if (track === 'مسار إعلامي' || track === 'إعلامي') return 'bg-ink-100 text-ink-700 border border-ink-200';
+  return 'bg-ink-50 text-ink-600 border border-ink-200';
 }
 
 export default function TasksPage() {
   const { user } = useSupervisor();
-
-  const roles = useMemo(() => (user?.role || '').split(',').map(r => r.trim()), [user]);
-  const isScientific = roles.includes('scientific_supervisor') || roles.includes('admin');
-
-  type Tab = 'submissions' | 'log' | 'add' | 'manage';
-  const [activeTab, setActiveTab] = useState<Tab>('submissions');
+  const [activeTab, setActiveTab] = useState<'submissions' | 'log' | 'add' | 'manage'>('manage');
   const [loading, setLoading] = useState(true);
 
   const [students, setStudents] = useState<Student[]>([]);
   const [supervisors, setSupervisors] = useState<SupervisorUser[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
-  const [categories, setCategories] = useState<string[]>(['عام']);
-  const [newCategory, setNewCategory] = useState('');
-  const [savingCats, setSavingCats] = useState(false);
-  const [showCatModal, setShowCatModal] = useState(false);
-  const [editingCat, setEditingCat] = useState<{ original: string; value: string } | null>(null);
 
-  // Filters
+  // Search/Filters states
   const [subSearch, setSubSearch] = useState('');
   const [subTaskFilter, setSubTaskFilter] = useState('');
+  const [subAdminFilter, setSubAdminFilter] = useState('');
+
   const [logSearch, setLogSearch] = useState('');
   const [logTaskFilter, setLogTaskFilter] = useState('');
+  const [logAdminFilter, setLogAdminFilter] = useState('');
   const [logStatusFilter, setLogStatusFilter] = useState('');
-  const [manageSearch, setManageSearch] = useState('');
-  const [manageTrack, setManageTrack] = useState('');
-  const [manageStage, setManageStage] = useState('');
-  const [manageMethod, setManageMethod] = useState('');
-  const [manageStatus, setManageStatus] = useState('');
 
-  // Eval modal
+  const [manageSearch, setManageSearch] = useState('');
+  const [manageTrackFilter, setManageTrackFilter] = useState('');
+  const [manageSortFilter, setManageSortFilter] = useState('default');
+
+  // Modals states
   const [evalSub, setEvalSub] = useState<Submission | null>(null);
   const [evalPoints, setEvalPoints] = useState('');
   const [evalComment, setEvalComment] = useState('');
   const [evalBusy, setEvalBusy] = useState(false);
 
-  // Edit task modal
   const [editTask, setEditTask] = useState<Task | null>(null);
   const [editBusy, setEditBusy] = useState(false);
-  const editFileRef = useRef<HTMLInputElement>(null);
 
-  // Scope modal
   const [scopeTask, setScopeTask] = useState<Task | null>(null);
   const [scopeSearch, setScopeSearch] = useState('');
   const [scopeSelected, setScopeSelected] = useState<number[]>([]);
   const [scopeBusy, setScopeBusy] = useState(false);
 
-  // Stats modal
   const [statsTask, setStatsTask] = useState<Task | null>(null);
   const [statsSearch, setStatsSearch] = useState('');
   const [statsFilter, setStatsFilter] = useState<'all' | 'submitted' | 'missing'>('all');
 
-  // Add task form
+  // Add task state
   const addFileRef = useRef<HTMLInputElement>(null);
   const [addTitle, setAddTitle] = useState('');
   const [addDesc, setAddDesc] = useState('');
   const [addPoints, setAddPoints] = useState('10');
-  const [addStartDate, setAddStartDate] = useState('');
   const [addDeadline, setAddDeadline] = useState('');
-  const [addTrack, setAddTrack] = useState('عام');
-  const [addStage, setAddStage] = useState('');
-  const [addCost, setAddCost] = useState('0');
-  const [addDuration, setAddDuration] = useState('');
-  const [addMethod, setAddMethod] = useState('file');
+  const [addMethod, setAddMethod] = useState('رفع ملف');
+  const [addTimeLimit, setAddTimeLimit] = useState('');
   const [addResourceLink, setAddResourceLink] = useState('');
   const [addImage, setAddImage] = useState<string | null>(null);
   const [addAdmins, setAddAdmins] = useState<string[]>([]);
+  const [addTrack, setAddTrack] = useState('عام');
   const [addBusy, setAddBusy] = useState(false);
 
-  // Inline points edit in log
-  const [inlineEditSub, setInlineEditSub] = useState<string | null>(null);
-  const [inlinePoints, setInlinePoints] = useState('');
-  const [inlineBusy, setInlineBusy] = useState(false);
-
-  // Accordion: which log card is expanded (only one at a time)
-  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+  const editFileRef = useRef<HTMLInputElement>(null);
 
   async function loadData() {
     try {
@@ -187,129 +152,114 @@ export default function TasksPage() {
         fetch('/api/supervisor/students', { cache: 'no-store' }),
         fetch('/api/supervisor/tasks/supervisors', { cache: 'no-store' }),
         fetch('/api/supervisor/tasks', { cache: 'no-store' }),
-        fetch('/api/supervisor/submissions', { cache: 'no-store' }),
+        fetch('/api/supervisor/submissions', { cache: 'no-store' })
       ]);
+
       const studentsData = await studentsRes.json().catch(() => ({ students: [] }));
       const supervisorsData = await supervisorsRes.json().catch(() => ({ supervisors: [] }));
-      const tasksData = await tasksRes.json().catch(() => ({ tasks: [], categories: [] }));
+      const tasksData = await tasksRes.json().catch(() => ({ tasks: [] }));
       const submissionsData = await submissionsRes.json().catch(() => ({ submissions: [] }));
 
       setStudents(studentsData.students ?? []);
       setSupervisors(supervisorsData.supervisors ?? []);
       setTasks(tasksData.tasks ?? []);
       setSubmissions(submissionsData.submissions ?? []);
-      if (Array.isArray(tasksData.categories) && tasksData.categories.length > 0) {
-        setCategories(tasksData.categories);
-      }
-    } catch {
+    } catch (err) {
+      console.error('Failed to load data', err);
       pushToast('error', 'فشل تحميل البيانات');
     } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    loadData();
+  }, []);
 
-  // For tasks_supervisor: tasks already pre-filtered by API; submissions filtered to match
-  const visibleSubmissions = useMemo(() => {
-    if (isScientific) return submissions;
-    const myTaskIds = new Set(tasks.map(t => t.id));
-    return submissions.filter(s => myTaskIds.has(s.taskId));
-  }, [submissions, tasks, isScientific]);
+  const pendingSubmissions = useMemo(() => submissions.filter(s => s.status === 'pending'), [submissions]);
+  const logSubmissions = useMemo(() => submissions.filter(s => s.status !== 'pending'), [submissions]);
 
-  const pendingSubmissions = useMemo(() => visibleSubmissions.filter(s => s.status === 'pending'), [visibleSubmissions]);
-  // Only finished evaluations belong in the log (exclude claimed / cancelled / expired)
-  const logSubmissions = useMemo(() => visibleSubmissions.filter(s => s.status === 'approved' || s.status === 'rejected'), [visibleSubmissions]);
+  const filteredPendingSubmissions = useMemo(() => {
+    return pendingSubmissions.filter(s => {
+      const matchQ = !subSearch.trim() || s.studentName.toLowerCase().includes(subSearch.trim().toLowerCase());
+      const matchTask = !subTaskFilter || s.taskId === subTaskFilter;
+      const matchAdmin = !subAdminFilter || 
+        (subAdminFilter === '__all__' ? s.taskAssignedAdmins.length === 0 : s.taskAssignedAdmins.includes(subAdminFilter));
+      return matchQ && matchTask && matchAdmin;
+    });
+  }, [pendingSubmissions, subSearch, subTaskFilter, subAdminFilter]);
 
-  const filteredPending = useMemo(() => pendingSubmissions.filter(s => {
-    const q = subSearch.trim().toLowerCase();
-    return (!q || s.studentName.toLowerCase().includes(q)) && (!subTaskFilter || s.taskId === subTaskFilter);
-  }), [pendingSubmissions, subSearch, subTaskFilter]);
+  const filteredLogSubmissions = useMemo(() => {
+    return logSubmissions.filter(s => {
+      const matchQ = !logSearch.trim() || s.studentName.toLowerCase().includes(logSearch.trim().toLowerCase());
+      const matchTask = !logTaskFilter || s.taskId === logTaskFilter;
+      const matchStatus = !logStatusFilter || s.status === logStatusFilter;
+      const matchAdmin = !logAdminFilter || 
+        (logAdminFilter === '__all__' ? s.taskAssignedAdmins.length === 0 : s.taskAssignedAdmins.includes(logAdminFilter));
+      return matchQ && matchTask && matchStatus && matchAdmin;
+    });
+  }, [logSubmissions, logSearch, logTaskFilter, logStatusFilter, logAdminFilter]);
 
-  const filteredLog = useMemo(() => logSubmissions.filter(s => {
-    const q = logSearch.trim().toLowerCase();
-    return (!q || s.studentName.toLowerCase().includes(q))
-      && (!logTaskFilter || s.taskId === logTaskFilter)
-      && (!logStatusFilter || s.status === logStatusFilter);
-  }), [logSubmissions, logSearch, logTaskFilter, logStatusFilter]);
+  const filteredTasks = useMemo(() => {
+    let result = tasks.filter(t => {
+      const matchQ = !manageSearch.trim() || t.title.toLowerCase().includes(manageSearch.trim().toLowerCase()) || t.description.toLowerCase().includes(manageSearch.trim().toLowerCase());
+      const matchTrack = !manageTrackFilter || t.track === manageTrackFilter;
+      return matchQ && matchTrack;
+    });
+    
+    if (manageSortFilter === 'points') {
+      result = result.sort((a, b) => b.maxPoints - a.maxPoints);
+    } else if (manageSortFilter === 'newest') {
+      result = result.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+    } else if (manageSortFilter === 'dueDate') {
+      result = result.sort((a, b) => +new Date(a.dueDate) - +new Date(b.dueDate));
+    }
+    return result;
+  }, [tasks, manageSearch, manageTrackFilter, manageSortFilter]);
 
-  const filteredTasks = useMemo(() => tasks.filter(t =>
-    (!manageSearch.trim() || t.title.toLowerCase().includes(manageSearch.trim().toLowerCase())) &&
-    (!manageTrack || (t.track || 'عام') === manageTrack) &&
-    (!manageStage || (t.stage || 'الكل') === manageStage) &&
-    (!manageMethod || methodKey(t.submissionMethod) === manageMethod) &&
-    (!manageStatus || (manageStatus === 'active' ? t.isActive : !t.isActive))
-  ), [tasks, manageSearch, manageTrack, manageStage, manageMethod, manageStatus]);
+  const uniqueTasksPending = useMemo(() => tasks.filter(t => new Set(pendingSubmissions.map(s => s.taskId)).has(t.id)), [tasks, pendingSubmissions]);
+  const uniqueTasksLog = useMemo(() => tasks.filter(t => new Set(logSubmissions.map(s => s.taskId)).has(t.id)), [tasks, logSubmissions]);
 
-  const uniqueTasksPending = useMemo(() => {
-    const ids = new Set(pendingSubmissions.map(s => s.taskId));
-    return tasks.filter(t => ids.has(t.id));
-  }, [tasks, pendingSubmissions]);
+  // General counts for stats
+  const totalTasksCount = tasks.length;
+  const activeTasksCount = tasks.filter(t => t.isActive).length;
+  const disabledTasksCount = totalTasksCount - activeTasksCount;
+  const pendingCount = pendingSubmissions.length;
 
-  const uniqueTasksLog = useMemo(() => {
-    const ids = new Set(logSubmissions.map(s => s.taskId));
-    return tasks.filter(t => ids.has(t.id));
-  }, [tasks, logSubmissions]);
-
-  // Stats modal data
-  const statsStudentList = useMemo(() => {
-    if (!statsTask) return [];
-    const active = students.filter(s => s.registrationStatus === 'approved');
-    const scoped = active.filter(s => isTaskTargeted(s, statsTask));
-    const subMap = new Map(submissions.filter(s => s.taskId === statsTask.id && ['pending', 'approved', 'rejected'].includes(s.status)).map(s => [s.registrationId, s]));
-    let list = scoped.map(st => ({ ...st, submitted: subMap.has(st.id), submission: subMap.get(st.id) || null }));
-    const q = statsSearch.trim().toLowerCase();
-    if (q) list = list.filter(i => i.studentName.toLowerCase().includes(q));
-    if (statsFilter === 'submitted') list = list.filter(i => i.submitted);
-    if (statsFilter === 'missing') list = list.filter(i => !i.submitted);
-    return list;
-  }, [statsTask, students, submissions, statsSearch, statsFilter]);
-
-  const statsCounts = useMemo(() => {
-    if (!statsTask) return { total: 0, submitted: 0, missing: 0, pending: 0 };
-    const active = students.filter(s => s.registrationStatus === 'approved');
-    const scoped = active.filter(s => isTaskTargeted(s, statsTask));
-    const taskSubs = submissions.filter(s => s.taskId === statsTask.id && ['pending', 'approved', 'rejected'].includes(s.status));
-    const submittedIds = new Set(taskSubs.map(s => s.registrationId));
-    const total = scoped.length;
-    const submitted = scoped.filter(s => submittedIds.has(s.id)).length;
-    return { total, submitted, missing: total - submitted, pending: taskSubs.filter(s => s.status === 'pending').length };
-  }, [statsTask, students, submissions]);
-
-  // Handlers
   async function handleAddTask(e: React.FormEvent) {
     e.preventDefault();
     if (!addTitle.trim() || !addDesc.trim() || !addDeadline) return pushToast('error', 'يرجى إدخال جميع الحقول الإلزامية');
+
     setAddBusy(true);
     try {
       const res = await fetch('/api/supervisor/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: addTitle.trim(), description: addDesc.trim(),
+          title: addTitle.trim(),
+          description: addDesc.trim(),
           maxPoints: parseInt(addPoints, 10),
-          startDate: addStartDate || null,
-          dueDate: addDeadline, track: addTrack, stage: addStage || null,
-          cost: parseInt(addCost, 10) || 0,
-          durationHours: addDuration ? parseInt(addDuration, 10) || null : null,
+          dueDate: addDeadline,
           submissionMethod: addMethod,
-          assignedAdmins: addAdmins, imageUrl: addImage,
+          timeLimitHours: addTimeLimit ? parseInt(addTimeLimit, 10) : null,
+          assignedAdmins: addAdmins,
+          track: addTrack.trim() || 'عام',
+          imageUrl: addImage,
           resourceLink: addResourceLink.trim() || null,
-          visibility: 'all', visibleToIds: [],
-        }),
+          visibility: 'all',
+          visibleToIds: [],
+        })
       });
+
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'فشل إضافة المهمة');
+
       pushToast('success', 'تم نشر المهمة بنجاح ✓');
-      setAddTitle(''); setAddDesc(''); setAddPoints('10');
-      setAddStartDate(''); setAddDeadline(''); setAddTrack('عام'); setAddStage('');
-      setAddCost('0'); setAddDuration('');
-      setAddMethod('file'); setAddResourceLink('');
-      setAddImage(null); setAddAdmins([]);
+      setAddTitle(''); setAddDesc(''); setAddPoints('10'); setAddDeadline(''); setAddMethod('رفع ملف'); setAddTimeLimit(''); setAddResourceLink(''); setAddImage(null); setAddAdmins([]); setAddTrack('عام');
       await loadData();
       setActiveTab('manage');
     } catch (err: any) {
-      pushToast('error', err.message || 'حدث خطأ');
+      pushToast('error', err.message || 'حدث خطأ في الشبكة');
     } finally {
       setAddBusy(false);
     }
@@ -317,27 +267,30 @@ export default function TasksPage() {
 
   async function handleEvaluate(status: 'approved' | 'rejected') {
     if (!evalSub) return;
-    const grade = parseInt(evalPoints === '' ? String(evalSub.taskMaxPoints) : evalPoints, 10);
+    const grade = parseInt(evalPoints, 10);
     if (status === 'approved' && (isNaN(grade) || grade < 0 || grade > evalSub.taskMaxPoints)) {
       return pushToast('error', `يجب أن تكون الدرجة بين 0 و ${evalSub.taskMaxPoints}`);
     }
-    if (status === 'rejected' && !evalComment.trim()) {
-      return pushToast('error', 'يجب كتابة سبب رد المهمة في خانة التعليق');
-    }
+
     setEvalBusy(true);
     try {
       const res = await fetch(`/api/supervisor/submissions/${evalSub.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status, grade: status === 'approved' ? grade : 0, feedback: evalComment.trim() || null }),
+        body: JSON.stringify({
+          status,
+          grade: status === 'approved' ? grade : 0,
+          feedback: evalComment.trim() || null
+        })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'فشل التقييم');
-      pushToast('success', status === 'approved' ? 'تم قبول التسليم ✓' : 'تم رد المهمة ✗');
+
+      pushToast('success', status === 'approved' ? 'تم قبول واعتماد التقييم ✓' : 'تم رد المهمة للطلب ✗');
       setEvalSub(null); setEvalPoints(''); setEvalComment('');
       loadData();
     } catch (err: any) {
-      pushToast('error', err.message);
+      pushToast('error', err.message || 'حدث خطأ أثناء التقييم');
     } finally {
       setEvalBusy(false);
     }
@@ -346,23 +299,29 @@ export default function TasksPage() {
   async function toggleTaskActive(task: Task) {
     try {
       const res = await fetch(`/api/supervisor/tasks/${task.id}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isActive: !task.isActive }),
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: !task.isActive })
       });
-      if (!res.ok) throw new Error('فشل تغيير الحالة');
-      pushToast('info', task.isActive ? 'تم تعطيل المهمة' : 'تم تفعيل المهمة');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'فشل تغيير الحالة');
+      pushToast('info', task.isActive ? 'تم تعطيل المهمة مؤقتاً' : 'تم تفعيل المهمة ونشرها');
       loadData();
-    } catch (err: any) { pushToast('error', err.message); }
+    } catch (err: any) {
+      pushToast('error', err.message);
+    }
   }
 
   async function handleTaskDelete(id: string, title: string) {
-    if (!confirm(`حذف المهمة "${title}" نهائياً؟`)) return;
+    if (!confirm(`هل أنت متأكد من حذف المهمة "${title}" نهائياً؟ سيتم حذف كافة تسليمات الطلاب المرتبطة بها!`)) return;
     try {
       const res = await fetch(`/api/supervisor/tasks/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('فشل الحذف');
-      pushToast('info', 'تم حذف المهمة');
+      if (!res.ok) throw new Error('فشل حذف المهمة');
+      pushToast('info', 'تم حذف المهمة نهائياً');
       loadData();
-    } catch (err: any) { pushToast('error', err.message); }
+    } catch (err: any) {
+      pushToast('error', err.message);
+    }
   }
 
   async function handleUpdateTask(e: React.FormEvent) {
@@ -371,29 +330,31 @@ export default function TasksPage() {
     setEditBusy(true);
     try {
       const res = await fetch(`/api/supervisor/tasks/${editTask.id}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: editTask.title, description: editTask.description,
+          title: editTask.title.trim(),
+          description: editTask.description.trim(),
           maxPoints: editTask.maxPoints,
-          startDate: editTask.startDate || null,
           dueDate: editTask.dueDate,
-          track: editTask.track,
-          stage: editTask.stage || null,
-          cost: editTask.cost ?? 0,
-          durationHours: editTask.durationHours ?? null,
+          track: editTask.track?.trim() || 'عام',
           submissionMethod: editTask.submissionMethod,
+          timeLimitHours: editTask.timeLimitHours,
           assignedAdmins: editTask.assignedAdmins,
           imageUrl: editTask.imageUrl,
           resourceLink: editTask.resourceLink,
-        }),
+        })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'فشل التحديث');
-      pushToast('success', 'تم حفظ التعديلات ✓');
+      if (!res.ok) throw new Error(data.error || 'فشل تحديث المهمة');
+      pushToast('success', 'تم حفظ التعديلات بنجاح ✓');
       setEditTask(null);
       loadData();
-    } catch (err: any) { pushToast('error', err.message); }
-    finally { setEditBusy(false); }
+    } catch (err: any) {
+      pushToast('error', err.message);
+    } finally {
+      setEditBusy(false);
+    }
   }
 
   async function handleScopeConfirm() {
@@ -401,628 +362,783 @@ export default function TasksPage() {
     setScopeBusy(true);
     try {
       const res = await fetch(`/api/supervisor/tasks/${scopeTask.id}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ visibility: scopeTask.visibility, visibleToIds: scopeTask.visibility === 'restricted' ? scopeSelected : [] }),
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          visibility: scopeTask.visibility,
+          visibleToIds: scopeTask.visibility === 'restricted' ? scopeSelected : [],
+        })
       });
-      if (!res.ok) throw new Error('فشل تحديث النطاق');
-      pushToast('success', 'تم تحديث نطاق المهمة ✓');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'فشل تحديث النطاق');
+      pushToast('success', 'تم تحديث نطاق المهمة بنجاح ✓');
       setScopeTask(null);
       loadData();
-    } catch (err: any) { pushToast('error', err.message); }
-    finally { setScopeBusy(false); }
+    } catch (err: any) {
+      pushToast('error', err.message);
+    } finally {
+      setScopeBusy(false);
+    }
   }
+
+  // --- Inline Points Editor ---
+  const [inlineEditSub, setInlineEditSub] = useState<string | null>(null);
+  const [inlinePoints, setInlinePoints] = useState('');
+  const [inlineBusy, setInlineBusy] = useState(false);
 
   async function saveInlinePoints(sub: Submission) {
     const val = parseInt(inlinePoints, 10);
-    if (isNaN(val) || val < 0 || val > sub.taskMaxPoints) return pushToast('error', `يجب أن تكون الدرجة بين 0 و ${sub.taskMaxPoints}`);
+    if (isNaN(val) || val < 0 || val > sub.taskMaxPoints) {
+      return pushToast('error', `يجب أن تكون الدرجة بين 0 و ${sub.taskMaxPoints}`);
+    }
     setInlineBusy(true);
     try {
       const res = await fetch(`/api/supervisor/submissions/${sub.id}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ grade: val }),
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ grade: val })
       });
-      if (!res.ok) throw new Error('فشل التعديل');
-      pushToast('success', 'تم تعديل الدرجة ✓');
+      if (!res.ok) throw new Error('Failed to update');
+      pushToast('success', 'تم تعديل الدرجة بنجاح ✓');
       setInlineEditSub(null);
       loadData();
-    } catch { pushToast('error', 'فشل تعديل الدرجة'); }
-    finally { setInlineBusy(false); }
+    } catch {
+      pushToast('error', 'فشل تعديل الدرجة');
+    } finally {
+      setInlineBusy(false);
+    }
   }
+
+  // Statistics modal helper
+  const statsStudentList = useMemo(() => {
+    if (!statsTask) return [];
+    const activeStudents = students.filter(s => s.registrationStatus === 'approved');
+    const scopedStudents = statsTask.visibility === 'restricted' ? activeStudents.filter(s => statsTask.visibleToIds.includes(s.id)) : activeStudents;
+    const taskSubmissionsMap = new Map(submissions.filter(s => s.taskId === statsTask.id).map(s => [s.registrationId, s]));
+
+    const list = scopedStudents.map(student => {
+      const sub = taskSubmissionsMap.get(student.id);
+      return { ...student, submitted: !!sub, submission: sub || null };
+    });
+
+    let filtered = list;
+    if (statsSearch.trim()) filtered = list.filter(item => item.studentName.toLowerCase().includes(statsSearch.trim().toLowerCase()));
+    if (statsFilter === 'submitted') filtered = filtered.filter(item => item.submitted);
+    else if (statsFilter === 'missing') filtered = filtered.filter(item => !item.submitted);
+    return filtered;
+  }, [statsTask, students, submissions, statsSearch, statsFilter]);
+
+  const statsCounts = useMemo(() => {
+    if (!statsTask) return { total: 0, submitted: 0, missing: 0, pending: 0 };
+    const activeStudents = students.filter(s => s.registrationStatus === 'approved');
+    const scopedStudents = statsTask.visibility === 'restricted' ? activeStudents.filter(s => statsTask.visibleToIds.includes(s.id)) : activeStudents;
+    const taskSubmissions = submissions.filter(s => s.taskId === statsTask.id);
+    const submittedIds = new Set(taskSubmissions.map(s => s.registrationId));
+    const total = scopedStudents.length;
+    const submitted = scopedStudents.filter(s => submittedIds.has(s.id)).length;
+    const pending = taskSubmissions.filter(s => s.status === 'pending').length;
+    const missing = total - submitted;
+    return { total, submitted, missing, pending };
+  }, [statsTask, students, submissions]);
 
   async function handleImagePick(e: React.ChangeEvent<HTMLInputElement>, isEdit = false) {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      const base64 = await compressImage(file, 100);
+      const base64 = await compressImage(file);
       if (isEdit && editTask) setEditTask({ ...editTask, imageUrl: base64 });
       else setAddImage(base64);
-      pushToast('info', 'تم تحميل الصورة ✓');
-    } catch { pushToast('error', 'تعذر معالجة الصورة'); }
+      pushToast('info', 'تم تجهيز الصورة بنجاح ✓');
+    } catch {
+      pushToast('error', 'تعذر معالجة الصورة');
+    }
   }
 
   const toggleAdminChip = (id: string, isEdit = false) => {
     if (isEdit && editTask) {
-      const next = editTask.assignedAdmins.includes(id) ? editTask.assignedAdmins.filter(x => x !== id) : [...editTask.assignedAdmins, id];
-      setEditTask({ ...editTask, assignedAdmins: next });
+      const current = editTask.assignedAdmins;
+      setEditTask({ ...editTask, assignedAdmins: current.includes(id) ? current.filter(x => x !== id) : [...current, id] });
     } else {
-      setAddAdmins(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+      setAddAdmins(addAdmins.includes(id) ? addAdmins.filter(x => x !== id) : [...addAdmins, id]);
     }
   };
 
-  async function saveCategories(cats: string[]) {
-    setSavingCats(true);
-    try {
-      await fetch('/api/supervisor/tasks', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'save_categories', categories: cats }),
-      });
-      setCategories(cats);
-    } catch { pushToast('error', 'فشل حفظ التصنيفات'); }
-    finally { setSavingCats(false); }
-  }
-
-  function addCategory() {
-    const cat = newCategory.trim();
-    if (!cat) return;
-    if (categories.includes(cat)) { pushToast('error', 'التصنيف موجود مسبقاً'); return; }
-    saveCategories([...categories, cat]);
-    setNewCategory('');
-  }
-
-  function removeCategory(cat: string) {
-    if (cat === 'عام') return;
-    saveCategories(categories.filter(c => c !== cat));
-    if (addTrack === cat) setAddTrack('عام');
-  }
-
-  function commitRename() {
-    if (!editingCat) return;
-    const next = editingCat.value.trim();
-    const original = editingCat.original;
-    if (!next || next === original) { setEditingCat(null); return; }
-    if (categories.includes(next)) { pushToast('error', 'التصنيف موجود مسبقاً'); return; }
-    saveCategories(categories.map(c => (c === original ? next : c)));
-    if (addTrack === original) setAddTrack(next);
-    setEditingCat(null);
-  }
-
-  if (loading) return <div className="card p-12 text-center text-ink-400 text-sm">جارٍ تحميل البيانات…</div>;
-
   return (
-    <div dir="rtl" className="w-full">
-      <div className="mb-6 flex items-center gap-3">
-        <span className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 text-white shadow-sm" style={{ background: 'linear-gradient(135deg,#FF9F1C,#F4720B)' }}>
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-          </svg>
-        </span>
-        <div>
-          <h1 className="text-2xl font-bold text-ink-900 mb-0.5">
-            {isScientific ? 'إدارة المهام والتحديات' : 'مهامي المُكلَّف بها'}
-          </h1>
-          <p className="text-sm text-ink-500">
-            {isScientific ? 'أنشئ المهام وكلّف المشرفين بمراجعتها وتتبع تسليمات الطلاب.' : 'راجع تسليمات الطلاب للمهام المُسنَدة إليك وقيّمها.'}
-          </p>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-2 mb-6 border-b border-ink-200 pb-2 overflow-x-auto scroll-soft">
-        <TabBtn active={activeTab === 'submissions'} onClick={() => setActiveTab('submissions')}>
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M12 3v12M17 8l-5-5-5 5" />
-          </svg>
-          <span>المهام المسلمة</span>
-          {pendingSubmissions.length > 0 && (
-            <span className="mr-1.5 px-2 py-0.5 rounded-full bg-nred-600 text-white text-xs font-mono">{pendingSubmissions.length}</span>
+    <div dir="rtl" className="w-full relative">
+      
+      {/* 1. TOPBAR TAB SELECTOR */}
+      <div className="bg-white border border-ink-200 rounded-[1.2rem] p-2 mb-8 flex flex-col md:flex-row gap-2 shadow-sm overflow-x-auto">
+        <button
+          onClick={() => setActiveTab('manage')}
+          className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-2 py-3 px-5 rounded-xl text-sm font-bold transition-all shrink-0 ${
+            activeTab === 'manage' ? 'bg-brand text-white shadow-brand' : 'text-ink-600 hover:bg-cream-100 hover:text-ink-900'
+          }`}
+        >
+          <span>إدارة المهام</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('submissions')}
+          className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-2 py-3 px-5 rounded-xl text-sm font-bold transition-all shrink-0 ${
+            activeTab === 'submissions' ? 'bg-brand text-white shadow-brand' : 'text-ink-600 hover:bg-cream-100 hover:text-ink-900'
+          }`}
+        >
+          <span>المهام المستلمة</span>
+          {pendingCount > 0 && (
+            <span className={`px-2.5 py-0.5 rounded-full text-xs font-mono font-bold ${activeTab === 'submissions' ? 'bg-white text-brand' : 'bg-brand-50 border border-brand-200 text-brand-600'}`}>
+              {pendingCount}
+            </span>
           )}
-        </TabBtn>
-        <TabBtn active={activeTab === 'log'} onClick={() => setActiveTab('log')}>
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
-            <line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
-          </svg>
+        </button>
+        <button
+          onClick={() => setActiveTab('log')}
+          className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-2 py-3 px-5 rounded-xl text-sm font-bold transition-all shrink-0 ${
+            activeTab === 'log' ? 'bg-brand text-white shadow-brand' : 'text-ink-600 hover:bg-cream-100 hover:text-ink-900'
+          }`}
+        >
           <span>سجل التقييمات</span>
-        </TabBtn>
-        {isScientific && (
-          <>
-            <TabBtn active={activeTab === 'add'} onClick={() => setActiveTab('add')}>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z" />
-              </svg>
-              <span>إضافة مهمة</span>
-            </TabBtn>
-            <TabBtn active={activeTab === 'manage'} onClick={() => setActiveTab('manage')}>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-              </svg>
-              <span>إدارة المهام</span>
-            </TabBtn>
-          </>
-        )}
+        </button>
+        <button
+          onClick={() => setActiveTab('add')}
+          className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-2 py-3 px-5 rounded-xl text-sm font-bold transition-all shrink-0 md:mr-auto ${
+            activeTab === 'add' ? 'bg-brand text-white shadow-brand' : 'text-ink-600 hover:bg-cream-100 hover:text-ink-900'
+          }`}
+        >
+          <span>إضافة مهمة</span>
+        </button>
       </div>
 
-      {/* TAB: PENDING SUBMISSIONS */}
-      {activeTab === 'submissions' && (
-        <div className="space-y-4 fade-in">
-          {pendingSubmissions.length > 0 && (
-            <div className="card p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label className="label">البحث عن طالب</label>
-                <input type="text" className="field py-1.5 px-3 text-sm" placeholder="ابحث باسم الطالب..." value={subSearch} onChange={e => setSubSearch(e.target.value)} />
-              </div>
-              <div>
-                <label className="label">تصفية حسب المهمة</label>
-                <select className="field py-1.5 px-3 text-sm" value={subTaskFilter} onChange={e => setSubTaskFilter(e.target.value)}>
-                  <option value="">كل المهام</option>
-                  {uniqueTasksPending.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
-                </select>
-              </div>
-            </div>
-          )}
-          {filteredPending.length === 0 ? (
-            <div className="card text-center p-12 space-y-3">
-              <div className="text-3xl">🎉</div>
-              <h3 className="font-bold text-lg text-ink-900">لا توجد تسليمات معلقة</h3>
-              <p className="text-sm text-ink-500">{pendingSubmissions.length > 0 ? 'لا نتائج تطابق الفلاتر.' : 'تم تقييم جميع التسليمات.'}</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {filteredPending.map(sub => (
-                <SubmissionCard key={sub.id} sub={sub} supervisors={supervisors} onEvaluate={setEvalSub} />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* TAB: EVALUATION LOG */}
-      {activeTab === 'log' && (
-        <div className="space-y-4 fade-in">
-          {logSubmissions.length > 0 && (
-            <div className="card p-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="label">اسم الطالب</label>
-                <input type="text" className="field py-1.5 px-3 text-sm" placeholder="ابحث..." value={logSearch} onChange={e => setLogSearch(e.target.value)} />
-              </div>
-              <div>
-                <label className="label">المهمة</label>
-                <select className="field py-1.5 px-3 text-sm" value={logTaskFilter} onChange={e => setLogTaskFilter(e.target.value)}>
-                  <option value="">كل المهام</option>
-                  {uniqueTasksLog.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="label">الحالة</label>
-                <select className="field py-1.5 px-3 text-sm" value={logStatusFilter} onChange={e => setLogStatusFilter(e.target.value)}>
-                  <option value="">كل الحالات</option>
-                  <option value="approved">مقبولة</option>
-                  <option value="rejected">مردودة</option>
-                </select>
-              </div>
-            </div>
-          )}
-          {filteredLog.length === 0 ? (
-            <div className="card text-center p-12 text-ink-400">لا توجد تقييمات مسجلة بعد.</div>
-          ) : (
-            <div className="space-y-4">
-              {filteredLog.map(sub => (
-                <SubmissionCard
-                  key={sub.id} sub={sub} supervisors={supervisors} isLog
-                  collapsible expanded={expandedLogId === sub.id}
-                  onToggle={() => setExpandedLogId(id => (id === sub.id ? null : sub.id))}
-                  inlineEditSub={inlineEditSub} inlinePoints={inlinePoints}
-                  setInlineEditSub={setInlineEditSub} setInlinePoints={setInlinePoints}
-                  saveInlinePoints={saveInlinePoints} inlineBusy={inlineBusy}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* TAB: ADD TASK (scientific only) */}
-      {activeTab === 'add' && isScientific && (
-        <div className="max-w-2xl mx-auto fade-in space-y-4">
-          <form onSubmit={handleAddTask} className="card p-6 space-y-4">
-            <h2 className="text-lg font-bold text-ink-900 border-b border-ink-150 pb-2 mb-4">إنشاء مهمة جديدة</h2>
-
-            <div>
-              <label className="label">عنوان المهمة <span className="req">*</span></label>
-              <input type="text" className="field" required placeholder="مثال: حفظ سورة الملك…" value={addTitle} onChange={e => setAddTitle(e.target.value)} />
-            </div>
-
-            <div>
-              <label className="label">وصف المهمة <span className="req">*</span></label>
-              <textarea className="field" required rows={4} placeholder="اكتب تفاصيل وشروط المهمة…" value={addDesc} onChange={e => setAddDesc(e.target.value)} />
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <label className="label">نقاط الإنجاز <span className="req">*</span></label>
-                <input type="number" className="field text-center" required min={1} value={addPoints} onChange={e => setAddPoints(e.target.value.replace(/\D/g, ''))} />
-              </div>
-              <div>
-                <label className="label">التصنيف</label>
-                <select className="field" value={addTrack} onChange={e => setAddTrack(e.target.value)}>
-                  {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="label">موعد البداية</label>
-                <input type="date" className="field" value={addStartDate} onChange={e => setAddStartDate(e.target.value)} />
-              </div>
-              <div>
-                <label className="label">الموعد النهائي <span className="req">*</span></label>
-                <input type="date" className="field" required value={addDeadline} onChange={e => setAddDeadline(e.target.value)} />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="label">المرحلة المعنية <span className="req">*</span></label>
-                <select className="field" value={addStage} onChange={e => setAddStage(e.target.value)}>
-                  <option value="">جميع المراحل</option>
-                  {STAGE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="label">طريقة التسليم <span className="req">*</span></label>
-                <select className="field" value={addMethod} onChange={e => setAddMethod(e.target.value)}>
-                  {SUBMISSION_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="label">مبلغ المهمة (يُخصم من رصيد الطالب عند الطلب)</label>
-                <input type="number" className="field text-center" min={0} value={addCost} onChange={e => setAddCost(e.target.value.replace(/\D/g, ''))} />
-              </div>
-              <div>
-                <label className="label">مهلة الإنجاز بالساعات (اختياري)</label>
-                <input type="number" className="field text-center" min={0} placeholder="مثال: 48" value={addDuration} onChange={e => setAddDuration(e.target.value.replace(/\D/g, ''))} />
-              </div>
-            </div>
-
-            <div>
-              <label className="label">صورة توضيحية (اختياري)</label>
-              <div onClick={() => addFileRef.current?.click()} className="border-2 border-dashed border-ink-300 rounded-xl p-4 text-center cursor-pointer hover:bg-cream-100/50">
-                <input ref={addFileRef} type="file" accept="image/*" className="hidden" onChange={e => handleImagePick(e, false)} />
-                {addImage ? (
-                  <div className="space-y-2">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={addImage} alt="Preview" className="max-h-40 mx-auto rounded-lg" />
-                    <button type="button" className="btn btn-secondary text-xs" onClick={ev => { ev.stopPropagation(); setAddImage(null); }}>إزالة</button>
+      {loading ? (
+        <div className="card p-12 text-center text-ink-400 text-sm">جارٍ تحميل البيانات…</div>
+      ) : (
+        <>
+          {/* TAB 1: MANAGE TASKS */}
+          {activeTab === 'manage' && (
+            <div className="space-y-6 fade-in">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-full bg-ncyan-50 flex items-center justify-center text-ncyan-600 text-2xl border border-ncyan-100 shadow-sm">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                   </div>
+                  <div>
+                    <h1 className="text-[1.75rem] font-bold text-ink-900">إدارة المهام</h1>
+                    <p className="text-[0.9rem] text-ink-500 mt-1">استعرض وعدّل وحذف جميع المهام المنشورة على المنصة.</p>
+                  </div>
+                </div>
+                <button onClick={() => setActiveTab('add')} className="btn bg-ink-900 text-white hover:bg-ink-800 rounded-xl px-5 py-3 font-bold shadow-soft">
+                  + إضافة مهمة جديدة
+                </button>
+              </div>
+
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
+                <div className="card p-6 flex flex-col items-center justify-center text-center shadow-soft">
+                  <div className="text-4xl font-extrabold text-ncyan-600">{totalTasksCount}</div>
+                  <div className="text-[0.9rem] font-bold text-ink-500 mt-2">إجمالي المهام</div>
+                </div>
+                <div className="card p-6 flex flex-col items-center justify-center text-center shadow-soft">
+                  <div className="text-4xl font-extrabold text-emerald-600">{activeTasksCount}</div>
+                  <div className="text-[0.9rem] font-bold text-ink-500 mt-2">مهام مُفعّلة</div>
+                </div>
+                <div className="card p-6 flex flex-col items-center justify-center text-center shadow-soft">
+                  <div className="text-4xl font-extrabold text-brand-600">{pendingCount}</div>
+                  <div className="text-[0.9rem] font-bold text-ink-500 mt-2">بانتظار التقييم</div>
+                </div>
+                <div className="card p-6 flex flex-col items-center justify-center text-center shadow-soft">
+                  <div className="text-4xl font-extrabold text-nred-600">{disabledTasksCount}</div>
+                  <div className="text-[0.9rem] font-bold text-ink-500 mt-2">مهام معطلة</div>
+                </div>
+              </div>
+
+              {/* Filters Box */}
+              <div className="bg-white rounded-2xl p-4 flex flex-col md:flex-row items-center gap-3 border border-ink-150 shadow-sm mt-2">
+                <div className="relative flex-1 w-full">
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-ink-400">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="ابحث باسم المهمة..."
+                    className="field pl-4 pr-11 py-2.5 text-[0.9rem] w-full rounded-xl bg-ink-50/30 border-transparent focus:border-ncyan-600 focus:bg-white"
+                    value={manageSearch}
+                    onChange={e => setManageSearch(e.target.value)}
+                  />
+                </div>
+                <div className="flex gap-3 w-full md:w-auto">
+                  <select className="field py-2.5 px-3 text-[0.9rem] flex-1 md:w-48 rounded-xl bg-ink-50/30 border-transparent focus:bg-white" value={manageTrackFilter} onChange={e => setManageTrackFilter(e.target.value)}>
+                    <option value="">كل المسارات</option>
+                    <option value="عام">العامة</option>
+                    <option value="الثقافي">الثقافي</option>
+                    <option value="مسار تقني">مسار تقني</option>
+                    <option value="الذاكرة الحديدية">الذاكرة الحديدية</option>
+                    <option value="الاجتماعي">الاجتماعي</option>
+                    <option value="مسار إعلامي">مسار إعلامي</option>
+                  </select>
+                  <select className="field py-2.5 px-3 text-[0.9rem] flex-1 md:w-48 rounded-xl bg-ink-50/30 border-transparent focus:bg-white" value={manageSortFilter} onChange={e => setManageSortFilter(e.target.value)}>
+                    <option value="default">الترتيب الافتراضي</option>
+                    <option value="newest">الأحدث أولاً</option>
+                    <option value="points">الأكثر نقاطاً</option>
+                    <option value="dueDate">حسب الاستحقاق</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Tasks List */}
+              <div className="card p-0 overflow-hidden border border-ink-150 shadow-soft">
+                {filteredTasks.length === 0 ? (
+                  <div className="p-16 text-center text-ink-400">لا توجد مهام مطابقة للبحث.</div>
                 ) : (
-                  <div className="py-2 text-ink-400 text-sm">اضغط لاختيار صورة</div>
+                  <div className="overflow-x-auto scroll-soft">
+                    <table className="w-full text-right">
+                      <thead className="bg-ink-50/60 border-b border-ink-150 text-ink-500 text-[0.85rem]">
+                        <tr>
+                          <th className="font-bold py-4 px-5">المهمة</th>
+                          <th className="font-bold py-4 px-5">المسار</th>
+                          <th className="font-bold py-4 px-5 text-center">النقاط</th>
+                          <th className="font-bold py-4 px-5">الموعد</th>
+                          <th className="font-bold py-4 px-5 text-center">الإجراءات</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredTasks.map(task => (
+                          <tr key={task.id} className={`border-b border-ink-150 last:border-0 hover:bg-cream-100/50 transition-colors ${!task.isActive ? 'opacity-60 bg-ink-50/20' : ''}`}>
+                            <td className="py-4 px-5 max-w-[280px]">
+                              <div className="font-bold text-ink-900 mb-1.5 text-[0.95rem]">{task.title}</div>
+                              <div className="text-[0.8rem] text-ink-400 line-clamp-1 leading-relaxed">{task.description}</div>
+                            </td>
+                            <td className="py-4 px-5">
+                              <span className={`px-3 py-1 rounded-full text-[0.75rem] font-bold ${getTrackPillClass(task.track)}`}>
+                                {task.track || 'عام'}
+                              </span>
+                            </td>
+                            <td className="py-4 px-5">
+                              <div className="flex flex-col items-center justify-center gap-1">
+                                <div className="flex items-center gap-1.5 font-extrabold text-ink-900 text-[0.95rem]">
+                                  <span>{task.maxPoints}</span>
+                                  <span className="text-brand-500 text-lg">☀️</span>
+                                </div>
+                                {task.timeLimitHours && (
+                                  <span className="text-ink-400 text-[0.75rem] font-bold bg-ink-50 px-2 py-0.5 rounded-md border border-ink-150">⏳ مهلة {task.timeLimitHours}س</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-4 px-5 font-mono text-[0.8rem] font-bold text-ink-500">
+                              {task.dueDate.split('T')[0]}
+                            </td>
+                            <td className="py-4 px-5">
+                              <div className="flex gap-2 justify-center flex-wrap">
+                                <button
+                                  className="border border-ncyan-600/30 text-ncyan-700 bg-ncyan-50/60 hover:bg-ncyan-100/60 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors"
+                                  onClick={() => setEditTask(task)}
+                                >
+                                  تعديل
+                                </button>
+                                <button
+                                  className={`border px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${task.isActive ? 'border-brand/40 text-brand-700 bg-brand-50/60 hover:bg-brand-100/60' : 'border-emerald-600/30 text-emerald-700 bg-emerald-50/60 hover:bg-emerald-100/60'}`}
+                                  onClick={() => toggleTaskActive(task)}
+                                >
+                                  {task.isActive ? 'تعطيل' : 'تفعيل'}
+                                </button>
+                                <button
+                                  className="border border-purple-500/30 text-purple-700 bg-purple-50/60 hover:bg-purple-100/60 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors"
+                                  onClick={() => { setScopeTask(task); setScopeSelected(task.visibleToIds || []); setScopeSearch(''); }}
+                                >
+                                  النطاق
+                                </button>
+                                <button
+                                  className="border border-nblue-400/30 text-nblue-700 bg-nblue-50/60 hover:bg-nblue-100/60 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors"
+                                  onClick={() => { setStatsTask(task); setStatsSearch(''); setStatsFilter('all'); }}
+                                >
+                                  تسليمات
+                                </button>
+                                <button
+                                  className="border border-nred-400/30 text-nred-700 bg-nred-50/60 hover:bg-nred-100/60 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors"
+                                  onClick={() => handleTaskDelete(task.id, task.title)}
+                                >
+                                  حذف
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             </div>
+          )}
 
-            <div>
-              <label className="label">رابط مرجعي (اختياري)</label>
-              <input type="url" className="field" placeholder="https://example.com/resource" value={addResourceLink} onChange={e => setAddResourceLink(e.target.value)} />
-            </div>
+          {/* TAB 2: SUBMISSIONS */}
+          {activeTab === 'submissions' && (
+            <div className="space-y-6 fade-in">
+              <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-full bg-brand-50 flex items-center justify-center text-brand-600 text-2xl border border-brand-100 shadow-sm">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-3 mb-1">
+                      <h1 className="text-[1.75rem] font-bold text-ink-900">مراجعة التسليمات</h1>
+                    </div>
+                    <p className="text-[0.9rem] text-ink-500 mt-1">اعتمد أو ارفض تسليمات الطلاب وامنح النقاط المناسبة.</p>
+                  </div>
+                </div>
+                {pendingCount > 0 && (
+                  <div className="bg-brand-50 border border-brand-200 text-brand-700 rounded-full px-5 py-2 text-[0.9rem] font-bold shadow-sm">
+                    {pendingCount} تسليم بانتظار المراجعة
+                  </div>
+                )}
+              </div>
 
-            <div>
-              <label className="label">المشرف المسؤول عن التقييم</label>
-              <p className="text-xs text-ink-400 mb-2">عدم التحديد = جميع مشرفي المهام والعلمية.</p>
-              <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={() => setAddAdmins([])} className={`choice text-xs py-1 px-3 ${addAdmins.length === 0 ? 'is-active' : ''}`}>الجميع</button>
-                {supervisors.map(s => (
-                  <button key={s.id} type="button" onClick={() => toggleAdminChip(String(s.id), false)} className={`choice text-xs py-1 px-3 ${addAdmins.includes(String(s.id)) ? 'is-active' : ''}`}>
-                    {s.name}
+              {pendingSubmissions.length > 0 && (
+                <div className="bg-white rounded-2xl p-4 flex flex-col md:flex-row items-center gap-3 border border-ink-150 shadow-sm">
+                  <div className="relative flex-1 w-full">
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-ink-400">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    </span>
+                    <input type="text" className="field pl-4 pr-11 py-2.5 text-[0.9rem] w-full rounded-xl bg-ink-50/30 border-transparent focus:bg-white focus:border-brand" placeholder="ابحث باسم الطالب..." value={subSearch} onChange={e => setSubSearch(e.target.value)} />
+                  </div>
+                  <select className="field py-2.5 px-3 text-[0.9rem] flex-1 md:w-48 rounded-xl bg-ink-50/30 border-transparent focus:bg-white" value={subTaskFilter} onChange={e => setSubTaskFilter(e.target.value)}>
+                    <option value="">كل المهام</option>
+                    {uniqueTasksPending.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
+                  </select>
+                  <select className="field py-2.5 px-3 text-[0.9rem] flex-1 md:w-48 rounded-xl bg-ink-50/30 border-transparent focus:bg-white" value={subAdminFilter} onChange={e => setSubAdminFilter(e.target.value)}>
+                    <option value="">كل المشرفين</option>
+                    <option value="__all__">جميع المشرفين</option>
+                    {supervisors.map(s => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
+                  </select>
+                  <button className="bg-ink-100 hover:bg-ink-200 text-ink-700 py-2.5 px-6 text-[0.9rem] font-bold rounded-xl shrink-0 transition-colors" onClick={() => { setSubSearch(''); setSubTaskFilter(''); setSubAdminFilter(''); }}>
+                    مسح
                   </button>
-                ))}
+                </div>
+              )}
+
+              {filteredPendingSubmissions.length === 0 ? (
+                <div className="card text-center p-20 border-ink-150 shadow-soft">
+                  <div className="text-5xl mb-4">🎉</div>
+                  <h3 className="font-extrabold text-xl text-ink-900 mb-2">لا توجد تسليمات معلقة</h3>
+                  <p className="text-[0.95rem] text-ink-500">لقد تم تقييم جميع تسليمات الطلاب بنجاح.</p>
+                </div>
+              ) : (
+                <div className="space-y-5">
+                  <div className="text-sm font-bold text-ink-700 flex items-center gap-2 px-1">
+                    بانتظار المراجعة ({filteredPendingSubmissions.length})
+                  </div>
+                  {filteredPendingSubmissions.map(sub => (
+                    <SubmissionCard key={sub.id} sub={sub} onEvaluate={setEvalSub} supervisors={supervisors} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 3: LOG */}
+          {activeTab === 'log' && (
+            <div className="space-y-6 fade-in">
+              <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-full bg-purple-50 flex items-center justify-center text-purple-600 text-2xl border border-purple-100 shadow-sm">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline><path d="M9 13l2 2 4-4"></path></svg>
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-3 mb-1">
+                      <h1 className="text-[1.75rem] font-bold text-ink-900">سجل التقييمات السابقة</h1>
+                    </div>
+                    <p className="text-[0.9rem] text-ink-500 mt-1">سجل كامل لجميع التسليمات التي تم قبولها أو ردها.</p>
+                  </div>
+                </div>
+                <div className="bg-purple-50 border border-purple-200 text-purple-700 rounded-full px-5 py-2 text-[0.9rem] font-bold shadow-sm">
+                  {logSubmissions.length} تقييم
+                </div>
               </div>
+
+              {logSubmissions.length > 0 && (
+                <div className="bg-white rounded-2xl p-4 flex flex-col md:flex-row items-center gap-3 border border-ink-150 shadow-sm flex-wrap">
+                  <div className="relative flex-1 min-w-[200px]">
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-ink-400">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    </span>
+                    <input type="text" className="field pl-4 pr-11 py-2.5 text-[0.9rem] w-full rounded-xl bg-ink-50/30 border-transparent focus:bg-white focus:border-purple-400" placeholder="ابحث باسم الطالب..." value={logSearch} onChange={e => setLogSearch(e.target.value)} />
+                  </div>
+                  <select className="field py-2.5 px-3 text-[0.9rem] flex-1 md:w-40 rounded-xl bg-ink-50/30 border-transparent focus:bg-white" value={logTaskFilter} onChange={e => setLogTaskFilter(e.target.value)}>
+                    <option value="">كل المهام</option>
+                    {uniqueTasksLog.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
+                  </select>
+                  <select className="field py-2.5 px-3 text-[0.9rem] flex-1 md:w-40 rounded-xl bg-ink-50/30 border-transparent focus:bg-white" value={logAdminFilter} onChange={e => setLogAdminFilter(e.target.value)}>
+                    <option value="">كل المشرفين</option>
+                    <option value="__all__">جميع المشرفين</option>
+                    {supervisors.map(s => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
+                  </select>
+                  <select className="field py-2.5 px-3 text-[0.9rem] flex-1 md:w-36 rounded-xl bg-ink-50/30 border-transparent focus:bg-white" value={logStatusFilter} onChange={e => setLogStatusFilter(e.target.value)}>
+                    <option value="">كل الحالات</option>
+                    <option value="approved">مقبولة</option>
+                    <option value="rejected">مردودة</option>
+                  </select>
+                  <button className="bg-ink-100 hover:bg-ink-200 text-ink-700 py-2.5 px-6 text-[0.9rem] font-bold rounded-xl shrink-0 transition-colors" onClick={() => { setLogSearch(''); setLogTaskFilter(''); setLogAdminFilter(''); setLogStatusFilter(''); }}>
+                    مسح
+                  </button>
+                </div>
+              )}
+
+              {filteredLogSubmissions.length === 0 ? (
+                <div className="card text-center p-20 border-ink-150 shadow-soft">
+                  <div className="text-4xl text-ink-300 mb-4">🗂️</div>
+                  <h3 className="font-extrabold text-xl text-ink-900">لا توجد تقييمات مسجلة بعد.</h3>
+                </div>
+              ) : (
+                <div className="space-y-5">
+                  {filteredLogSubmissions.map(sub => (
+                    <SubmissionCard
+                      key={sub.id} sub={sub} supervisors={supervisors} isLog
+                      inlineEditSub={inlineEditSub} inlinePoints={inlinePoints}
+                      setInlineEditSub={setInlineEditSub} setInlinePoints={setInlinePoints}
+                      saveInlinePoints={saveInlinePoints} inlineBusy={inlineBusy}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
+          )}
 
-            <button type="submit" disabled={addBusy} className="btn btn-primary w-full py-2.5 font-bold">
-              {addBusy ? 'جارٍ النشر…' : 'نشر المهمة للطلاب'}
-            </button>
-          </form>
-        </div>
-      )}
+          {/* TAB 4: ADD TASK */}
+          {activeTab === 'add' && (
+            <div className="max-w-4xl mx-auto fade-in space-y-6">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-full bg-nblue-50 flex items-center justify-center text-nblue-600 text-2xl border border-nblue-100 shadow-sm">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+                </div>
+                <div>
+                  <h1 className="text-[1.75rem] font-bold text-ink-900 mb-1">إضافة مهمة جديدة</h1>
+                  <p className="text-[0.9rem] text-ink-500">قم بنشر المهام والأنشطة لجميع الطلاب أو تحديد فئة منهم.</p>
+                </div>
+              </div>
 
-      {/* TAB: MANAGE TASKS (scientific only) */}
-      {activeTab === 'manage' && isScientific && (
-        <div className="space-y-4 fade-in">
-          <div className="card p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="relative flex-1 sm:w-80">
-              <input type="text" placeholder="ابحث في المهام…" className="field py-1.5 pr-9 pl-3 text-sm w-full" value={manageSearch} onChange={e => setManageSearch(e.target.value)} />
-              <svg className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-ink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-            </div>
-            <div className="flex items-center gap-3">
-              <button type="button" className="btn btn-secondary text-sm py-1.5 px-3 flex items-center gap-1.5" onClick={() => { setShowCatModal(true); setEditingCat(null); setNewCategory(''); }}>
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" /><line x1="7" y1="7" x2="7.01" y2="7" />
-                </svg>
-                <span>إدارة التصنيفات</span>
-              </button>
-              <div className="text-xs text-ink-400 whitespace-nowrap">إجمالي: {filteredTasks.length} من {tasks.length}</div>
-            </div>
-          </div>
+              <form onSubmit={handleAddTask} className="bg-white rounded-2xl p-6 md:p-8 space-y-6 border border-ink-150 shadow-soft">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="md:col-span-2">
+                    <label className="label mb-1.5 font-bold text-ink-800">عنوان المهمة <span className="req">*</span></label>
+                    <input type="text" className="field py-3 rounded-xl bg-ink-50/20" required placeholder="مثال: حفظ سورة الملك..." value={addTitle} onChange={e => setAddTitle(e.target.value)} />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="label mb-1.5 font-bold text-ink-800">وصف وتفاصيل المهمة <span className="req">*</span></label>
+                    <textarea className="field py-3 rounded-xl bg-ink-50/20" required rows={4} placeholder="اكتب تفاصيل وشروط المهمة بالتفصيل للطلاب..." value={addDesc} onChange={e => setAddDesc(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="label mb-1.5 font-bold text-ink-800">المسار التدريبي <span className="req">*</span></label>
+                    <select className="field py-3 rounded-xl bg-ink-50/20" required value={addTrack} onChange={e => setAddTrack(e.target.value)}>
+                      <option value="عام">عام</option>
+                      <option value="الثقافي">الثقافي</option>
+                      <option value="مسار تقني">مسار تقني</option>
+                      <option value="الذاكرة الحديدية">الذاكرة الحديدية</option>
+                      <option value="الاجتماعي">الاجتماعي</option>
+                      <option value="مسار إعلامي">مسار إعلامي</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label mb-1.5 font-bold text-ink-800">تاريخ الاستحقاق <span className="req">*</span></label>
+                    <input type="date" className="field py-3 rounded-xl bg-ink-50/20 font-mono" required value={addDeadline} onChange={e => setAddDeadline(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="label mb-1.5 font-bold text-ink-800">نقاط الإنجاز <span className="req">*</span></label>
+                    <div className="relative">
+                       <input type="number" className="field py-3 rounded-xl bg-ink-50/20 text-center font-extrabold text-brand-600 text-lg w-full" required min={1} value={addPoints} onChange={e => setAddPoints(e.target.value.replace(/\D/g, ''))} />
+                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl">☀️</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="label mb-1.5 font-bold text-ink-800">طريقة التسليم <span className="req">*</span></label>
+                    <select className="field py-3 rounded-xl bg-ink-50/20" value={addMethod} onChange={e => setAddMethod(e.target.value)}>
+                      <option value="رفع ملف">رفع ملف (صورة / مستند / فيديو)</option>
+                      <option value="إقرار بالإنجاز">إقرار بالإنجاز فقط</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label mb-1.5 font-bold text-ink-800">مهلة الإنجاز (اختياري)</label>
+                    <input type="number" min={1} placeholder="مثال: 2 (ساعتين)" className="field py-3 rounded-xl bg-ink-50/20 font-mono" value={addTimeLimit} onChange={e => setAddTimeLimit(e.target.value.replace(/\D/g, ''))} />
+                  </div>
+                </div>
 
-          <div className="card p-3 grid grid-cols-2 md:grid-cols-4 gap-2">
-            <select className="field py-1.5 px-3 text-sm" value={manageTrack} onChange={e => setManageTrack(e.target.value)}>
-              <option value="">كل التصنيفات</option>
-              {categories.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <select className="field py-1.5 px-3 text-sm" value={manageStage} onChange={e => setManageStage(e.target.value)}>
-              <option value="">كل المراحل</option>
-              <option value="الكل">الكل</option>
-              {STAGE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-            <select className="field py-1.5 px-3 text-sm" value={manageMethod} onChange={e => setManageMethod(e.target.value)}>
-              <option value="">كل طرق التسليم</option>
-              {SUBMISSION_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-            </select>
-            <select className="field py-1.5 px-3 text-sm" value={manageStatus} onChange={e => setManageStatus(e.target.value)}>
-              <option value="">كل الحالات</option>
-              <option value="active">نشطة</option>
-              <option value="disabled">معطلة</option>
-            </select>
-          </div>
+                <div className="pt-6 border-t border-ink-150">
+                  <label className="label mb-3 font-bold text-ink-800">صورة توضيحية للمهمة (اختياري)</label>
+                  <div onClick={() => addFileRef.current?.click()} className="border-2 border-dashed border-ink-200 bg-ink-50/30 hover:bg-cream-100 rounded-2xl p-8 text-center cursor-pointer transition-colors">
+                    <input ref={addFileRef} type="file" accept="image/*" className="hidden" onChange={e => handleImagePick(e, false)} />
+                    {addImage ? (
+                      <div className="space-y-4">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={addImage} alt="Preview" className="max-h-48 mx-auto rounded-xl shadow-sm border border-ink-150" />
+                        <button type="button" className="btn btn-secondary text-sm font-bold bg-white" onClick={(e) => { e.stopPropagation(); setAddImage(null); }}>إزالة الصورة</button>
+                      </div>
+                    ) : (
+                      <div className="text-ink-500 text-[0.95rem] flex flex-col items-center gap-3">
+                        <div className="w-12 h-12 bg-white rounded-full shadow-sm flex items-center justify-center text-ink-300 border border-ink-150">
+                           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                        </div>
+                        <span className="font-medium">اضغط لاختيار صورة من جهازك للمهمة</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
 
-          <div className="card p-0 overflow-hidden">
-            {filteredTasks.length === 0 ? (
-              <p className="text-center py-12 text-ink-400 text-sm">لا توجد مهام.</p>
-            ) : (
-              <div className="overflow-x-auto scroll-soft">
-                <table className="tbl text-right">
-                  <thead>
-                    <tr>
-                      <th>المهمة</th>
-                      <th>التصنيف</th>
-                      <th>المرحلة</th>
-                      <th>النقاط</th>
-                      <th>البداية</th>
-                      <th>الاستحقاق</th>
-                      <th>الحالة</th>
-                      <th className="text-center">الإجراءات</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredTasks.map(task => (
-                      <tr key={task.id} className={!task.isActive ? 'opacity-60 bg-ink-50/20' : ''}>
-                        <td className="max-w-xs">
-                          <div className="font-semibold text-ink-900">{task.title}</div>
-                          <div className="text-xs text-ink-400 truncate">{task.description}</div>
-                        </td>
-                        <td><span className="pill pill-gray text-xs">{task.track || 'عام'}</span></td>
-                        <td className="text-xs text-ink-500">{task.stage || 'الكل'}</td>
-                        <td className="font-bold text-brand-600">{task.maxPoints} ن</td>
-                        <td className="text-xs font-mono text-ink-500">{task.startDate ? task.startDate.split('T')[0] : '—'}</td>
-                        <td className="text-sm font-mono">{task.dueDate.split('T')[0]}</td>
-                        <td><span className={`pill ${task.isActive ? 'pill-green' : 'pill-red'}`}>{task.isActive ? 'نشطة' : 'معطلة'}</span></td>
-                        <td>
-                          <div className="flex gap-1 justify-center">
-                            <button className="btn btn-secondary py-1 px-2.5 text-xs" onClick={() => setEditTask(task)}>تعديل</button>
-                            <button className={`btn py-1 px-2.5 text-xs ${task.isActive ? 'btn-danger' : 'btn-primary'}`} onClick={() => toggleTaskActive(task)}>
-                              {task.isActive ? 'تعطيل' : 'تفعيل'}
-                            </button>
-                            <button className="btn btn-secondary py-1 px-2.5 text-xs" onClick={() => { setScopeTask(task); setScopeSelected(task.visibleToIds || []); setScopeSearch(''); }}>النطاق</button>
-                            <button className="btn btn-secondary py-1 px-2.5 text-xs" onClick={() => { setStatsTask(task); setStatsSearch(''); setStatsFilter('all'); }}>إحصائيات</button>
-                            <button className="text-nred-600 hover:text-nred-800 text-lg px-2" onClick={() => handleTaskDelete(task.id, task.title)}>×</button>
-                          </div>
-                        </td>
-                      </tr>
+                <div>
+                  <label className="label mb-1.5 font-bold text-ink-800">رابط مرجعي خارجي (اختياري)</label>
+                  <input type="url" className="field py-3 rounded-xl bg-ink-50/20" placeholder="https://example.com/resource" value={addResourceLink} onChange={e => setAddResourceLink(e.target.value)} />
+                </div>
+
+                <div className="bg-cream-50 p-5 rounded-2xl border border-ink-150">
+                  <label className="label font-bold text-ink-800 text-base">المشرف المسؤول عن التقييم</label>
+                  <p className="text-[0.85rem] text-ink-500 mb-4">اختر مشرفاً واحداً أو أكثر. عدم التحديد يعني أن جميع المشرفين يستطيعون التقييم.</p>
+                  <div className="flex flex-wrap gap-2.5">
+                    <button type="button" onClick={() => setAddAdmins([])} className={`choice text-xs font-bold py-2 px-4 rounded-xl ${addAdmins.length === 0 ? 'bg-ink-800 text-white border-ink-800 shadow-sm' : 'bg-white'}`}>جميع المشرفين</button>
+                    {supervisors.map(s => (
+                      <button key={s.id} type="button" onClick={() => toggleAdminChip(String(s.id), false)} className={`choice text-xs font-bold py-2 px-4 rounded-xl ${addAdmins.includes(String(s.id)) ? 'bg-ink-800 text-white border-ink-800 shadow-sm' : 'bg-white'}`}>
+                        {s.name}
+                      </button>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
+                  </div>
+                </div>
+
+                <div className="pt-4">
+                  <button type="submit" disabled={addBusy} className="btn bg-brand-500 hover:bg-brand-600 text-white w-full py-4 rounded-xl font-bold text-[1.05rem] shadow-brand transition-all">
+                    {addBusy ? 'جارٍ نشر المهمة…' : 'نشر المهمة والتحدي للطلاب 🚀'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+        </>
       )}
 
-      {/* MODAL: EVALUATE SUBMISSION */}
+      {/* MODAL 1: EVALUATE SUBMISSION */}
       {evalSub && (
         <div className="modal-backdrop flex items-center justify-center p-4 z-50" onClick={() => setEvalSub(null)}>
-          <div className="modal-panel w-full max-w-lg" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-5 border-b border-ink-200">
-              <h3 className="text-lg font-bold text-ink-900">مراجعة وتقييم المهمة</h3>
-              <button className="text-2xl text-ink-400" onClick={() => setEvalSub(null)}>×</button>
+          <div className="modal-panel w-full max-w-lg shadow-elevated" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-6 border-b border-ink-150 bg-ink-50/50 rounded-t-2xl">
+              <h3 className="text-xl font-extrabold text-ink-900">مراجعة وتقييم المهمة</h3>
+              <button className="text-3xl text-ink-400 hover:text-ink-900 transition-colors" onClick={() => setEvalSub(null)}>×</button>
             </div>
-            <div className="p-5 space-y-4">
-              <div className="bg-cream-50 p-3 rounded-lg border border-ink-150 flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-xs text-ink-400">الطالب:</div>
-                  <div className="font-bold text-ink-900 text-sm">{evalSub.studentName}</div>
-                  <div className="text-sm font-semibold text-brand-600 mt-1">{evalSub.taskTitle}</div>
+            <div className="p-6 space-y-6">
+              <div className="flex items-start gap-4">
+                <div className="w-14 h-14 rounded-full bg-emerald-50 text-emerald-600 font-extrabold flex items-center justify-center text-2xl shrink-0 border border-emerald-100 shadow-sm">
+                  {evalSub.studentName?.charAt(0) || 'ط'}
                 </div>
-                {evalSub.taskTrack && <span className="pill pill-gray text-xs shrink-0">{evalSub.taskTrack}</span>}
+                <div>
+                  <div className="font-extrabold text-ink-900 text-lg mb-0.5">{evalSub.studentName}</div>
+                  <div className="text-[0.95rem] font-bold text-brand-600">{evalSub.taskTitle}</div>
+                </div>
               </div>
 
-              <div>
-                <div className="label">ما سلّمه الطالب:</div>
-                <SubmissionContent fileUrl={evalSub.fileUrl} />
-              </div>
+              {evalSub.fileUrl && (
+                <div className="bg-cream-100/60 p-5 rounded-2xl border border-ink-150">
+                  <div className="text-[0.85rem] text-ink-500 font-bold mb-3">محتوى التسليم المرفق:</div>
+                  {evalSub.fileUrl.startsWith('data:image') || evalSub.fileUrl.startsWith('http') && evalSub.fileUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={evalSub.fileUrl} alt="إثبات التسليم" className="max-h-64 rounded-xl border border-ink-200 mx-auto shadow-sm" />
+                  ) : evalSub.fileUrl === 'admin://manual-mark' ? (
+                    <div className="text-[0.95rem] text-ink-700 font-medium italic text-center py-4 bg-white rounded-xl border border-ink-150">إقرار إنجاز يدوي من المشرف</div>
+                  ) : (
+                    <a href={evalSub.fileUrl} target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:text-white hover:bg-brand-500 hover:border-brand-500 text-[0.95rem] font-bold block text-center py-4 bg-white rounded-xl border border-ink-200 transition-all shadow-sm">
+                      📄 فتح المستند المرفق في نافذة جديدة
+                    </a>
+                  )}
+                </div>
+              )}
 
-              <div>
-                <label className="label">النقاط الممنوحة (الحد الأقصى: {evalSub.taskMaxPoints})</label>
-                <div className="flex items-center gap-3">
-                  <input type="number" min={0} max={evalSub.taskMaxPoints} className="field w-24 text-center font-bold text-lg"
-                    value={evalPoints === '' ? evalSub.taskMaxPoints : evalPoints}
-                    onChange={e => setEvalPoints(e.target.value.replace(/\D/g, ''))} />
-                  <div className="flex-1 flex gap-1">
-                    {([['كامل', evalSub.taskMaxPoints], ['75%', Math.round(evalSub.taskMaxPoints * 0.75)], ['50%', Math.round(evalSub.taskMaxPoints * 0.5)], ['صفر', 0]] as [string, number][]).map(([l, v]) => (
-                      <button key={l} type="button" onClick={() => setEvalPoints(String(v))} className="btn btn-secondary text-xs flex-1">{l}</button>
-                    ))}
+              <div className="bg-white p-5 rounded-2xl border border-ink-200 shadow-sm">
+                <label className="label font-bold text-ink-900 text-[0.95rem] mb-3">النقاط الممنوحة (الحد الأقصى: {evalSub.taskMaxPoints})</label>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                  <div className="relative">
+                     <input type="number" min={0} max={evalSub.taskMaxPoints} className="field w-28 text-center font-extrabold text-2xl py-3 text-brand-600 border-brand-200 bg-brand-50/30 rounded-xl" value={evalPoints === '' ? evalSub.taskMaxPoints : evalPoints} onChange={e => setEvalPoints(e.target.value.replace(/\D/g, ''))} />
+                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-lg">☀️</span>
+                  </div>
+                  <div className="flex-1 flex gap-2">
+                    <button type="button" onClick={() => setEvalPoints(String(evalSub.taskMaxPoints))} className="btn bg-ink-50 hover:bg-ink-100 text-ink-800 border-transparent text-[0.8rem] flex-1 py-3 rounded-xl font-bold">كامل</button>
+                    <button type="button" onClick={() => setEvalPoints(String(Math.round(evalSub.taskMaxPoints * 0.75)))} className="btn bg-ink-50 hover:bg-ink-100 text-ink-800 border-transparent text-[0.8rem] flex-1 py-3 rounded-xl font-bold">75%</button>
+                    <button type="button" onClick={() => setEvalPoints(String(Math.round(evalSub.taskMaxPoints * 0.5)))} className="btn bg-ink-50 hover:bg-ink-100 text-ink-800 border-transparent text-[0.8rem] flex-1 py-3 rounded-xl font-bold">50%</button>
+                    <button type="button" onClick={() => setEvalPoints('0')} className="btn bg-ink-50 hover:bg-ink-100 text-ink-800 border-transparent text-[0.8rem] flex-1 py-3 rounded-xl font-bold">صفر</button>
                   </div>
                 </div>
-                <div className="mt-2 h-2 rounded-full overflow-hidden" style={{ background: '#EDEAE3' }}>
-                  <div className="h-full rounded-full transition-all" style={{
-                    width: `${Math.min(100, Math.round(((evalPoints === '' ? evalSub.taskMaxPoints : (parseInt(evalPoints, 10) || 0)) / Math.max(1, evalSub.taskMaxPoints)) * 100))}%`,
-                    background: 'linear-gradient(90deg,#34d399,#16a34a)',
-                  }} />
-                </div>
               </div>
 
               <div>
-                <label className="label">تعليق للطالب <span className="text-ink-400 text-xs font-normal">(مطلوب عند رد المهمة)</span></label>
-                <textarea className="field" rows={2} placeholder="مثال: أحسنت، استمر في التميز! — أو سبب الرد." value={evalComment} onChange={e => setEvalComment(e.target.value)} />
+                <label className="label font-bold text-ink-800 mb-2">تعليق أو توجيه للطالب (اختياري)</label>
+                <textarea className="field py-3 rounded-xl bg-ink-50/30" rows={2} placeholder="مثال: ممتاز، استمر في هذا التميز!" value={evalComment} onChange={e => setEvalComment(e.target.value)} />
               </div>
             </div>
-            <div className="flex justify-end gap-2 p-4 border-t border-ink-200">
-              <button onClick={() => handleEvaluate('rejected')} disabled={evalBusy} className="btn btn-danger text-sm">رد المهمة</button>
-              <button onClick={() => handleEvaluate('approved')} disabled={evalBusy} className="btn btn-primary text-sm font-bold">
-                {evalBusy ? 'جارٍ الحفظ…' : 'اعتماد وحفظ النقاط'}
+            <div className="flex flex-col sm:flex-row justify-end gap-3 p-6 border-t border-ink-150 bg-ink-50/50 rounded-b-2xl">
+              <button onClick={() => handleEvaluate('rejected')} disabled={evalBusy} className="btn bg-white text-nred-600 border border-nred-200 hover:bg-nred-50 transition-colors text-[0.95rem] font-bold rounded-xl py-3 px-6">
+                رد المهمة للطلب (رفض)
+              </button>
+              <button onClick={() => handleEvaluate('approved')} disabled={evalBusy} className="btn bg-emerald-600 hover:bg-emerald-700 border-transparent text-white text-[0.95rem] font-bold shadow-soft rounded-xl py-3 px-8">
+                {evalBusy ? 'جارٍ الحفظ…' : 'اعتماد وقبول التسليم ✓'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL: EDIT TASK */}
-      {editTask && isScientific && (
+      {/* MODAL 2: EDIT TASK */}
+      {editTask && (
         <div className="modal-backdrop flex items-center justify-center p-4 z-50" onClick={() => setEditTask(null)}>
-          <div className="modal-panel w-full max-w-xl" onClick={e => e.stopPropagation()}>
+          <div className="modal-panel w-full max-w-2xl shadow-elevated" onClick={e => e.stopPropagation()}>
             <form onSubmit={handleUpdateTask}>
-              <div className="flex items-center justify-between p-5 border-b border-ink-200">
-                <h3 className="text-lg font-bold text-ink-900">تعديل المهمة</h3>
-                <button type="button" className="text-2xl text-ink-400" onClick={() => setEditTask(null)}>×</button>
+              <div className="flex items-center justify-between p-6 border-b border-ink-150 bg-ink-50/50 rounded-t-2xl">
+                <h3 className="text-xl font-extrabold text-ink-900">تعديل بيانات المهمة</h3>
+                <button type="button" className="text-3xl text-ink-400 hover:text-ink-900" onClick={() => setEditTask(null)}>×</button>
               </div>
-              <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto scroll-soft">
-                <div>
-                  <label className="label">العنوان</label>
-                  <input type="text" className="field" required value={editTask.title} onChange={e => setEditTask({ ...editTask, title: e.target.value })} />
-                </div>
-                <div>
-                  <label className="label">الوصف</label>
-                  <textarea className="field" required rows={4} value={editTask.description} onChange={e => setEditTask({ ...editTask, description: e.target.value })} />
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div>
-                    <label className="label">النقاط</label>
-                    <input type="number" className="field text-center" required min={1} value={editTask.maxPoints} onChange={e => setEditTask({ ...editTask, maxPoints: parseInt(e.target.value) || 1 })} />
+              <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto scroll-soft">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="md:col-span-2">
+                    <label className="label font-bold text-ink-800 mb-1.5">عنوان المهمة</label>
+                    <input type="text" className="field py-3 rounded-xl bg-ink-50/30" required value={editTask.title} onChange={e => setEditTask({ ...editTask, title: e.target.value })} />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="label font-bold text-ink-800 mb-1.5">الوصف</label>
+                    <textarea className="field py-3 rounded-xl bg-ink-50/30" required rows={3} value={editTask.description} onChange={e => setEditTask({ ...editTask, description: e.target.value })} />
                   </div>
                   <div>
-                    <label className="label">التصنيف</label>
-                    <select className="field" value={editTask.track || 'عام'} onChange={e => setEditTask({ ...editTask, track: e.target.value })}>
-                      {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                    <label className="label font-bold text-ink-800 mb-1.5">المسار التدريبي</label>
+                    <select className="field py-3 rounded-xl bg-ink-50/30" required value={editTask.track || 'عام'} onChange={e => setEditTask({ ...editTask, track: e.target.value })}>
+                      <option value="عام">عام</option>
+                      <option value="الثقافي">الثقافي</option>
+                      <option value="مسار تقني">مسار تقني</option>
+                      <option value="الذاكرة الحديدية">الذاكرة الحديدية</option>
+                      <option value="الاجتماعي">الاجتماعي</option>
+                      <option value="مسار إعلامي">مسار إعلامي</option>
                     </select>
                   </div>
                   <div>
-                    <label className="label">موعد البداية</label>
-                    <input type="date" className="field" value={editTask.startDate?.split('T')[0] || ''} onChange={e => setEditTask({ ...editTask, startDate: e.target.value || null })} />
+                    <label className="label font-bold text-ink-800 mb-1.5">النقاط</label>
+                    <div className="relative">
+                      <input type="number" className="field py-3 rounded-xl bg-ink-50/30 text-center font-extrabold text-brand-600 w-full" required min={1} value={editTask.maxPoints} onChange={e => setEditTask({ ...editTask, maxPoints: parseInt(e.target.value.replace(/\D/g, ''), 10) || 1 })} />
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg">☀️</span>
+                    </div>
                   </div>
                   <div>
-                    <label className="label">الموعد النهائي</label>
-                    <input type="date" className="field" required value={editTask.dueDate.split('T')[0]} onChange={e => setEditTask({ ...editTask, dueDate: e.target.value })} />
+                    <label className="label font-bold text-ink-800 mb-1.5">تاريخ الاستحقاق</label>
+                    <input type="date" className="field py-3 rounded-xl bg-ink-50/30 font-mono" required value={editTask.dueDate.split('T')[0]} onChange={e => setEditTask({ ...editTask, dueDate: e.target.value })} />
                   </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="label">المرحلة المعنية</label>
-                    <select className="field" value={editTask.stage || ''} onChange={e => setEditTask({ ...editTask, stage: e.target.value || null })}>
-                      <option value="">جميع المراحل</option>
-                      {STAGE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                    <label className="label font-bold text-ink-800 mb-1.5">طريقة التسليم</label>
+                    <select className="field py-3 rounded-xl bg-ink-50/30" value={editTask.submissionMethod || 'رفع ملف'} onChange={e => setEditTask({ ...editTask, submissionMethod: e.target.value })}>
+                      <option value="رفع ملف">رفع ملف (صورة / مستند / فيديو)</option>
+                      <option value="إقرار بالإنجاز">إقرار بالإنجاز فقط</option>
                     </select>
                   </div>
                   <div>
-                    <label className="label">طريقة التسليم</label>
-                    <select className="field" value={methodKey(editTask.submissionMethod)} onChange={e => setEditTask({ ...editTask, submissionMethod: e.target.value })}>
-                      {SUBMISSION_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                    </select>
+                    <label className="label font-bold text-ink-800 mb-1.5">مهلة الإنجاز بالساعات (اختياري)</label>
+                    <input type="number" min={1} placeholder="بدون مهلة" className="field py-3 rounded-xl bg-ink-50/30 font-mono" value={editTask.timeLimitHours || ''} onChange={e => setEditTask({ ...editTask, timeLimitHours: e.target.value ? parseInt(e.target.value, 10) : null })} />
                   </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="label">مبلغ المهمة (يُخصم عند الطلب)</label>
-                    <input type="number" className="field text-center" min={0} value={editTask.cost ?? 0} onChange={e => setEditTask({ ...editTask, cost: parseInt(e.target.value, 10) || 0 })} />
-                  </div>
-                  <div>
-                    <label className="label">مهلة الإنجاز بالساعات (اختياري)</label>
-                    <input type="number" className="field text-center" min={0} placeholder="مثال: 48" value={editTask.durationHours ?? ''} onChange={e => setEditTask({ ...editTask, durationHours: e.target.value ? parseInt(e.target.value, 10) || null : null })} />
-                  </div>
-                </div>
-                <div>
-                  <label className="label">الصورة التوضيحية</label>
-                  <div onClick={() => editFileRef.current?.click()} className="border border-dashed border-ink-300 rounded-xl p-3 text-center cursor-pointer hover:bg-cream-100/50">
+
+                <div className="pt-4 border-t border-ink-150">
+                  <label className="label font-bold text-ink-800 mb-3">تغيير الصورة التوضيحية (اختياري)</label>
+                  <div onClick={() => editFileRef.current?.click()} className="border-2 border-dashed border-ink-200 rounded-2xl p-6 text-center cursor-pointer hover:bg-ink-50/50 transition-colors">
                     <input ref={editFileRef} type="file" accept="image/*" className="hidden" onChange={e => handleImagePick(e, true)} />
                     {editTask.imageUrl ? (
-                      <div className="space-y-2">
+                      <div className="space-y-4">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={editTask.imageUrl} alt="Preview" className="max-h-36 mx-auto rounded" />
-                        <button type="button" className="btn btn-secondary text-xs" onClick={ev => { ev.stopPropagation(); setEditTask({ ...editTask, imageUrl: null }); }}>إزالة</button>
+                        <img src={editTask.imageUrl} alt="Preview" className="max-h-40 mx-auto rounded-xl shadow-sm" />
+                        <button type="button" className="btn bg-white border-ink-200 text-sm font-bold shadow-sm" onClick={(e) => { e.stopPropagation(); setEditTask({ ...editTask, imageUrl: null }); }}>إزالة الصورة</button>
                       </div>
-                    ) : <div className="py-2 text-ink-400 text-xs">اضغط لرفع صورة جديدة</div>}
+                    ) : (
+                      <div className="text-ink-400 text-sm font-medium">🖼️ اضغط لرفع صورة جديدة للمهمة</div>
+                    )}
                   </div>
                 </div>
+
                 <div>
-                  <label className="label">رابط مرجعي</label>
-                  <input type="url" className="field" value={editTask.resourceLink || ''} onChange={e => setEditTask({ ...editTask, resourceLink: e.target.value || null })} />
-                </div>
-                <div>
-                  <label className="label">المشرف المسؤول</label>
-                  <div className="flex flex-wrap gap-1.5">
-                    <button type="button" onClick={() => setEditTask({ ...editTask, assignedAdmins: [] })} className={`choice text-xs py-0.5 px-2.5 ${editTask.assignedAdmins.length === 0 ? 'is-active' : ''}`}>الجميع</button>
+                  <label className="label font-bold text-ink-800 mb-2">المشرف المسؤول عن التقييم</label>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    <button type="button" onClick={() => setEditTask({ ...editTask, assignedAdmins: [] })} className={`choice text-[0.8rem] font-bold py-2 px-4 rounded-xl ${editTask.assignedAdmins.length === 0 ? 'bg-ink-800 text-white border-ink-800 shadow-sm' : 'bg-white'}`}>جميع المشرفين</button>
                     {supervisors.map(s => (
-                      <button key={s.id} type="button" onClick={() => toggleAdminChip(String(s.id), true)} className={`choice text-xs py-0.5 px-2.5 ${editTask.assignedAdmins.includes(String(s.id)) ? 'is-active' : ''}`}>
+                      <button key={s.id} type="button" onClick={() => toggleAdminChip(String(s.id), true)} className={`choice text-[0.8rem] font-bold py-2 px-4 rounded-xl ${editTask.assignedAdmins.includes(String(s.id)) ? 'bg-ink-800 text-white border-ink-800 shadow-sm' : 'bg-white'}`}>
                         {s.name}
                       </button>
                     ))}
                   </div>
                 </div>
               </div>
-              <div className="flex justify-end gap-2 p-4 border-t border-ink-200">
-                <button type="button" onClick={() => setEditTask(null)} className="btn btn-ghost text-sm">إلغاء</button>
-                <button type="submit" disabled={editBusy} className="btn btn-primary text-sm font-bold">{editBusy ? 'جارٍ الحفظ…' : 'حفظ التعديلات'}</button>
+              <div className="flex justify-end gap-3 p-6 border-t border-ink-150 bg-ink-50/50 rounded-b-2xl">
+                <button type="button" onClick={() => setEditTask(null)} className="btn bg-white border border-ink-200 text-ink-600 text-[0.95rem] font-bold rounded-xl py-3 px-6">إلغاء</button>
+                <button type="submit" disabled={editBusy} className="btn bg-brand-500 hover:bg-brand-600 text-white text-[0.95rem] font-bold rounded-xl py-3 px-8 shadow-brand transition-all">
+                  {editBusy ? 'جاري الحفظ…' : 'حفظ التعديلات'}
+                </button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* MODAL: SCOPE */}
-      {scopeTask && isScientific && (
+      {/* MODAL 3: VISIBILITY SCOPE */}
+      {scopeTask && (
         <div className="modal-backdrop flex items-center justify-center p-4 z-50" onClick={() => setScopeTask(null)}>
-          <div className="modal-panel w-full max-w-lg" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-5 border-b border-ink-200">
+          <div className="modal-panel w-full max-w-lg shadow-elevated" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-6 border-b border-ink-150 bg-ink-50/50 rounded-t-2xl">
               <div>
-                <h3 className="text-lg font-bold text-ink-900">نطاق المهمة</h3>
-                <div className="text-xs text-ink-400 mt-0.5">{scopeTask.title}</div>
+                <h3 className="text-xl font-extrabold text-ink-900">تعديل النطاق:</h3>
+                <div className="text-[0.9rem] font-bold text-ink-500 mt-1">{scopeTask.title}</div>
               </div>
-              <button className="text-2xl text-ink-400" onClick={() => setScopeTask(null)}>×</button>
+              <button className="text-3xl text-ink-400 hover:text-ink-900 transition-colors" onClick={() => setScopeTask(null)}>×</button>
             </div>
-            <div className="p-5 space-y-4">
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setScopeTask({ ...scopeTask, visibility: 'all' })} className={`choice flex-1 py-2 text-center ${scopeTask.visibility === 'all' ? 'is-active' : ''}`}>متاحة للجميع</button>
-                <button type="button" onClick={() => setScopeTask({ ...scopeTask, visibility: 'restricted' })} className={`choice flex-1 py-2 text-center ${scopeTask.visibility === 'restricted' ? 'is-active' : ''}`}>طلاب محددون</button>
+            <div className="p-6 space-y-5">
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setScopeTask({ ...scopeTask, visibility: 'all' })}
+                  className={`flex-1 text-center py-3 rounded-xl font-bold border transition-all ${scopeTask.visibility === 'all' ? 'bg-brand text-white border-brand shadow-brand' : 'bg-white text-ink-600 border-ink-200 hover:bg-ink-50'}`}
+                >
+                  🌐 متاحة للجميع
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScopeTask({ ...scopeTask, visibility: 'restricted' })}
+                  className={`flex-1 text-center py-3 rounded-xl font-bold border transition-all ${scopeTask.visibility === 'restricted' ? 'bg-brand text-white border-brand shadow-brand' : 'bg-white text-ink-600 border-ink-200 hover:bg-ink-50'}`}
+                >
+                  👥 طلاب محددون فقط
+                </button>
               </div>
+
               {scopeTask.visibility === 'restricted' && (
-                <div className="space-y-3">
-                  <div className="flex gap-2">
-                    <input type="text" className="field py-1 px-3 text-xs flex-1" placeholder="ابحث..." value={scopeSearch} onChange={e => setScopeSearch(e.target.value)} />
-                    <button type="button" className="btn btn-secondary py-1 px-2 text-xs" onClick={() => setScopeSelected([])}>إلغاء الكل</button>
+                <div className="space-y-4 pt-2">
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div className="relative flex-1 w-full">
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400">🔍</span>
+                      <input type="text" className="field pl-3 pr-9 py-2 text-[0.85rem] rounded-lg w-full" placeholder="ابحث باسم الطالب..." value={scopeSearch} onChange={e => setScopeSearch(e.target.value)} />
+                    </div>
+                    <div className="flex gap-2 w-full sm:w-auto">
+                      <button type="button" className="btn bg-ink-100 hover:bg-ink-200 text-ink-800 py-2 px-3 text-[0.75rem] font-bold rounded-lg flex-1 sm:flex-none" onClick={() => {
+                        const query = scopeSearch.trim().toLowerCase();
+                        const toSelect = students.filter(s => s.registrationStatus === 'approved' && (!query || s.studentName.toLowerCase().includes(query))).map(s => s.id);
+                        setScopeSelected(Array.from(new Set([...scopeSelected, ...toSelect])));
+                      }}>
+                        تحديد النتائج
+                      </button>
+                      <button type="button" className="btn bg-white border border-ink-200 text-ink-600 hover:bg-ink-50 py-2 px-3 text-[0.75rem] font-bold rounded-lg flex-1 sm:flex-none" onClick={() => setScopeSelected([])}>
+                        إلغاء التحديد
+                      </button>
+                    </div>
                   </div>
-                  <div className="max-h-60 overflow-y-auto border border-ink-200 rounded-lg p-2 space-y-1 scroll-soft">
-                    {students
-                      .filter(s => s.registrationStatus === 'approved' && (!scopeSearch.trim() || s.studentName.toLowerCase().includes(scopeSearch.trim().toLowerCase())))
-                      .map(st => {
-                        const checked = scopeSelected.includes(st.id);
-                        return (
-                          <label key={st.id} className="flex items-center gap-2.5 p-1.5 hover:bg-cream-100/50 rounded cursor-pointer text-xs">
-                            <input type="checkbox" checked={checked} className="accent-brand" onChange={() => setScopeSelected(checked ? scopeSelected.filter(i => i !== st.id) : [...scopeSelected, st.id])} />
-                            <span>{st.studentName} ({st.stage} - {st.grade})</span>
-                          </label>
-                        );
-                      })}
+
+                  <div className="max-h-60 overflow-y-auto border border-ink-200 rounded-xl p-3 space-y-2 scroll-soft bg-ink-50/30">
+                    {students.filter(s => s.registrationStatus === 'approved' && (!scopeSearch.trim() || s.studentName.toLowerCase().includes(scopeSearch.trim().toLowerCase()))).map(student => {
+                      const checked = scopeSelected.includes(student.id);
+                      return (
+                        <label key={student.id} className="flex items-center gap-3 p-2 hover:bg-white rounded-lg cursor-pointer text-[0.85rem] transition-colors border border-transparent hover:border-ink-150 hover:shadow-sm">
+                          <input type="checkbox" checked={checked} className="accent-brand w-4 h-4" onChange={() => setScopeSelected(checked ? scopeSelected.filter(id => id !== student.id) : [...scopeSelected, student.id])} />
+                          <span className="font-bold text-ink-800">{student.studentName} <span className="text-ink-400 font-normal">({student.stage} - {student.grade})</span></span>
+                        </label>
+                      );
+                    })}
                   </div>
-                  <div className="text-xs text-ink-500">{scopeSelected.length} طالب محدد</div>
+                  <div className="text-[0.85rem] text-brand-600 font-extrabold bg-brand-50 border border-brand-100 rounded-lg py-2 px-4 inline-block">
+                    تم تحديد: {scopeSelected.length} طالب
+                  </div>
                 </div>
               )}
             </div>
-            <div className="flex justify-end gap-2 p-4 border-t border-ink-200">
-              <button onClick={() => setScopeTask(null)} className="btn btn-ghost text-sm">إلغاء</button>
-              <button onClick={handleScopeConfirm} disabled={scopeBusy || (scopeTask.visibility === 'restricted' && scopeSelected.length === 0)} className="btn btn-primary text-sm font-bold">
+            <div className="flex justify-end gap-3 p-6 border-t border-ink-150 bg-ink-50/50 rounded-b-2xl">
+              <button onClick={() => setScopeTask(null)} className="btn bg-white border border-ink-200 text-ink-600 text-[0.95rem] font-bold rounded-xl py-3 px-6">إلغاء</button>
+              <button onClick={handleScopeConfirm} disabled={scopeBusy || (scopeTask.visibility === 'restricted' && scopeSelected.length === 0)} className="btn bg-brand-500 hover:bg-brand-600 text-white text-[0.95rem] font-bold rounded-xl py-3 px-8 shadow-brand transition-all">
                 {scopeBusy ? 'جارٍ الحفظ…' : 'تحديث النطاق'}
               </button>
             </div>
@@ -1030,58 +1146,91 @@ export default function TasksPage() {
         </div>
       )}
 
-      {/* MODAL: STATISTICS */}
-      {statsTask && isScientific && (
+      {/* MODAL 4: STATISTICS */}
+      {statsTask && (
         <div className="modal-backdrop flex items-center justify-center p-4 z-50" onClick={() => setStatsTask(null)}>
-          <div className="modal-panel w-full max-w-2xl" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-5 border-b border-ink-200">
+          <div className="modal-panel w-full max-w-3xl shadow-elevated" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-6 border-b border-ink-150 bg-ink-50/50 rounded-t-2xl">
               <div>
-                <h3 className="text-lg font-bold text-ink-900">إحصائيات التسليمات</h3>
-                <div className="text-xs text-ink-400 mt-0.5">{statsTask.title}</div>
+                <h3 className="text-xl font-extrabold text-ink-900">إحصائيات تسليمات الطلاب</h3>
+                <div className="text-[0.9rem] font-bold text-ink-500 mt-1">{statsTask.title}</div>
               </div>
-              <button className="text-2xl text-ink-400" onClick={() => setStatsTask(null)}>×</button>
+              <button className="text-3xl text-ink-400 hover:text-ink-900 transition-colors" onClick={() => setStatsTask(null)}>×</button>
             </div>
-            <div className="p-5 space-y-4">
-              <div className="grid grid-cols-4 gap-2 text-center">
-                {[
-                  { label: 'المستهدفين', val: statsCounts.total, bg: 'bg-ink-50', border: 'border-ink-150', text: 'text-ink-800' },
-                  { label: 'سلّموا', val: statsCounts.submitted, bg: 'bg-brand/10', border: 'border-brand/20', text: 'text-brand-600' },
-                  { label: 'لم يسلّموا', val: statsCounts.missing, bg: 'bg-nred-50', border: 'border-nred-100', text: 'text-nred-600' },
-                  { label: 'بانتظار التقييم', val: statsCounts.pending, bg: 'bg-yellow-50', border: 'border-yellow-250', text: 'text-yellow-600' },
-                ].map(({ label, val, bg, border, text }) => (
-                  <div key={label} className={`p-2.5 rounded-lg border ${bg} ${border}`}>
-                    <div className={`text-xl font-extrabold ${text}`}>{val}</div>
-                    <div className={`text-[0.65rem] font-bold ${text} opacity-80`}>{label}</div>
-                  </div>
-                ))}
+            <div className="p-6 space-y-6">
+              {/* Stats Strip */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+                <div className="bg-ink-50 p-4 rounded-xl border border-ink-150 shadow-sm">
+                  <div className="text-3xl font-extrabold text-ink-800">{statsCounts.total}</div>
+                  <div className="text-[0.8rem] text-ink-500 font-bold mt-1">إجمالي المستهدفين</div>
+                </div>
+                <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 shadow-sm">
+                  <div className="text-3xl font-extrabold text-emerald-600">{statsCounts.submitted}</div>
+                  <div className="text-[0.8rem] text-emerald-700 font-bold mt-1">تم التسليم</div>
+                </div>
+                <div className="bg-nred-50 p-4 rounded-xl border border-nred-100 shadow-sm">
+                  <div className="text-3xl font-extrabold text-nred-600">{statsCounts.missing}</div>
+                  <div className="text-[0.8rem] text-nred-700 font-bold mt-1">لم يسلموا</div>
+                </div>
+                <div className="bg-brand-50 p-4 rounded-xl border border-brand-100 shadow-sm">
+                  <div className="text-3xl font-extrabold text-brand-600">{statsCounts.pending}</div>
+                  <div className="text-[0.8rem] text-brand-700 font-bold mt-1">بانتظار التقييم</div>
+                </div>
               </div>
-              <div className="flex gap-3">
-                <input type="text" placeholder="ابحث…" className="field py-1 px-3 text-xs flex-1" value={statsSearch} onChange={e => setStatsSearch(e.target.value)} />
-                <select className="field py-1 px-3 text-xs sm:w-44" value={statsFilter} onChange={e => setStatsFilter(e.target.value as 'all' | 'submitted' | 'missing')}>
-                  <option value="all">الجميع</option>
-                  <option value="submitted">سلّموا فقط</option>
-                  <option value="missing">لم يسلّموا</option>
+
+              {/* Filters */}
+              <div className="flex flex-col sm:flex-row items-center gap-3">
+                <div className="relative flex-1 w-full">
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400">🔍</span>
+                  <input type="text" placeholder="ابحث عن طالب..." className="field pl-3 pr-9 py-2.5 text-[0.85rem] rounded-xl w-full bg-ink-50/30 border-ink-200 focus:bg-white" value={statsSearch} onChange={e => setStatsSearch(e.target.value)} />
+                </div>
+                <select className="field py-2.5 px-3 text-[0.85rem] rounded-xl sm:w-56 bg-ink-50/30 border-ink-200 focus:bg-white" value={statsFilter} onChange={e => setStatsFilter(e.target.value as any)}>
+                  <option value="all">جميع الطلاب المشمولين</option>
+                  <option value="submitted">الذين سلّموا فقط</option>
+                  <option value="missing">الذين لم يسلّموا</option>
                 </select>
               </div>
-              <div className="max-h-64 overflow-y-auto border border-ink-200 rounded-lg scroll-soft">
+
+              {/* Table */}
+              <div className="max-h-64 overflow-y-auto border border-ink-150 rounded-xl bg-white shadow-sm scroll-soft">
                 {statsStudentList.length === 0 ? (
-                  <div className="text-center py-10 text-ink-400 text-xs">لا يوجد طلاب.</div>
+                  <div className="text-center py-12 text-ink-400 font-medium text-[0.9rem]">لا يوجد طلاب يطابقون الفلاتر المحددة.</div>
                 ) : (
-                  <table className="tbl text-right text-xs">
-                    <thead><tr><th>الطالب</th><th>الحالة</th><th>الدرجة</th><th>التاريخ</th></tr></thead>
+                  <table className="w-full text-right text-[0.85rem]">
+                    <thead className="bg-ink-50/80 sticky top-0 border-b border-ink-150 text-ink-500">
+                      <tr>
+                        <th className="py-3 px-4 font-bold">الطالب</th>
+                        <th className="py-3 px-4 font-bold">الحالة</th>
+                        <th className="py-3 px-4 font-bold text-center">الدرجة</th>
+                        <th className="py-3 px-4 font-bold">التاريخ</th>
+                      </tr>
+                    </thead>
                     <tbody>
-                      {statsStudentList.map(item => (
-                        <tr key={item.id}>
-                          <td className="font-semibold">{item.studentName} ({item.stage})</td>
-                          <td>
+                      {statsStudentList.map((item, i) => (
+                        <tr key={item.id} className={`border-b border-ink-100 last:border-0 hover:bg-cream-100/50 ${i % 2 === 0 ? 'bg-white' : 'bg-ink-50/10'}`}>
+                          <td className="py-3 px-4">
+                            <span className="font-extrabold text-ink-900">{item.studentName}</span>
+                            <span className="text-ink-400 mr-2">({item.stage} - {item.grade})</span>
+                          </td>
+                          <td className="py-3 px-4">
                             {item.submitted ? (
-                              <span className={`pill ${statusBadgeClass(item.submission!.status)} py-0.5 px-2`}>{statusLabel(item.submission!.status)}</span>
+                              <span className={`px-2.5 py-1 rounded-full text-[0.7rem] font-bold ${statusBadgeClass(item.submission!.status)}`}>
+                                {statusLabel(item.submission!.status)}
+                              </span>
                             ) : (
-                              <span className="pill pill-red py-0.5 px-2">لم يسلّم</span>
+                              <span className="px-2.5 py-1 rounded-full text-[0.7rem] font-bold bg-nred-50 text-nred-600 border border-nred-200">لم يسلّم بعد</span>
                             )}
                           </td>
-                          <td className="font-bold text-center">{item.submission?.status === 'approved' ? `${item.submission.grade} ن` : '—'}</td>
-                          <td className="font-mono text-[0.7rem] text-ink-500">{item.submission ? item.submission.submittedAt.split('T')[0] : '—'}</td>
+                          <td className="py-3 px-4 font-extrabold text-center text-[0.95rem]">
+                            {item.submission?.status === 'approved' ? (
+                              <span className="text-emerald-600">{item.submission.grade} ☀️</span>
+                            ) : (
+                              <span className="text-ink-300">—</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 font-mono text-[0.75rem] text-ink-500 font-medium">
+                            {item.submission ? item.submission.submittedAt.split('T')[0] : '—'}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -1089,59 +1238,8 @@ export default function TasksPage() {
                 )}
               </div>
             </div>
-            <div className="flex justify-end p-4 border-t border-ink-200">
-              <button onClick={() => setStatsTask(null)} className="btn btn-primary text-sm font-bold">إغلاق</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: CATEGORY MANAGEMENT */}
-      {showCatModal && isScientific && (
-        <div className="modal-backdrop flex items-center justify-center p-4 z-50" onClick={() => setShowCatModal(false)}>
-          <div className="modal-panel w-full max-w-md" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-5 border-b border-ink-200">
-              <h3 className="text-lg font-bold text-ink-900">إدارة التصنيفات</h3>
-              <button className="text-2xl text-ink-400" onClick={() => setShowCatModal(false)}>×</button>
-            </div>
-            <div className="p-5 space-y-4">
-              <div className="flex gap-2">
-                <input type="text" className="field py-1.5 px-3 text-sm flex-1" placeholder="أضف تصنيفاً جديداً..."
-                  value={newCategory} onChange={e => setNewCategory(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCategory(); } }} />
-                <button type="button" disabled={savingCats} className="btn btn-primary text-sm py-1.5 px-4" onClick={addCategory}>إضافة</button>
-              </div>
-              <div className="space-y-1.5 max-h-72 overflow-y-auto scroll-soft">
-                {categories.map(cat => (
-                  <div key={cat} className="flex items-center gap-2 bg-cream-50 border border-ink-150 rounded-lg px-3 py-2">
-                    {editingCat?.original === cat ? (
-                      <>
-                        <input autoFocus type="text" className="field py-1 px-2 text-sm flex-1"
-                          value={editingCat.value}
-                          onChange={e => setEditingCat({ original: cat, value: e.target.value })}
-                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitRename(); } if (e.key === 'Escape') setEditingCat(null); }} />
-                        <button className="btn btn-primary py-1 px-2.5 text-xs" onClick={commitRename}>حفظ</button>
-                        <button className="btn btn-secondary py-1 px-2 text-xs" onClick={() => setEditingCat(null)}>إلغاء</button>
-                      </>
-                    ) : (
-                      <>
-                        <span className="flex-1 text-sm font-semibold text-ink-800">{cat}</span>
-                        {cat === 'عام' ? (
-                          <span className="text-[11px] text-ink-400">افتراضي</span>
-                        ) : (
-                          <>
-                            <button className="text-brand-600 hover:underline text-xs font-bold" onClick={() => setEditingCat({ original: cat, value: cat })}>تعديل</button>
-                            <button className="text-nred-600 hover:text-nred-800 text-lg leading-none px-1" onClick={() => removeCategory(cat)}>×</button>
-                          </>
-                        )}
-                      </>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="flex justify-end p-4 border-t border-ink-200">
-              <button onClick={() => setShowCatModal(false)} className="btn btn-primary text-sm font-bold">تم</button>
+            <div className="flex justify-end p-6 border-t border-ink-150 bg-ink-50/50 rounded-b-2xl">
+              <button onClick={() => setStatsTask(null)} className="btn bg-brand-500 hover:bg-brand-600 text-white text-[0.95rem] font-bold rounded-xl py-3 px-8 shadow-brand">إغلاق</button>
             </div>
           </div>
         </div>
@@ -1150,112 +1248,122 @@ export default function TasksPage() {
   );
 }
 
-function TabBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button onClick={onClick} className={`choice py-2 px-4 text-sm font-bold shrink-0 flex items-center gap-1.5 ${active ? 'is-active' : ''}`}>
-      {children}
-    </button>
-  );
-}
-
+/* SUBMISSION CARD COMPONENT */
 function SubmissionCard({
-  sub, supervisors, onEvaluate, isLog = false,
-  collapsible = false, expanded = false, onToggle,
-  inlineEditSub, inlinePoints, setInlineEditSub, setInlinePoints, saveInlinePoints, inlineBusy,
-}: {
-  sub: Submission; supervisors: SupervisorUser[]; onEvaluate?: (s: Submission) => void; isLog?: boolean;
-  collapsible?: boolean; expanded?: boolean; onToggle?: () => void;
-  inlineEditSub?: string | null; inlinePoints?: string;
-  setInlineEditSub?: (id: string | null) => void; setInlinePoints?: (v: string) => void;
-  saveInlinePoints?: (s: Submission) => void; inlineBusy?: boolean;
-}) {
+  sub, onEvaluate, supervisors, isLog = false,
+  inlineEditSub, inlinePoints, setInlineEditSub, setInlinePoints, saveInlinePoints, inlineBusy
+}: any) {
   const isPending = sub.status === 'pending';
   const isApproved = sub.status === 'approved';
   const isRejected = sub.status === 'rejected';
-  const showBody = !collapsible || expanded;
-  const assignedLabel = sub.taskAssignedAdmins.length === 0 ? 'جميع المشرفين'
-    : sub.taskAssignedAdmins.map(id => supervisors.find(s => String(s.id) === id)?.name).filter(Boolean).join('، ');
 
+  const borderColor = isPending ? 'border-brand-500' : isApproved ? 'border-emerald-500' : 'border-nred-500';
+  
+  const assignedLabel = sub.taskAssignedAdmins?.length === 0 ? 'جميع المشرفين' : sub.taskAssignedAdmins?.map((id: string) => supervisors.find((s: any) => String(s.id) === id)?.name).filter(Boolean).join('، ');
+  
   return (
-    <div className={`card p-5 relative overflow-hidden transition-all ${collapsible ? 'cursor-pointer hover:shadow-md' : 'hover:shadow-md'}`}
-      style={{ borderRight: `4px solid ${isPending ? '#FFA726' : isApproved ? 'var(--accent)' : '#EF4444'}` }}
-      onClick={collapsible ? onToggle : undefined}>
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-full bg-brand/10 text-brand-600 font-extrabold flex items-center justify-center text-lg shrink-0">
+    <div className={`bg-white rounded-2xl p-5 md:p-6 relative transition-all duration-200 hover:shadow-md border border-ink-150 border-r-4 ${borderColor} mb-4 shadow-sm`}>
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-5">
+        
+        {/* Right side (RTL): Avatar & Name */}
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 font-extrabold flex items-center justify-center text-xl shrink-0 border border-emerald-100 shadow-sm">
             {sub.studentName?.charAt(0) || 'ط'}
           </div>
-          <div className="min-w-0">
-            <h4 className="font-bold text-ink-900 text-sm truncate">{sub.studentName}</h4>
-            <span className="text-[0.7rem] text-ink-400 font-mono">{sub.submittedAt.split('T')[0]} {sub.submittedAt.split('T')[1]?.substring(0, 5)}</span>
+          <div>
+            <h4 className="font-extrabold text-ink-900 text-[1.05rem]">{sub.studentName}</h4>
+            <span className="text-[0.75rem] text-ink-400 font-mono inline-block mt-0.5 font-medium">
+              تاريخ التسليم: {sub.submittedAt.split('T')[0]}
+            </span>
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <span className={`pill ${isPending ? 'pill-yellow' : isApproved ? 'pill-green' : 'pill-red'} text-xs font-bold`}>
+
+        {/* Left side (RTL): Badges */}
+        <div className="flex items-center gap-2 self-start sm:self-center">
+          <span className={`px-3 py-1 rounded-full font-bold text-[0.7rem] ${getTrackPillClass(sub.taskTrack)}`}>
+            {sub.taskTrack || 'عام'}
+          </span>
+          <span className={`px-3 py-1 rounded-full text-[0.7rem] font-bold shadow-sm ${isPending ? 'bg-brand-50 text-brand-700 border border-brand-200' : isApproved ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-nred-50 text-nred-700 border border-nred-200'}`}>
             {statusLabel(sub.status)}
           </span>
-          {collapsible && (
-            <svg className={`w-4 h-4 text-ink-400 transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
-          )}
         </div>
       </div>
 
-      {/* compact task line — always visible */}
-      <div className="mt-3 text-sm flex items-center gap-2 flex-wrap">
-        <span className="text-xs text-ink-400 font-bold">المهمة:</span>
-        <span className="font-semibold text-ink-850">{sub.taskTitle}</span>
-        {!showBody && isApproved && sub.grade !== null && <span className="pill pill-green text-[11px]">{sub.grade} / {sub.taskMaxPoints}</span>}
+      <div className="mb-5">
+        <div className="font-extrabold text-ink-900 text-lg mb-1.5">{sub.taskTitle}</div>
+        <div className="text-[0.8rem] text-ink-500 font-bold mb-3">المشرف المسؤول: <span className="text-ink-700 font-medium">{assignedLabel}</span></div>
+        <div className="inline-flex items-center gap-1.5 bg-ink-50 text-ink-700 border border-ink-200 px-3 py-1.5 rounded-lg text-[0.8rem] font-bold shadow-sm">
+          الحد الأقصى: <span className="text-brand-600">{sub.taskMaxPoints} ☀️</span>
+        </div>
       </div>
 
-      {showBody && (
-        <div className={collapsible ? 'mt-3 fade-in' : 'mt-3'} onClick={collapsible ? (e => e.stopPropagation()) : undefined}>
-          <div className="flex items-center gap-2 flex-wrap mb-3">
-            {sub.taskTrack && <span className="pill pill-gray text-[11px]">{sub.taskTrack}</span>}
-            <span className="pill pill-yellow text-[11px]">الحد الأقصى: {sub.taskMaxPoints}</span>
-          </div>
-
-          {sub.fileUrl && (
-            <div className="mb-4 bg-ink-50/20 p-2.5 rounded-lg border border-ink-150/50">
-              <div className="text-xs text-ink-400 font-bold mb-1.5">محتوى التسليم:</div>
-              <SubmissionContent fileUrl={sub.fileUrl} />
-            </div>
+      {sub.fileUrl && (
+        <div className="bg-cream-100/60 p-5 rounded-2xl border border-ink-150 mb-5 shadow-inner">
+          <div className="text-[0.8rem] text-ink-400 font-bold mb-3">محتوى التسليم المرفق</div>
+          {sub.fileUrl.startsWith('data:image') || sub.fileUrl.startsWith('http') && sub.fileUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={sub.fileUrl} alt="إثبات الإنجاز" className="max-h-56 rounded-xl border border-ink-200 cursor-zoom-in shadow-sm mx-auto" onClick={() => window.open(sub.fileUrl, '_blank')} />
+          ) : sub.fileUrl === 'admin://manual-mark' ? (
+            <div className="text-[0.9rem] text-ink-600 font-medium italic text-center py-3">إقرار تسليم يدوي مباشر من المشرف</div>
+          ) : (
+            <a href={sub.fileUrl} target="_blank" rel="noopener noreferrer" className="text-brand-600 bg-white hover:bg-brand-50 border border-ink-200 font-bold text-[0.9rem] block text-center py-3 rounded-xl transition-colors shadow-sm">
+              📄 عرض المستند المرفق (اضغط للفتح)
+            </a>
           )}
+        </div>
+      )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-ink-100 text-xs text-ink-500">
-            <div><span className="font-bold">المشرف الموجه:</span> <span className="font-medium text-ink-700">{assignedLabel}</span></div>
-            {!isPending && (
-              <div>
-                {isApproved && (
-                  <div className="flex items-center gap-2.5 flex-wrap">
-                    {inlineEditSub === sub.id ? (
-                      <div className="flex items-center gap-1.5">
-                        <input type="number" min={0} max={sub.taskMaxPoints} className="field py-0.5 px-1.5 w-16 text-center font-bold"
-                          value={inlinePoints} onChange={e => setInlinePoints?.(e.target.value.replace(/\D/g, ''))} />
-                        <button onClick={() => saveInlinePoints?.(sub)} disabled={inlineBusy} className="btn btn-primary py-0.5 px-2 text-[0.7rem]">حفظ</button>
-                        <button onClick={() => setInlineEditSub?.(null)} className="btn btn-secondary py-0.5 px-1.5 text-[0.7rem]">إلغاء</button>
-                      </div>
-                    ) : (
-                      <>
-                        <span className="pill pill-green font-extrabold text-[0.75rem]">الدرجة: {sub.grade} / {sub.taskMaxPoints}</span>
-                        <button onClick={() => { setInlineEditSub?.(sub.id); setInlinePoints?.(String(sub.grade || 0)); }} className="text-brand-600 hover:underline font-bold text-[0.7rem]">تعديل</button>
-                      </>
-                    )}
+      {/* Reviewer / Grade / Feedback */}
+      {!isPending && (
+        <div className="pt-5 border-t border-ink-150">
+          {isApproved && (
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+              <div className="flex items-center gap-3">
+                {inlineEditSub === sub.id ? (
+                  <div className="flex items-center gap-2 bg-ink-50/50 p-2 rounded-xl border border-ink-200" onClick={e => e.stopPropagation()}>
+                    <input type="number" min={0} max={sub.taskMaxPoints} className="field py-1.5 px-3 w-24 text-center font-extrabold text-[0.95rem] text-brand-600 rounded-lg border-brand-200" value={inlinePoints} onChange={e => setInlinePoints?.(e.target.value.replace(/\D/g, ''))} />
+                    <button onClick={() => saveInlinePoints?.(sub)} disabled={inlineBusy} className="btn bg-brand-500 hover:bg-brand-600 text-white py-1.5 px-4 rounded-lg text-xs font-bold shadow-sm">حفظ</button>
+                    <button onClick={() => setInlineEditSub?.(null)} className="btn bg-white border-ink-200 text-ink-600 py-1.5 px-4 rounded-lg text-xs font-bold shadow-sm">إلغاء</button>
                   </div>
+                ) : (
+                  <>
+                    <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-4 py-2 rounded-xl font-extrabold text-[0.9rem] flex items-center gap-2 shadow-sm">
+                      النقاط الممنوحة: {sub.grade} / {sub.taskMaxPoints} ☀️
+                    </span>
+                    <button onClick={() => { setInlineEditSub?.(sub.id); setInlinePoints?.(String(sub.grade || 0)); }} className="text-brand-600 hover:text-white bg-white hover:bg-brand-500 border border-brand-200 hover:border-brand-500 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm">
+                      ✏️ تعديل النقاط
+                    </button>
+                  </>
                 )}
-                {isRejected && <span className="text-nred-600 font-bold bg-nred-50 py-0.5 px-2 rounded">تم رد المهمة</span>}
-                {sub.feedback && <div className="mt-1 text-ink-400 italic">تعليق: &ldquo;{sub.feedback}&rdquo;</div>}
               </div>
-            )}
-          </div>
-
-          {isPending && onEvaluate && (
-            <div className="mt-4 flex gap-2 justify-end">
-              <button onClick={() => onEvaluate(sub)} className="btn btn-danger py-1.5 px-4 text-xs">رد المهمة</button>
-              <button onClick={() => onEvaluate(sub)} className="btn btn-primary py-1.5 px-4 text-xs font-bold">قبول وتقييم النقاط</button>
+              {sub.feedback && (
+                <div className="text-[0.85rem] text-ink-500 font-medium italic mt-2 sm:mt-0 bg-ink-50/50 px-4 py-2 rounded-lg border border-ink-150">
+                  <span className="font-bold text-ink-700">التعليق:</span> "{sub.feedback}"
+                </div>
+              )}
             </div>
           )}
+          {isRejected && (
+             <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+               <span className="text-nred-600 font-extrabold bg-nred-50 py-1.5 px-4 rounded-xl border border-nred-200 text-[0.85rem] shadow-sm">
+                 تم رد المهمة
+               </span>
+               {sub.feedback && (
+                 <div className="text-[0.85rem] text-nred-600 font-medium italic bg-nred-50/50 px-4 py-2 rounded-lg border border-nred-100">
+                   <span className="font-bold">السبب:</span> "{sub.feedback}"
+                 </div>
+               )}
+             </div>
+          )}
+        </div>
+      )}
+
+      {/* Evaluate Buttons */}
+      {isPending && onEvaluate && (
+        <div className="mt-4 flex justify-end pt-5 border-t border-ink-150">
+           <button onClick={() => onEvaluate(sub)} className="btn bg-brand-500 hover:bg-brand-600 text-white font-bold py-2.5 px-8 rounded-xl text-[0.9rem] shadow-brand transition-colors w-full sm:w-auto">
+              مراجعة وتقييم التسليم
+           </button>
         </div>
       )}
     </div>

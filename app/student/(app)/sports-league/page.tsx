@@ -187,5 +187,6 @@ export default function StudentSportsLeague() {
           </p>
         </div>
       </div>
+    </div>
   );
 }

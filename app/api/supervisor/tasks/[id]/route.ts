@@ -15,6 +15,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const patch: any = {};
     if (body.title !== undefined) patch.title = body.title;
     if (body.description !== undefined) patch.description = body.description;
+    if (body.track !== undefined) patch.track = body.track;
     if (body.isActive !== undefined) patch.isActive = Boolean(body.isActive);
     if (body.submissionMethod !== undefined) patch.submissionMethod = body.submissionMethod;
     if (body.imageUrl !== undefined) patch.imageUrl = body.imageUrl;
@@ -22,6 +23,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (body.visibility !== undefined) patch.visibility = body.visibility;
     if (body.visibleToIds !== undefined) patch.visibleToIds = Array.isArray(body.visibleToIds) ? body.visibleToIds.map(Number) : [];
     if (body.assignedAdmins !== undefined) patch.assignedAdmins = Array.isArray(body.assignedAdmins) ? body.assignedAdmins.map(String) : [];
+    if (body.timeLimitHours !== undefined) {
+      patch.timeLimitHours = body.timeLimitHours ? parseInt(body.timeLimitHours, 10) : null;
+    }
 
     if (body.maxPoints !== undefined) {
       const maxPtsVal = parseInt(body.maxPoints, 10);
@@ -29,16 +33,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         patch.maxPoints = maxPtsVal;
       }
     }
-    if (body.startDate !== undefined) {
-      patch.startDate = body.startDate ? new Date(body.startDate).toISOString() : null;
-    }
     if (body.dueDate !== undefined) {
       patch.dueDate = new Date(body.dueDate).toISOString();
     }
-    if (body.track !== undefined) patch.track = body.track;
-    if (body.stage !== undefined) patch.stage = body.stage || null;
-    if (body.cost !== undefined) patch.cost = Math.max(0, parseInt(body.cost, 10) || 0);
-    if (body.durationHours !== undefined) patch.durationHours = body.durationHours != null && body.durationHours !== '' ? (Math.max(0, parseInt(body.durationHours, 10) || 0) || null) : null;
 
     const updated = await updateTask(id, patch);
     if (!updated) {
