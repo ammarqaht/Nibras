@@ -118,7 +118,7 @@ export default function StudentFamily() {
           </div>
           <div className="min-w-0">
             <p className="text-[11px] tracking-wide font-medium uppercase" style={{ color: 'var(--ink-soft)' }}>مشرف الأسرة</p>
-            <p className="font-display text-base font-bold truncate" style={{ color: 'var(--ink)' }}>{supervisor.name}</p>
+            <p className="font-display text-base font-bold truncate" style={{ color: 'var(--ink)' }}>أ. {supervisor.name}</p>
           </div>
         </section>
       )}

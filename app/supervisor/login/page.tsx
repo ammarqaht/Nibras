@@ -63,13 +63,13 @@ export default function SupervisorLogin() {
           </div>
 
           <div>
-            <label className="label">البريد الإلكتروني / اسم المستخدم</label>
+            <label className="label">اسم المستخدم</label>
             <input
               className="field"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="username"
-              placeholder="admin"
+              placeholder="0000"
             />
           </div>
           <div>

@@ -53,8 +53,23 @@ export default function FinancePage() {
   // Modal open states
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [showAddRevenue, setShowAddRevenue] = useState(false);
+  const [showCatModal, setShowCatModal] = useState(false);
+  const [invCats, setInvCats] = useState<string[]>([]);
+  const [newCat, setNewCat] = useState('');
+  const [catBusy, setCatBusy] = useState(false);
 
-  const allowed = !user || user.role.split(',').map((r) => r.trim()).some((r) => r === 'admin' || r === 'finance' || r === 'finance_supervisor');
+  async function saveCats(cats: string[]) {
+    setCatBusy(true);
+    const r = await fetch('/api/supervisor/invoice-categories', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ categories: cats }) });
+    const j = await r.json().catch(() => ({}));
+    setCatBusy(false);
+    if (!r.ok) { pushToast('error', j.error ?? 'فشل حفظ التصنيفات'); return; }
+    setInvCats(j.categories ?? cats);
+  }
+  const addCat = () => { const c = newCat.trim(); if (c && !invCats.includes(c)) { saveCats([...invCats, c]); setNewCat(''); } };
+  const removeCat = (c: string) => saveCats(invCats.filter(x => x !== c));
+
+  const allowed = !user || user.role.split(',').map((r) => r.trim()).some((r) => r === 'finance' || r === 'finance_supervisor');
 
   async function load() {
     const [ir, sr, setr, ger, orr] = await Promise.all([
@@ -76,6 +91,8 @@ export default function FinancePage() {
     setFee(parseInt(String(feeStr).replace(/[^\d]/g, ''), 10) || 0);
     setGeneralExpenses(gej.expenses ?? []);
     setOtherRevenues(orj.revenues ?? []);
+    const cj = await fetch('/api/supervisor/invoice-categories', { cache: 'no-store' }).then(r => r.json()).catch(() => ({ categories: [] }));
+    setInvCats(cj.categories ?? []);
     setLoading(false);
   }
   
@@ -208,7 +225,7 @@ export default function FinancePage() {
   }
 
   if (user && !allowed) {
-    return <div className="card p-10 text-center text-ink-500">هذه الصفحة متاحة للمالية والمدير العام فقط.</div>;
+    return <div className="card p-10 text-center text-ink-500">هذه الصفحة متاحة للمشرف المالي فقط.</div>;
   }
 
   return (
@@ -260,7 +277,13 @@ export default function FinancePage() {
 
           {/* Invoice list block */}
           <div className="mb-6">
-            <h2 className="text-lg font-bold text-ink-900 mb-3">فواتير المشرفين والأنشطة</h2>
+            <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+              <h2 className="text-lg font-bold text-ink-900">فواتير المشرفين والأنشطة</h2>
+              <button onClick={() => setShowCatModal(true)} className="btn btn-secondary text-sm py-1.5 px-3 flex items-center gap-1.5">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" /><line x1="7" y1="7" x2="7.01" y2="7" /></svg>
+                تصنيفات الفواتير
+              </button>
+            </div>
             {/* filters */}
             <div className="flex flex-wrap gap-2 mb-4">
               {TABS.map((t) => {
@@ -644,6 +667,38 @@ export default function FinancePage() {
           onSave={handleAddRevenue}
         />
       )}
+
+      {/* Invoice categories modal */}
+      {showCatModal && (
+        <div className="modal-backdrop flex items-center justify-center p-4" onClick={() => setShowCatModal(false)}>
+          <div className="modal-panel w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-5 border-b border-ink-200">
+              <h2 className="text-lg font-bold text-ink-900">تصنيفات / أقسام الفواتير</h2>
+              <button onClick={() => setShowCatModal(false)} className="text-2xl text-ink-400 leading-none">×</button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="flex gap-2">
+                <input className="field py-1.5 px-3 text-sm flex-1" placeholder="أضف تصنيفاً جديداً…" value={newCat}
+                  onChange={e => setNewCat(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCat(); } }} />
+                <button disabled={catBusy} onClick={addCat} className="btn btn-primary text-sm py-1.5 px-4">إضافة</button>
+              </div>
+              <div className="space-y-1.5 max-h-72 overflow-y-auto scroll-soft">
+                {invCats.length === 0 ? (
+                  <p className="text-center text-ink-400 text-sm py-4">لا توجد تصنيفات.</p>
+                ) : invCats.map(c => (
+                  <div key={c} className="flex items-center justify-between bg-cream-50 border border-ink-150 rounded-lg px-3 py-2">
+                    <span className="text-sm font-semibold text-ink-800">{c}</span>
+                    <button className="text-nred-600 hover:text-nred-800 text-lg leading-none px-1" onClick={() => removeCat(c)}>×</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex justify-end p-4 border-t border-ink-200">
+              <button onClick={() => setShowCatModal(false)} className="btn btn-primary text-sm">تم</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -709,14 +764,7 @@ function ReviewModal({
           {invoice.reviewNote && (
             <div className="text-sm rounded-md p-2.5" style={{ background: '#FDEAE6', color: '#C42910' }}>ملاحظة: {invoice.reviewNote}</div>
           )}
-          {invoice.items.length > 0 && (
-            <div className="rounded-lg border border-ink-200 overflow-hidden">
-              <table className="tbl">
-                <thead><tr><th>المنتج</th><th>الكمية</th><th>السعر</th></tr></thead>
-                <tbody>{invoice.items.map((it, i) => <tr key={i}><td>{it.name}</td><td dir="ltr">{it.qty}</td><td dir="ltr">{money(it.price)}</td></tr>)}</tbody>
-              </table>
-            </div>
-          )}
+
           <div className="flex items-center justify-between text-lg font-bold border-t border-ink-200 pt-3">
             <span>الإجمالي</span>
             <span dir="ltr" style={{ color: 'var(--accent-deep)' }}>{money(invoice.total)}</span>

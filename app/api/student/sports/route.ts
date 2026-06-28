@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getStudentSession } from '@/lib/auth';
 import {
   getSportLeagues, getSportMatches, getLeagueStandings,
-  getGroups,
+  getGroups, getStudents,
 } from '@/lib/services';
 
 export async function GET(req: NextRequest) {
@@ -10,7 +10,11 @@ export async function GET(req: NextRequest) {
     const session = getStudentSession(req);
     if (!session) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
 
-    const stage = session.stage;
+    const students = await getStudents();
+    const student = students.find(s => s.id === session.id);
+    if (!student) return NextResponse.json({ error: 'الطالب غير موجود' }, { status: 404 });
+
+    const stage = student.stage;
     const leagues = await getSportLeagues(stage);
     const activeLeague = leagues.find(l => l.status === 'active') || leagues[0] || null;
 
@@ -31,14 +35,14 @@ export async function GET(req: NextRequest) {
       rank: i + 1,
       ...s,
       groupName: groupMap[s.groupId] || `فريق ${s.groupId}`,
-      isMyGroup: session.groupId === s.groupId,
+      isMyGroup: student.groupId === s.groupId,
     }));
 
     const enrichedMatches = matches.map(m => ({
       ...m,
       homeName: groupMap[m.homeGroupId] || `فريق ${m.homeGroupId}`,
       awayName: groupMap[m.awayGroupId] || `فريق ${m.awayGroupId}`,
-      isMyMatch: session.groupId === m.homeGroupId || session.groupId === m.awayGroupId,
+      isMyMatch: student.groupId === m.homeGroupId || student.groupId === m.awayGroupId,
     }));
 
     return NextResponse.json({

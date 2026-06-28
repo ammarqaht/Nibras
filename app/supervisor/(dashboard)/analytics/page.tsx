@@ -294,7 +294,7 @@ export default function AnalyticsPage() {
   const roles = user?.role ? user.role.split(',').map(r => r.trim()) : [];
   const isPrivileged = roles.some(r => ['admin','general_supervisor','finance','finance_supervisor'].includes(r));
   const canSeeFinance = roles.some(r =>
-    ['admin','finance','finance_supervisor'].includes(r)
+    ['finance','finance_supervisor'].includes(r)
   );
 
   const TABS = ALL_TABS.filter(t => {
@@ -365,7 +365,7 @@ export default function AnalyticsPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
             <Kpi label="إجمالي المسجّلين" value={reg.total} color="#103F91" icon="🎓" />
             <Kpi label="المقبولون" value={reg.approved} sub={`${reg.pending} قيد المراجعة`} color="#22c55e" icon="✅" />
-            {isPrivileged && <Kpi label="الدفع المكتمل" value={reg.paid} sub={`${reg.exempted} معفى`} color="#FF9F1C" icon="💳" />}
+            {canSeeFinance && <Kpi label="الدفع المكتمل" value={reg.paid} sub={`${reg.exempted} معفى`} color="#FF9F1C" icon="💳" />}
             <Kpi label="بحالات صحية" value={reg.withCondition} sub={reg.withCondition>0 ? 'اضغط للتفاصيل' : undefined} color="#E52E25" icon="🏥" />
           </div>
 
@@ -380,7 +380,7 @@ export default function AnalyticsPage() {
             </Card>
 
             <Card>
-              {isPrivileged && (
+              {canSeeFinance && (
                 <>
                   <p className="text-sm font-semibold text-gray-700 mb-3">حالة الدفع</p>
                   <div className="space-y-3 mb-4">

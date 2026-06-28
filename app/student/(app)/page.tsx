@@ -11,13 +11,31 @@ type TaskPeek = {
   task: { id: string; title: string; description: string; maxPoints: number; dueDate: string; track: string | null };
   submission: { id: string; status: string; grade: number | null; feedback: string | null; fileUrl: string; submittedAt: string } | null;
 };
-type PointRec = { id: number; delta: number; reason: string; category: string; pointType: string; createdAt: string };
+type PointRec = { id: number; delta: number; reason: string; category: string; pointType: string; recordedBy: string | null; createdAt: string };
+
+// Prefix supervisor names with "أ." (skip the system actor)
+function withTitle(name: string | null | undefined) {
+  if (!name || name === 'النظام') return name || '';
+  return `أ. ${name}`;
+}
 type FamilyPeek = { group: { id: number; name: string; stage: string } | null };
+type AnnouncementPeek = { id: number; title: string; body: string; createdAt: string };
 
 const CATEGORY_LABELS: Record<string, string> = {
   attendance: 'الحضور', tasks: 'المهام', social: 'اجتماعية', cultural: 'ثقافية',
   scientific: 'علمية', sports: 'رياضية', media: 'إعلامية', general: 'عام', behavior: 'سلوك',
 };
+
+const ATT_COLORS: Record<string, { bg: string; border: string; label: string }> = {
+  present: { bg: '#D1FAE5', border: '#34D399', label: 'حاضر' },
+  late:    { bg: '#FEF3C7', border: '#FBBF24', label: 'متأخر' },
+  excused: { bg: '#DBEAFE', border: '#60A5FA', label: 'معتذر' },
+  absent:  { bg: '#FEE2E2', border: '#F87171', label: 'غائب' },
+  none:    { bg: '#F1F1EE', border: '#E5E5E0', label: '—' },
+};
+function toDateStr(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 const ROLE_LABELS: Record<string, string> = {
   social_supervisor: 'اجتماعية',
@@ -100,8 +118,18 @@ export default function StudentHome() {
   const [attendance, setAttendance] = useState<AttendanceItem[]>([]);
   const [tasks, setTasks] = useState<TaskPeek[]>([]);
   const [points, setPoints] = useState<PointRec[]>([]);
+  const [announcements, setAnnouncements] = useState<AnnouncementPeek[]>([]);
   const [family, setFamily] = useState<FamilyPeek | null>(null);
   const [showBreakdown, setShowBreakdown] = useState(false);
+  const [showLedger, setShowLedger] = useState(false);
+  const [ledgerFilter, setLedgerFilter] = useState<'all' | 'plus' | 'minus'>('all');
+  const [ledgerCat, setLedgerCat] = useState('');
+  const [showAttendance, setShowAttendance] = useState(false);
+  const [excuseDate, setExcuseDate] = useState('');
+  const [excuseReason, setExcuseReason] = useState('');
+  const [excuseBusy, setExcuseBusy] = useState(false);
+  const [excuseMsg, setExcuseMsg] = useState('');
+  const [myExcuses, setMyExcuses] = useState<{ date: string; status: string }[]>([]);
   const [loadingSched, setLoadingSched] = useState(true);
   const [loadingAtt, setLoadingAtt] = useState(true);
   const [loadingTasks, setLoadingTasks] = useState(true);
@@ -113,7 +141,9 @@ export default function StudentHome() {
     fetch('/api/student/attendance').then(r => r.json()).then(d => setAttendance(d.attendance || [])).finally(() => setLoadingAtt(false));
     fetch('/api/student/tasks').then(r => r.json()).then(d => setTasks(d.tasks || [])).finally(() => setLoadingTasks(false));
     fetch('/api/student/points').then(r => r.json()).then(d => setPoints(d.points || []));
+    fetch('/api/student/announcements-feed').then(r => r.json()).then(d => setAnnouncements(d.announcements || [])).catch(() => {});
     fetch('/api/student/family').then(r => r.json()).then(d => setFamily(d));
+    fetch('/api/student/excuse').then(r => r.json()).then(d => setMyExcuses(d.excuses || [])).catch(() => {});
   }, []);
 
   // Toggle .is-in on .reveal children when in view (lightweight motion)
@@ -130,7 +160,7 @@ export default function StudentHome() {
     }, { rootMargin: '0px 0px -10% 0px', threshold: 0.05 });
     els.forEach(el => io.observe(el));
     return () => io.disconnect();
-  }, []);
+  }, [loadingAtt, loadingTasks, loadingSched, announcements]);
 
   const presentCount = attendance.filter(a => a.status === 'present').length;
   const absentCount = attendance.filter(a => a.status === 'absent').length;
@@ -143,6 +173,38 @@ export default function StudentHome() {
   const indivTasks = points.filter(p => p.pointType === 'individual' && p.category === 'tasks').reduce((a, p) => a + p.delta, 0);
   const indivOther = (user?.individual ?? 0) - indivAttendance - indivTasks;
   const ledger = [...points].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+  const ledgerCats = Array.from(new Set(points.map(p => p.category)));
+  const filteredLedger = ledger.filter(p =>
+    (ledgerFilter === 'all' || (ledgerFilter === 'plus' ? p.delta >= 0 : p.delta < 0)) &&
+    (!ledgerCat || p.category === ledgerCat)
+  );
+
+  const last7 = (() => {
+    const out: { date: string; status: string | null; label: string }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const ds = toDateStr(d);
+      const rec = attendance.find(a => a.date === ds);
+      out.push({ date: ds, status: rec ? rec.status : null, label: d.toLocaleDateString('ar-SA', { weekday: 'short' }) });
+    }
+    return out;
+  })();
+  const attendanceSorted = [...attendance].sort((a, b) => b.date.localeCompare(a.date));
+  const excuseStatusOf = (date: string) => myExcuses.find(e => e.date === date)?.status;
+
+  async function submitExcuse() {
+    if (!excuseDate || !excuseReason.trim()) { setExcuseMsg('اختر اليوم واكتب السبب'); return; }
+    setExcuseBusy(true); setExcuseMsg('');
+    try {
+      const r = await fetch('/api/student/excuse', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date: excuseDate, reason: excuseReason }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { setExcuseMsg(j.error || 'تعذّر الإرسال'); return; }
+      setExcuseMsg('تم إرسال طلب العذر لمشرف التحضير ✓');
+      setExcuseReason(''); setExcuseDate('');
+      const d = await fetch('/api/student/excuse').then(rr => rr.json()).catch(() => ({ excuses: [] }));
+      setMyExcuses(d.excuses || []);
+    } finally { setExcuseBusy(false); }
+  }
 
   // Active tasks not yet submitted, ordered by due date asc
   const activeNotSubmitted = tasks
@@ -338,56 +400,75 @@ export default function StudentHome() {
           {ledger.length === 0 ? (
             <div className="p-5"><EmptyState emoji="🧾" line="لا توجد حركات على رصيدك بعد." /></div>
           ) : (
-            <ul className="divide-y" style={{ ['--tw-divide-color' as any]: 'var(--line)' }}>
-              {ledger.slice(0, 15).map(p => {
-                const positive = p.delta >= 0;
-                return (
-                  <li key={p.id} className="flex items-center gap-3 px-4 py-3">
-                    <span className="w-10 h-9 rounded-xl flex items-center justify-center text-sm font-bold tabular-nums shrink-0"
-                      style={{ background: positive ? '#E7F6EC' : '#FDEAE6', color: positive ? '#1B7A43' : '#C42910' }}>
-                      {positive ? '+' : ''}{p.delta}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate" style={{ color: 'var(--ink)' }}>{p.reason}</p>
-                      <p className="text-[11px] mt-0.5" style={{ color: 'var(--ink-soft)' }}>
-                        {CATEGORY_LABELS[p.category] || p.category} · <span dir="ltr">{new Date(p.createdAt).toLocaleDateString('ar-SA')}</span>
-                      </p>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
+            <>
+              <ul className="divide-y" style={{ ['--tw-divide-color' as any]: 'var(--line)' }}>
+                {ledger.slice(0, 5).map(p => <LedgerRow key={p.id} p={p} />)}
+              </ul>
+              {ledger.length > 5 && (
+                <button onClick={() => { setShowLedger(true); setLedgerFilter('all'); setLedgerCat(''); }}
+                  className="w-full py-3 text-sm font-medium border-t" style={{ color: 'var(--accent-deep)', borderColor: 'var(--line)' }}>
+                  عرض المزيد ({ledger.length}) ←
+                </button>
+              )}
+            </>
           )}
         </div>
       </section>
 
-      {/* 6. Attendance chips — subtle */}
-      {!loadingAtt && totalSessions > 0 && (
+      {/* 6. Announcements peek */}
+      <section className="reveal">
+        <div className="flex items-baseline justify-between mb-3 px-1">
+          <h2 className="font-display text-lg font-bold" style={{ color: 'var(--ink)' }}>الإعلانات</h2>
+          <Link href="/student/announcements" className="text-xs font-medium" style={{ color: 'var(--accent-deep)' }}>عرض الكل ←</Link>
+        </div>
+        {announcements.length === 0 ? (
+          <div className="card p-5"><EmptyState emoji="📭" line="لا توجد إعلانات حالياً." /></div>
+        ) : (
+          <div className="space-y-2">
+            {announcements.slice(0, 2).map(a => (
+              <Link key={a.id} href="/student/announcements" className="card p-4 block hover:shadow-md transition-shadow">
+                <p className="font-display text-base font-bold mb-1" style={{ color: 'var(--ink)' }}>{a.title}</p>
+                <p className="text-xs line-clamp-2" style={{ color: 'var(--ink-soft)' }}>{a.body}</p>
+                <p className="text-[11px] mt-2" style={{ color: 'var(--ink-soft)', opacity: 0.75 }}>
+                  {new Date(a.createdAt).toLocaleDateString('ar-SA', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </p>
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* 7. Attendance — last 7 days */}
+      {!loadingAtt && (
         <section className="reveal">
-          <div className="card p-4">
+          <button onClick={() => { setShowAttendance(true); setExcuseMsg(''); }} className="card p-4 w-full text-right hover:shadow-md transition-shadow">
             <div className="flex items-baseline justify-between mb-3">
-              <h3 className="font-display text-base font-bold" style={{ color: 'var(--ink)' }}>الحضور</h3>
-              <span className="tabular-nums text-xs font-medium" style={{ color: 'var(--ink-soft)' }}>{attendancePct}% التزام</span>
+              <h3 className="font-display text-base font-bold" style={{ color: 'var(--ink)' }}>الحضور — آخر ٧ أيام</h3>
+              <span className="text-xs font-medium" style={{ color: 'var(--accent-deep)' }}>السجل وتقديم عذر ←</span>
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { label: 'حضر', count: presentCount, color: '#1B7A43', bg: '#E7F6EC' },
-                { label: 'متأخر', count: lateCount, color: '#854D0E', bg: '#FEF9C3' },
-                { label: 'غاب', count: absentCount, color: '#C42910', bg: '#FDEAE6' },
-              ].map(item => (
-                <div key={item.label} className="rounded-xl py-2 text-center" style={{ background: item.bg }}>
-                  <p className="font-display tabular-nums text-xl font-bold" style={{ color: item.color }}>{item.count}</p>
-                  <p className="text-[11px] font-medium" style={{ color: item.color }}>{item.label}</p>
-                </div>
+            <div className="flex gap-1.5">
+              {last7.map(d => {
+                const c = ATT_COLORS[d.status || 'none'];
+                return (
+                  <div key={d.date} className="flex-1 text-center">
+                    <div className="h-9 rounded-lg" style={{ background: c.bg, border: `1px solid ${c.border}` }} title={c.label} />
+                    <p className="text-[10px] mt-1" style={{ color: 'var(--ink-soft)' }}>{d.label}</p>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex flex-wrap gap-3 mt-3 text-[10px]" style={{ color: 'var(--ink-soft)' }}>
+              {[['present', 'حاضر'], ['late', 'متأخر'], ['excused', 'معتذر'], ['absent', 'غائب']].map(([k, l]) => (
+                <span key={k} className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded" style={{ background: ATT_COLORS[k].bg, border: `1px solid ${ATT_COLORS[k].border}` }} />{l}</span>
               ))}
             </div>
-          </div>
+          </button>
         </section>
       )}
 
       {/* Individual points breakdown */}
       {showBreakdown && user && (
-        <div className="modal-backdrop flex items-end sm:items-center justify-center p-3 sm:p-6" onClick={() => setShowBreakdown(false)}>
+        <div className="modal-backdrop flex items-center justify-center p-3 sm:p-6" onClick={() => setShowBreakdown(false)}>
           <div className="modal-panel w-full max-w-sm" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: 'var(--line)' }}>
               <h3 className="font-display text-lg font-bold" style={{ color: 'var(--ink)' }}>تفاصيل النقاط الفردية</h3>
@@ -413,7 +494,97 @@ export default function StudentHome() {
           </div>
         </div>
       )}
+
+      {/* Full balance ledger */}
+      {showLedger && (
+        <div className="modal-backdrop flex items-center justify-center p-3 sm:p-6" onClick={() => setShowLedger(false)}>
+          <div className="modal-panel w-full max-w-md max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b flex items-center justify-between" style={{ borderColor: 'var(--line)' }}>
+              <h3 className="font-display text-lg font-bold" style={{ color: 'var(--ink)' }}>سجل الرصيد الكامل</h3>
+              <button onClick={() => setShowLedger(false)} className="btn btn-ghost p-2" aria-label="إغلاق">✕</button>
+            </div>
+            <div className="p-3 border-b flex gap-2" style={{ borderColor: 'var(--line)' }}>
+              <select className="field py-1.5 px-3 text-sm flex-1" value={ledgerFilter} onChange={e => setLedgerFilter(e.target.value as 'all' | 'plus' | 'minus')}>
+                <option value="all">كل الحركات</option>
+                <option value="plus">إضافة (+)</option>
+                <option value="minus">خصم (−)</option>
+              </select>
+              <select className="field py-1.5 px-3 text-sm flex-1" value={ledgerCat} onChange={e => setLedgerCat(e.target.value)}>
+                <option value="">كل التصنيفات</option>
+                {ledgerCats.map(c => <option key={c} value={c}>{CATEGORY_LABELS[c] || c}</option>)}
+              </select>
+            </div>
+            <div className="overflow-y-auto scroll-soft flex-1">
+              {filteredLedger.length === 0 ? (
+                <div className="p-6 text-center text-sm" style={{ color: 'var(--ink-soft)' }}>لا حركات مطابقة.</div>
+              ) : (
+                <ul className="divide-y" style={{ ['--tw-divide-color' as any]: 'var(--line)' }}>
+                  {filteredLedger.map(p => <LedgerRow key={p.id} p={p} />)}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Attendance log + excuse submission */}
+      {showAttendance && (
+        <div className="modal-backdrop flex items-center justify-center p-3 sm:p-6" onClick={() => setShowAttendance(false)}>
+          <div className="modal-panel w-full max-w-md max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b flex items-center justify-between" style={{ borderColor: 'var(--line)' }}>
+              <h3 className="font-display text-lg font-bold" style={{ color: 'var(--ink)' }}>سجل الحضور</h3>
+              <button onClick={() => setShowAttendance(false)} className="btn btn-ghost p-2" aria-label="إغلاق">✕</button>
+            </div>
+            <div className="p-4 border-b space-y-2" style={{ borderColor: 'var(--line)' }}>
+              <p className="text-sm font-bold" style={{ color: 'var(--ink)' }}>تقديم عذر غياب</p>
+              <input type="date" dir="ltr" className="field py-1.5 text-sm" value={excuseDate} onChange={e => setExcuseDate(e.target.value)} />
+              <textarea rows={2} className="field text-sm resize-none" placeholder="سبب الغياب…" value={excuseReason} onChange={e => setExcuseReason(e.target.value)} />
+              {excuseMsg && <p className="text-xs" style={{ color: excuseMsg.includes('✓') ? '#1B7A43' : 'var(--red)' }}>{excuseMsg}</p>}
+              <button onClick={submitExcuse} disabled={excuseBusy} className="btn btn-primary w-full text-sm">{excuseBusy ? 'جارٍ الإرسال…' : 'إرسال العذر لمشرف التحضير'}</button>
+            </div>
+            <div className="overflow-y-auto scroll-soft flex-1">
+              {attendanceSorted.length === 0 ? (
+                <div className="p-6 text-center text-sm" style={{ color: 'var(--ink-soft)' }}>لا سجل حضور بعد.</div>
+              ) : (
+                <ul className="divide-y" style={{ ['--tw-divide-color' as any]: 'var(--line)' }}>
+                  {attendanceSorted.map(a => {
+                    const c = ATT_COLORS[a.status] || ATT_COLORS.none;
+                    const ex = excuseStatusOf(a.date);
+                    return (
+                      <li key={a.id} className="flex items-center gap-3 px-4 py-2.5">
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: c.border }} />
+                        <span className="flex-1 text-sm tabular-nums" dir="ltr" style={{ color: 'var(--ink)' }}>{a.date}</span>
+                        {ex && <span className="text-[10px]" style={{ color: 'var(--ink-soft)' }}>{ex === 'pending' ? 'عذر قيد المراجعة' : ex === 'accepted' ? 'عذر مقبول' : 'عذر مرفوض'}</span>}
+                        <span className="text-xs font-bold" style={{ color: c.border }}>{c.label}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+function LedgerRow({ p }: { p: PointRec }) {
+  const positive = p.delta >= 0;
+  const by = withTitle(p.recordedBy);
+  return (
+    <li className="flex items-center gap-3 px-4 py-3">
+      <span className="w-10 h-9 rounded-xl flex items-center justify-center text-sm font-bold tabular-nums shrink-0"
+        style={{ background: positive ? '#E7F6EC' : '#FDEAE6', color: positive ? '#1B7A43' : '#C42910' }}>
+        {positive ? '+' : ''}{p.delta}
+      </span>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium truncate" style={{ color: 'var(--ink)' }}>{p.reason}</p>
+        <p className="text-[11px] mt-0.5" style={{ color: 'var(--ink-soft)' }}>
+          {CATEGORY_LABELS[p.category] || p.category} · <span dir="ltr">{new Date(p.createdAt).toLocaleDateString('ar-SA')}</span>{by ? ` · ${by}` : ''}
+        </p>
+      </div>
+    </li>
   );
 }
 

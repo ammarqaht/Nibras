@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
        'sports_supervisor', 'general_supervisor', 'attendance_supervisor'].includes(r)
     );
 
-    const isFinanceRole = roles.some(r => ['finance', 'finance_supervisor', 'admin'].includes(r));
+    const isFinanceRole = roles.some(r => ['finance', 'finance_supervisor'].includes(r));
     const isAdminRole = roles.includes('admin');
 
     // Fetch only what this role needs — reduces DB load and cold-start time

@@ -129,6 +129,10 @@ export default function TasksPage() {
   const [logTaskFilter, setLogTaskFilter] = useState('');
   const [logStatusFilter, setLogStatusFilter] = useState('');
   const [manageSearch, setManageSearch] = useState('');
+  const [manageTrack, setManageTrack] = useState('');
+  const [manageStage, setManageStage] = useState('');
+  const [manageMethod, setManageMethod] = useState('');
+  const [manageStatus, setManageStatus] = useState('');
 
   // Eval modal
   const [evalSub, setEvalSub] = useState<Submission | null>(null);
@@ -230,8 +234,12 @@ export default function TasksPage() {
   }), [logSubmissions, logSearch, logTaskFilter, logStatusFilter]);
 
   const filteredTasks = useMemo(() => tasks.filter(t =>
-    !manageSearch.trim() || t.title.toLowerCase().includes(manageSearch.trim().toLowerCase())
-  ), [tasks, manageSearch]);
+    (!manageSearch.trim() || t.title.toLowerCase().includes(manageSearch.trim().toLowerCase())) &&
+    (!manageTrack || (t.track || 'عام') === manageTrack) &&
+    (!manageStage || (t.stage || 'الكل') === manageStage) &&
+    (!manageMethod || methodKey(t.submissionMethod) === manageMethod) &&
+    (!manageStatus || (manageStatus === 'active' ? t.isActive : !t.isActive))
+  ), [tasks, manageSearch, manageTrack, manageStage, manageMethod, manageStatus]);
 
   const uniqueTasksPending = useMemo(() => {
     const ids = new Set(pendingSubmissions.map(s => s.taskId));
@@ -482,13 +490,20 @@ export default function TasksPage() {
 
   return (
     <div dir="rtl" className="w-full">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-ink-900 mb-1">
-          {isScientific ? 'إدارة المهام والتحديات' : 'مهامي المُكلَّف بها'}
-        </h1>
-        <p className="text-sm text-ink-500">
-          {isScientific ? 'أنشئ المهام وكلّف المشرفين بمراجعتها وتتبع تسليمات الطلاب.' : 'راجع تسليمات الطلاب للمهام المُسنَدة إليك وقيّمها.'}
-        </p>
+      <div className="mb-6 flex items-center gap-3">
+        <span className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 text-white shadow-sm" style={{ background: 'linear-gradient(135deg,#FF9F1C,#F4720B)' }}>
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+          </svg>
+        </span>
+        <div>
+          <h1 className="text-2xl font-bold text-ink-900 mb-0.5">
+            {isScientific ? 'إدارة المهام والتحديات' : 'مهامي المُكلَّف بها'}
+          </h1>
+          <p className="text-sm text-ink-500">
+            {isScientific ? 'أنشئ المهام وكلّف المشرفين بمراجعتها وتتبع تسليمات الطلاب.' : 'راجع تسليمات الطلاب للمهام المُسنَدة إليك وقيّمها.'}
+          </p>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -730,8 +745,29 @@ export default function TasksPage() {
                 </svg>
                 <span>إدارة التصنيفات</span>
               </button>
-              <div className="text-xs text-ink-400 whitespace-nowrap">إجمالي: {tasks.length} مهمة</div>
+              <div className="text-xs text-ink-400 whitespace-nowrap">إجمالي: {filteredTasks.length} من {tasks.length}</div>
             </div>
+          </div>
+
+          <div className="card p-3 grid grid-cols-2 md:grid-cols-4 gap-2">
+            <select className="field py-1.5 px-3 text-sm" value={manageTrack} onChange={e => setManageTrack(e.target.value)}>
+              <option value="">كل التصنيفات</option>
+              {categories.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <select className="field py-1.5 px-3 text-sm" value={manageStage} onChange={e => setManageStage(e.target.value)}>
+              <option value="">كل المراحل</option>
+              <option value="الكل">الكل</option>
+              {STAGE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <select className="field py-1.5 px-3 text-sm" value={manageMethod} onChange={e => setManageMethod(e.target.value)}>
+              <option value="">كل طرق التسليم</option>
+              {SUBMISSION_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+            </select>
+            <select className="field py-1.5 px-3 text-sm" value={manageStatus} onChange={e => setManageStatus(e.target.value)}>
+              <option value="">كل الحالات</option>
+              <option value="active">نشطة</option>
+              <option value="disabled">معطلة</option>
+            </select>
           </div>
 
           <div className="card p-0 overflow-hidden">

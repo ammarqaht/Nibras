@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStudentSession } from '@/lib/auth';
-import { getStudentGroup } from '@/lib/services';
+import { getStudents, getStudentGroup } from '@/lib/services';
 
 export async function GET(req: NextRequest) {
   const session = getStudentSession(req);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  if (!session.groupId) {
+  const students = await getStudents();
+  const student = students.find(s => s.id === session.id);
+  if (!student || !student.groupId) {
     return NextResponse.json({ group: null });
   }
 
-  const data = await getStudentGroup(session.groupId);
+  const data = await getStudentGroup(student.groupId);
   if (!data) return NextResponse.json({ group: null });
 
   return NextResponse.json({

@@ -70,6 +70,7 @@ export default function SportsLeaguePage() {
   const [expandedMatch, setExpandedMatch] = useState<number|null>(null);
   const [actionsOpen,   setActionsOpen]   = useState(false);
   const [cardsView,     setCardsView]     = useState<'active'|'log'>('active');
+  const [showMatchStats, setShowMatchStats] = useState<Record<number, boolean>>({});
 
   // forms
   const [showAddMatch,  setShowAddMatch]  = useState(false);
@@ -348,73 +349,88 @@ export default function SportsLeaguePage() {
 
                             {open && (
                               <div className="border-t border-ink-100 p-4 space-y-4 fade-in bg-cream-50/30">
-                                {/* score editing */}
-                                {canEdit && (
-                                  <div className="flex items-center justify-center gap-3 sm:gap-5">
-                                    <div className="flex-1 text-center min-w-0"><p className="text-xs text-ink-400 mb-1 truncate">{groupName(m.homeGroupId)}</p>
-                                      <div className="flex items-center justify-center gap-1.5">
-                                        <RoundBtn label="−" onClick={()=>adjustScore(m,'home',-1)}/>
-                                        <span className="text-2xl font-bold tabular-nums w-7 text-center">{m.homeScore}</span>
-                                        <RoundBtn label="+" accent onClick={()=>openScorer(m,m.homeGroupId)}/>
-                                      </div>
-                                    </div>
-                                    <span className="text-ink-300 font-bold">–</span>
-                                    <div className="flex-1 text-center min-w-0"><p className="text-xs text-ink-400 mb-1 truncate">{groupName(m.awayGroupId)}</p>
-                                      <div className="flex items-center justify-center gap-1.5">
-                                        <RoundBtn label="−" onClick={()=>adjustScore(m,'away',-1)}/>
-                                        <span className="text-2xl font-bold tabular-nums w-7 text-center">{m.awayScore}</span>
-                                        <RoundBtn label="+" accent onClick={()=>openScorer(m,m.awayGroupId)}/>
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* status */}
-                                {canEdit && (
-                                  <div className="flex gap-2 justify-center flex-wrap">
-                                    {(['scheduled','live','finished'] as const).map(st=>(
-                                      <button key={st} onClick={()=>patchMatch(m.id,{status:st})}
-                                        className={`choice text-xs py-1 px-3 ${m.status===st?'is-active':''}`}>{MATCH_STATUS[st].label}</button>
-                                    ))}
-                                  </div>
-                                )}
-
-                                {/* goals + cards */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                  <div className="rounded-xl border border-ink-150 p-3 space-y-2 bg-white">
-                                    <div className="flex items-center justify-between">
-                                      <p className="text-sm font-bold text-ink-800">⚽ الأهداف ({matchGoals(m.id).length})</p>
-                                      {canEdit && <button className="text-xs font-bold text-brand-600" onClick={()=>openScorer(m,m.homeGroupId)}>+ هدف</button>}
-                                    </div>
-                                    {matchGoals(m.id).length===0 ? <p className="text-xs text-ink-400 text-center py-1">لا أهداف</p>
-                                      : matchGoals(m.id).map(g=>(
-                                          <div key={g.id} className="flex items-center gap-2 text-sm rounded-lg px-2 py-1.5 bg-cream-50">
-                                            <span>⚽</span><span className="flex-1 font-medium text-ink-800 truncate">{g.scorerName}</span>
-                                            <span className="text-xs text-ink-400 shrink-0">{groupName(g.teamGroupId)}</span>
-                                            {canEdit && <button className="text-nred-400 hover:text-nred-600 text-xs" onClick={()=>removeGoal(g)}>✕</button>}
-                                          </div>
-                                        ))}
-                                  </div>
-                                  <div className="rounded-xl border border-ink-150 p-3 space-y-2 bg-white">
-                                    <div className="flex items-center justify-between">
-                                      <p className="text-sm font-bold text-ink-800">🟨 البطاقات ({matchCards(m.id).length})</p>
-                                      {canEdit && <button className="text-xs font-bold text-brand-600" onClick={()=>openCard(m)}>+ بطاقة</button>}
-                                    </div>
-                                    {matchCards(m.id).length===0 ? <p className="text-xs text-ink-400 text-center py-1">لا بطاقات</p>
-                                      : matchCards(m.id).map(c=>(
-                                          <div key={c.id} className="flex items-center gap-2 text-sm rounded-lg px-2 py-1.5 bg-cream-50">
-                                            <span>{c.cardType==='yellow'?'🟨':'🟥'}</span><span className="flex-1 font-medium text-ink-800 truncate">{c.studentName}</span>
-                                            {c.suspensionMatches>0 && <span className="pill pill-red text-[10px] py-0.5 px-1.5">إيقاف</span>}
-                                            {canEdit && <button className="text-nred-400 hover:text-nred-600 text-xs" onClick={()=>removeCard(c.id)}>✕</button>}
-                                          </div>
-                                        ))}
-                                  </div>
+                                {/* The 4 primary action buttons requested */}
+                                <div className="flex flex-wrap gap-2 justify-center">
+                                  {canEdit && (
+                                    <button onClick={() => openScorer(m, m.homeGroupId)} className="choice py-1.5 px-3 text-xs font-bold flex items-center gap-1.5 bg-blue-50 border-blue-250 text-blue-800 hover:bg-blue-100/50">
+                                      ⚽ اضافة الاقوال
+                                    </button>
+                                  )}
+                                  <button onClick={() => setShowMatchStats(prev => ({ ...prev, [m.id]: !prev[m.id] }))} className={`choice py-1.5 px-3 text-xs font-bold flex items-center gap-1.5 ${showMatchStats[m.id] ? 'is-active bg-brand border-brand text-white' : 'bg-brand-50/20 border-brand/35 text-brand-800 hover:bg-brand-50'}`}>
+                                    👁️ عرض الاقوال
+                                  </button>
+                                  {canEdit && (
+                                    <>
+                                      <button onClick={() => openCard(m)} className="choice py-1.5 px-3 text-xs font-bold flex items-center gap-1.5 bg-red-50 border-red-250 text-red-800 hover:bg-red-100/50">
+                                        🟨🟥 اضافة مخالفة
+                                      </button>
+                                      <button onClick={() => openBehavior(m)} className="choice py-1.5 px-3 text-xs font-bold flex items-center gap-1.5 bg-cyan-50 border-cyan-250 text-cyan-800 hover:bg-cyan-100/50">
+                                        📝 سلوك
+                                      </button>
+                                    </>
+                                  )}
                                 </div>
 
+                                {/* Goals & cards display: shown when "عرض الاقوال" is active */}
+                                {showMatchStats[m.id] && (
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 fade-in">
+                                    {/* goals */}
+                                    <div className="rounded-xl border border-ink-150 p-3 space-y-2 bg-white shadow-sm">
+                                      <p className="text-sm font-bold text-ink-800">⚽ الأهداف ({matchGoals(m.id).length})</p>
+                                      {matchGoals(m.id).length===0 ? <p className="text-xs text-ink-400 text-center py-1">لا أهداف</p>
+                                        : matchGoals(m.id).map(g=>(
+                                            <div key={g.id} className="flex items-center gap-2 text-sm rounded-lg px-2 py-1.5 bg-cream-50">
+                                              <span>⚽</span><span className="flex-1 font-medium text-ink-800 truncate">{g.scorerName}</span>
+                                              <span className="text-xs text-ink-400 shrink-0">{groupName(g.teamGroupId)}</span>
+                                              {canEdit && <button className="text-nred-400 hover:text-nred-600 text-xs" onClick={()=>removeGoal(g)}>✕</button>}
+                                            </div>
+                                          ))}
+                                    </div>
+                                    {/* cards */}
+                                    <div className="rounded-xl border border-ink-150 p-3 space-y-2 bg-white shadow-sm">
+                                      <p className="text-sm font-bold text-ink-800">🟨 البطاقات والمخالفات ({matchCards(m.id).length})</p>
+                                      {matchCards(m.id).length===0 ? <p className="text-xs text-ink-400 text-center py-1">لا بطاقات</p>
+                                        : matchCards(m.id).map(c=>(
+                                            <div key={c.id} className="flex items-center gap-2 text-sm rounded-lg px-2 py-1.5 bg-cream-50">
+                                              <span>{c.cardType==='yellow'?'🟨':'🟥'}</span><span className="flex-1 font-medium text-ink-800 truncate">{c.studentName}</span>
+                                              {c.suspensionMatches>0 && <span className="pill pill-red text-[10px] py-0.5 px-1.5">إيقاف</span>}
+                                              {canEdit && <button className="text-nred-400 hover:text-nred-600 text-xs" onClick={()=>removeCard(c.id)}>✕</button>}
+                                            </div>
+                                          ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Admin score adjustment and status controls */}
                                 {canEdit && (
-                                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                                    <button className="btn btn-secondary text-xs py-1.5 px-3" onClick={()=>openBehavior(m)}>+ ملاحظة سلوكية</button>
-                                    <button className="btn text-xs py-1.5 px-3 text-nred-600 border-nred-200 bg-nred-50 hover:bg-nred-100" onClick={()=>deleteMatch(m.id)}>حذف المباراة</button>
+                                  <div className="border-t border-ink-100 pt-3 space-y-3">
+                                    <div className="flex items-center justify-between text-[11px] font-bold text-ink-400">التحكم بالنتيجة وحالة المباراة:</div>
+                                    <div className="flex items-center justify-center gap-3 sm:gap-5">
+                                      <div className="flex-1 text-center min-w-0"><p className="text-xs text-ink-400 mb-1 truncate">{groupName(m.homeGroupId)}</p>
+                                        <div className="flex items-center justify-center gap-1.5">
+                                          <RoundBtn label="−" onClick={()=>adjustScore(m,'home',-1)}/>
+                                          <span className="text-2xl font-bold tabular-nums w-7 text-center">{m.homeScore}</span>
+                                          <RoundBtn label="+" accent onClick={()=>openScorer(m,m.homeGroupId)}/>
+                                        </div>
+                                      </div>
+                                      <span className="text-ink-300 font-bold">–</span>
+                                      <div className="flex-1 text-center min-w-0"><p className="text-xs text-ink-400 mb-1 truncate">{groupName(m.awayGroupId)}</p>
+                                        <div className="flex items-center justify-center gap-1.5">
+                                          <RoundBtn label="−" onClick={()=>adjustScore(m,'away',-1)}/>
+                                          <span className="text-2xl font-bold tabular-nums w-7 text-center">{m.awayScore}</span>
+                                          <RoundBtn label="+" accent onClick={()=>openScorer(m,m.awayGroupId)}/>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center justify-between gap-4 flex-wrap pt-2">
+                                      <div className="flex gap-2">
+                                        {(['scheduled','live','finished'] as const).map(st=>(
+                                          <button key={st} onClick={()=>patchMatch(m.id,{status:st})}
+                                            className={`choice text-xs py-1 px-3 ${m.status===st?'is-active':''}`}>{MATCH_STATUS[st].label}</button>
+                                        ))}
+                                      </div>
+                                      <button className="btn text-xs py-1.5 px-3 text-nred-600 border-nred-200 bg-nred-50 hover:bg-nred-100 font-medium" onClick={()=>deleteMatch(m.id)}>حذف المباراة</button>
+                                    </div>
                                   </div>
                                 )}
                               </div>

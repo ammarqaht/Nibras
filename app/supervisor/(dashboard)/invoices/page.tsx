@@ -207,15 +207,7 @@ function AddInvoiceModal({
   const [invoiceDate, setInvoiceDate] = useState('');
   const [category, setCategory] = useState('');
   const [department, setDepartment] = useState(deptOptions.length === 1 ? deptOptions[0].key : '');
-  const [items, setItems] = useState<Item[]>([{ name: '', qty: 1, price: 0 }]);
-  const [tax, setTax] = useState('');
   const [total, setTotal] = useState('');
-
-  const itemsSum = items.reduce((s, it) => s + (Number(it.qty) || 0) * (Number(it.price) || 0), 0);
-
-  useEffect(() => {
-    setTotal(String(itemsSum));
-  }, [itemsSum]);
 
   async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -243,16 +235,9 @@ function AddInvoiceModal({
         return;
       }
       const d = j.data || {};
-      const extractedTitle = d.title || title || 'فاتورة';
       if (d.title) setTitle(d.title);
       if (d.vendor) setVendor(d.vendor);
       if (d.invoiceDate) setInvoiceDate(d.invoiceDate);
-      if (Array.isArray(d.items) && d.items.length) {
-        setItems(d.items.map((it: any) => ({ name: it.name || '', qty: Number(it.qty) || 1, price: Number(it.price) || 0 })));
-      } else if (d.total != null) {
-        setItems([{ name: extractedTitle, qty: 1, price: Number(d.total) || 0 }]);
-      }
-      if (d.tax != null) setTax(String(d.tax));
       if (d.total != null) setTotal(String(d.total));
       setAiExtracted(true);
       setAiConfidence(d.confidence ?? null);
@@ -264,14 +249,11 @@ function AddInvoiceModal({
     }
   }
 
-  const setItem = (i: number, patch: Partial<Item>) =>
-    setItems((p) => p.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
-
   async function submit() {
-    if (!title.trim()) return pushToast('error', 'أدخل عنوان الفاتورة');
+    if (!title.trim()) return pushToast('error', 'أدخل بيان الصرف');
     if (!department) return pushToast('error', 'اختر القسم');
-    const finalTotal = itemsSum;
-    if (finalTotal <= 0) return pushToast('error', 'أدخل المنتجات بأسعار صحيحة');
+    const finalTotal = parseFloat(total);
+    if (isNaN(finalTotal) || finalTotal <= 0) return pushToast('error', 'أدخل قيمة الإجمالي بشكل صحيح');
 
     setBusy(true);
     const r = await fetch('/api/supervisor/invoices', {
@@ -283,9 +265,9 @@ function AddInvoiceModal({
         invoiceDate: invoiceDate.trim() || null,
         category: category || null,
         department,
-        items: items.filter((it) => it.name.trim()),
-        subtotal: itemsSum || null,
-        tax: tax === '' ? null : Number(tax),
+        items: [{ name: title.trim(), qty: 1, price: finalTotal }],
+        subtotal: finalTotal,
+        tax: null,
         total: finalTotal,
         imageData: image,
         entryMode,
@@ -355,7 +337,7 @@ function AddInvoiceModal({
                 {CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
               </select>
             </Field>
-            <Field label="عنوان / اسم الفاتورة" required>
+            <Field label="بيان الصرف (ماذا اشتريت؟)" required>
               <input className="field" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="مثال: مشتريات قرطاسية" />
             </Field>
             <Field label="المتجر / المورّد">
@@ -366,40 +348,14 @@ function AddInvoiceModal({
             </Field>
           </div>
 
-          {/* items editor */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="label !mb-0">المنتجات</label>
-              <button type="button" className="btn btn-ghost text-xs" onClick={() => setItems((p) => [...p, { name: '', qty: 1, price: 0 }])}>+ إضافة منتج</button>
-            </div>
-            <div className="space-y-2">
-              {items.map((it, i) => (
-                <div key={i} className="grid grid-cols-12 gap-2 items-center">
-                  <div className="col-span-6">
-                    <input className="field" placeholder="اسم المنتج" value={it.name} onChange={(e) => setItem(i, { name: e.target.value })} />
-                  </div>
-                  <div className="col-span-2">
-                    <input className="field text-center" dir="ltr" inputMode="numeric" placeholder="كمية" value={it.qty} onChange={(e) => setItem(i, { qty: Number(e.target.value.replace(/\D/g, '')) || 0 })} />
-                  </div>
-                  <div className="col-span-3">
-                    <input className="field text-center" dir="ltr" inputMode="decimal" placeholder="سعر" value={it.price} onChange={(e) => setItem(i, { price: Number(e.target.value) || 0 })} />
-                  </div>
-                  <div className="col-span-1 text-center">
-                    <button type="button" onClick={() => setItems((p) => p.filter((_, idx) => idx !== i))} className="text-nred-600 px-1.5 text-lg" title="حذف">×</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="text-xs text-ink-400 mt-1.5">مجموع المنتجات: <span dir="ltr" className="font-mono">{money(itemsSum)}</span></div>
-          </div>
-
           <Field label="الإجمالي" required>
             <input
-              className="field bg-cream-100/50 cursor-not-allowed font-semibold"
+              type="number"
+              step="any"
+              className="field font-semibold"
               dir="ltr"
-              readOnly
-              disabled
-              value={itemsSum > 0 ? itemsSum.toFixed(2) : ''}
+              value={total}
+              onChange={(e) => setTotal(e.target.value)}
               placeholder="0.00"
             />
           </Field>
@@ -458,18 +414,7 @@ function ViewInvoiceModal({
             </div>
           )}
 
-          {invoice.items.length > 0 && (
-            <div className="rounded-lg border border-ink-200 overflow-hidden">
-              <table className="tbl">
-                <thead><tr><th>المنتج</th><th>الكمية</th><th>السعر</th></tr></thead>
-                <tbody>
-                  {invoice.items.map((it, i) => (
-                    <tr key={i}><td>{it.name}</td><td dir="ltr">{it.qty}</td><td dir="ltr">{money(it.price)}</td></tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+
 
           <div className="flex items-center justify-between text-lg font-bold border-t border-ink-200 pt-3">
             <span>الإجمالي</span>

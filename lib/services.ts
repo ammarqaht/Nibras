@@ -146,16 +146,16 @@ export const GLOBAL_ROLES = [
 ];
 
 export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
-  attendance_supervisor:    ['attendance', 'students', 'analytics', 'points'],
-  social_supervisor:        ['points', 'students', 'groups', 'schedule', 'analytics'],
-  cultural_supervisor:      ['points', 'students', 'groups', 'schedule', 'analytics'],
-  scientific_supervisor:    ['points', 'students', 'groups', 'schedule', 'analytics'],
-  sports_supervisor:        ['points', 'students', 'groups', 'schedule', 'analytics'],
-  groups_supervisor:        ['groups', 'students', 'points', 'attendance', 'analytics'],
-  general_supervisor:       ['students', 'analytics', 'invoices', 'groups', 'attendance', 'points'],
-  media_supervisor:         ['announcements', 'schedule', 'students', 'analytics', 'points'],
-  stage_supervisor:         ['groups', 'students', 'points', 'attendance', 'analytics'],
-  tasks_supervisor:         ['tasks', 'students', 'analytics'],
+  attendance_supervisor: ['attendance', 'students', 'analytics', 'points'],
+  social_supervisor: ['points', 'students', 'groups', 'schedule', 'analytics'],
+  cultural_supervisor: ['points', 'students', 'groups', 'schedule', 'analytics'],
+  scientific_supervisor: ['points', 'students', 'groups', 'schedule', 'analytics'],
+  sports_supervisor: ['points', 'students', 'groups', 'schedule', 'analytics'],
+  groups_supervisor: ['groups', 'students', 'points', 'attendance', 'analytics'],
+  general_supervisor: ['students', 'analytics', 'invoices', 'groups', 'attendance', 'points'],
+  media_supervisor: ['announcements', 'schedule', 'students', 'analytics', 'points'],
+  stage_supervisor: ['groups', 'students', 'points', 'attendance', 'analytics'],
+  tasks_supervisor: ['tasks', 'students', 'analytics'],
 };
 
 /**
@@ -241,10 +241,10 @@ const FILE_SUBMISSIONS = path.join(DATA_DIR, 'submissions.json');
 const FILE_SCHEDULES = path.join(DATA_DIR, 'schedules.json');
 const FILE_GENERAL_EXPENSES = path.join(DATA_DIR, 'general_expenses.json');
 const FILE_OTHER_REVENUES = path.join(DATA_DIR, 'other_revenues.json');
-const FILE_SPORT_LEAGUES   = path.join(DATA_DIR, 'sport_leagues.json');
-const FILE_SPORT_MATCHES   = path.join(DATA_DIR, 'sport_matches.json');
-const FILE_SPORT_GOALS     = path.join(DATA_DIR, 'sport_goals.json');
-const FILE_SPORT_CARDS     = path.join(DATA_DIR, 'sport_cards.json');
+const FILE_SPORT_LEAGUES = path.join(DATA_DIR, 'sport_leagues.json');
+const FILE_SPORT_MATCHES = path.join(DATA_DIR, 'sport_matches.json');
+const FILE_SPORT_GOALS = path.join(DATA_DIR, 'sport_goals.json');
+const FILE_SPORT_CARDS = path.join(DATA_DIR, 'sport_cards.json');
 const FILE_SPORT_BEHAVIORS = path.join(DATA_DIR, 'sport_behaviors.json');
 
 async function readJsonFile<T>(filePath: string, defaultVal: T): Promise<T> {
@@ -271,18 +271,18 @@ export async function seedDefaultAdminIfNeeded(): Promise<void> {
   const isDev = process.env.NODE_ENV !== 'production';
 
   const devAccounts = isDev ? [
-    { email: '1',  role: 'admin',                    name: 'تجربة مدير عام' },
-    { email: '2',  role: 'finance',                  name: 'تجربة مسؤول مالية' },
-    { email: '3',  role: 'attendance_supervisor',    name: 'تجربة مشرف تحضير' },
-    { email: '4',  role: 'social_supervisor',        name: 'تجربة مشرف اجتماعية' },
-    { email: '5',  role: 'cultural_supervisor',      name: 'تجربة مشرف ثقافية' },
-    { email: '6',  role: 'groups_supervisor',        name: 'تجربة مشرف أسر' },
-    { email: '7',  role: 'general_supervisor',       name: 'تجربة مشرف عام' },
-    { email: '8',  role: 'media_supervisor',         name: 'تجربة مشرف إعلامية' },
-    { email: '9',  role: 'scientific_supervisor',    name: 'تجربة مشرف علمية' },
-    { email: '10', role: 'sports_supervisor',        name: 'تجربة مشرف رياضية' },
-    { email: '11', role: 'stage_supervisor',         name: 'تجربة مشرف مرحلة' },
-    { email: '12', role: 'tasks_supervisor',         name: 'تجربة مشرف مهام' },
+    { email: '1', role: 'admin', name: 'تجربة مدير عام' },
+    { email: '2', role: 'finance', name: 'تجربة مسؤول مالية' },
+    { email: '3', role: 'attendance_supervisor', name: 'تجربة مشرف تحضير' },
+    { email: '4', role: 'social_supervisor', name: 'تجربة مشرف اجتماعية' },
+    { email: '5', role: 'cultural_supervisor', name: 'تجربة مشرف ثقافية' },
+    { email: '6', role: 'groups_supervisor', name: 'تجربة مشرف أسر' },
+    { email: '7', role: 'general_supervisor', name: 'تجربة مشرف عام' },
+    { email: '8', role: 'media_supervisor', name: 'تجربة مشرف إعلامية' },
+    { email: '9', role: 'scientific_supervisor', name: 'تجربة مشرف علمية' },
+    { email: '10', role: 'sports_supervisor', name: 'تجربة مشرف رياضية' },
+    { email: '11', role: 'stage_supervisor', name: 'تجربة مشرف مرحلة' },
+    { email: '12', role: 'tasks_supervisor', name: 'تجربة مشرف مهام' },
   ] : [];
   const devHash = hashPassword('a');
 
@@ -315,22 +315,22 @@ export async function seedDefaultAdminIfNeeded(): Promise<void> {
 
     const upsertJson = (email: string, role: string, name: string, hash: string, defaultStage = '', defaultGroupIds = '') => {
       const idx = supervisors.findIndex(s => s.email === email);
-      if (idx !== -1) { 
-        supervisors[idx].passwordHash = hash; 
+      if (idx !== -1) {
+        supervisors[idx].passwordHash = hash;
         supervisors[idx].role = role;
         // Do not overwrite groupIds or stage if they already exist
       }
       else {
-        supervisors.push({ 
-          id: supervisors.length > 0 ? Math.max(...supervisors.map(s => s.id)) + 1 : 1, 
-          name, 
-          email, 
-          passwordHash: hash, 
-          role, 
-          groupIds: defaultGroupIds, 
-          departments: '', 
+        supervisors.push({
+          id: supervisors.length > 0 ? Math.max(...supervisors.map(s => s.id)) + 1 : 1,
+          name,
+          email,
+          passwordHash: hash,
+          role,
+          groupIds: defaultGroupIds,
+          departments: '',
           stage: defaultStage,
-          createdAt: new Date().toISOString() 
+          createdAt: new Date().toISOString()
         });
       }
     };
@@ -338,10 +338,10 @@ export async function seedDefaultAdminIfNeeded(): Promise<void> {
     upsertJson('admin', 'admin', 'المدير العام', defaultHash);
     for (const d of devAccounts) {
       upsertJson(
-        d.email, 
-        d.role, 
-        d.name, 
-        devHash, 
+        d.email,
+        d.role,
+        d.name,
+        devHash,
         d.role === 'stage_supervisor' ? 'ابتدائي' : '',
         d.role === 'groups_supervisor' ? '1' : ''
       );
@@ -377,7 +377,7 @@ export async function getSupervisorByEmail(email: string): Promise<SupervisorInf
       disableDatabase();
     }
   }
-  
+
   if (!databaseAvailable) {
     const supervisors = await readJsonFile<SupervisorInfo[]>(FILE_SUPERVISORS, []);
     return supervisors.find(s => s.email === email) || null;
@@ -736,6 +736,41 @@ export async function deleteAttendance(registrationId: number, date: string): Pr
   }
 }
 
+// ─── ATTENDANCE EXCUSES (طلبات عذر الغياب) — stored in settings JSON ───────────
+export type AttendanceExcuse = {
+  id: string; registrationId: number; studentName: string;
+  date: string; reason: string; status: 'pending' | 'accepted' | 'rejected'; createdAt: string;
+};
+
+export async function getAttendanceExcuses(): Promise<AttendanceExcuse[]> {
+  const raw = await getSetting('attendance_excuses');
+  try { return raw ? JSON.parse(raw) : []; } catch { return []; }
+}
+
+export async function addAttendanceExcuse(data: { registrationId: number; studentName: string; date: string; reason: string }): Promise<AttendanceExcuse> {
+  const list = await getAttendanceExcuses();
+  const dup = list.find(e => e.registrationId === data.registrationId && e.date === data.date && e.status === 'pending');
+  if (dup) return dup;
+  const crypto = await import('crypto');
+  const rec: AttendanceExcuse = { id: crypto.randomUUID(), ...data, status: 'pending', createdAt: new Date().toISOString() };
+  list.push(rec);
+  await saveSetting('attendance_excuses', JSON.stringify(list));
+  return rec;
+}
+
+export async function resolveAttendanceExcuse(id: string, accept: boolean, recordedBy: string): Promise<AttendanceExcuse | null> {
+  const list = await getAttendanceExcuses();
+  const idx = list.findIndex(e => e.id === id);
+  if (idx === -1) return null;
+  list[idx].status = accept ? 'accepted' : 'rejected';
+  await saveSetting('attendance_excuses', JSON.stringify(list));
+  if (accept) {
+    // Mark the student as excused for that day
+    await logAttendance(list[idx].registrationId, list[idx].date, 'excused', recordedBy);
+  }
+  return list[idx];
+}
+
 // Delete attendance-linked point records for a student on a specific date.
 // Points created by the attendance route embed the date as " | YYYY-MM-DD" in the reason.
 export async function deleteAttendancePointsByDate(registrationId: number, date: string): Promise<void> {
@@ -1004,7 +1039,7 @@ export async function updateAnnouncement(id: number, patch: { title?: string; bo
     const list = await readJsonFile<AnnouncementInfo[]>(FILE_ANNOUNCEMENTS, []);
     const idx = list.findIndex((a) => a.id === id);
     if (idx === -1) return null;
-    
+
     const updated = {
       ...list[idx],
       ...patch,
@@ -1069,7 +1104,7 @@ export async function saveSetting(key: string, value: string): Promise<void> {
 
 export async function getMergedSettings() {
   const custom = await getSettings();
-  
+
   const site = {
     ...origSite,
     nameAr: custom.siteNameAr || origSite.nameAr,
@@ -1185,7 +1220,7 @@ export async function deleteStudent(id: number): Promise<boolean> {
     const registrations = await readJsonFile<any[]>(FILE_REGISTRATIONS, []);
     const index = registrations.findIndex(s => s.id === id);
     if (index === -1) return false;
-    
+
     registrations.splice(index, 1);
     await writeJsonFile(FILE_REGISTRATIONS, registrations);
 
@@ -1973,6 +2008,7 @@ export async function submitClaim(registrationId: number, taskId: string, fileUr
   if (!existing || !['claimed', 'rejected'].includes(existing.status)) {
     return { error: 'يجب طلب المهمة أولاً قبل تسليمها' };
   }
+  const wasClaimed = existing.status === 'claimed'; // deposit still held → release it (full) on first submit
   const now = new Date();
   if (hasDatabase) {
     const prisma = getPrisma()!;
@@ -1982,6 +2018,8 @@ export async function submitClaim(registrationId: number, taskId: string, fileUr
     const idx = list.findIndex(s => String(s.id) === existing.id);
     if (idx !== -1) { list[idx] = { ...list[idx], fileUrl, status: 'pending', submittedAt: now.toISOString() }; await writeJsonFile(FILE_SUBMISSIONS, list); }
   }
+  // Submitting returns the full deposit (the task cost) to the student's balance
+  if (wasClaimed) await refundTaskCost(registrationId, taskId);
   const refreshed = await getSubmissions();
   return { submission: refreshed.find(s => s.id === existing.id) };
 }
@@ -1990,6 +2028,7 @@ export async function cancelClaim(registrationId: number, taskId: string): Promi
   const subs = await getSubmissions();
   const existing = subs.find(s => s.registrationId === registrationId && s.taskId === taskId);
   if (!existing || !ACTIVE_CLAIM_STATUSES.includes(existing.status)) return { ok: false, error: 'لا توجد مهمة نشطة لإلغائها' };
+  const wasClaimed = existing.status === 'claimed'; // deposit only held while not yet submitted
   const tasks = await getTasks();
   const task = tasks.find(t => t.id === taskId);
   const cost = task?.cost ?? 0;
@@ -2001,20 +2040,21 @@ export async function cancelClaim(registrationId: number, taskId: string): Promi
     const idx = list.findIndex(s => String(s.id) === existing.id);
     if (idx !== -1) { list[idx] = { ...list[idx], status: 'cancelled' }; await writeJsonFile(FILE_SUBMISSIONS, list); }
   }
-  const refund = Math.floor(cost / 2);
+  // Cancelling returns HALF the deposit — only if it was still held (not yet submitted)
+  const refund = wasClaimed ? Math.floor(cost / 2) : 0;
   if (refund > 0) {
     await addPointsRecord({ registrationId, delta: refund, reason: `استرداد نصف مبلغ مهمة ملغاة: ${task?.title || ''}`, category: 'tasks', pointType: 'deduction', recordedBy: 'النظام' });
   }
   return { ok: true };
 }
 
-// On approval the full cost is returned to the student (in addition to the reward points).
+// Returns the held deposit (the full task cost) to the student's balance.
 export async function refundTaskCost(registrationId: number, taskId: string): Promise<void> {
   const tasks = await getTasks();
   const task = tasks.find(t => t.id === taskId);
   const cost = task?.cost ?? 0;
   if (cost > 0) {
-    await addPointsRecord({ registrationId, delta: cost, reason: `استرداد مبلغ المهمة بعد القبول: ${task?.title || ''}`, category: 'tasks', pointType: 'deduction', recordedBy: 'النظام' });
+    await addPointsRecord({ registrationId, delta: cost, reason: `استرداد مبلغ المهمة: ${task?.title || ''}`, category: 'tasks', pointType: 'deduction', recordedBy: 'النظام' });
   }
 }
 
@@ -2588,17 +2628,17 @@ export async function getStageLeaderboard(stage: string): Promise<{
 
   const allPoints = hasDatabase
     ? await (async () => {
-        const prisma = getPrisma()!;
-        const list = await prisma.point.findMany({
-          where: { registrationId: { in: stageStudents.map(s => s.id) } }
-        });
-        return list.map(p => ({
-          id: p.id, registrationId: p.registrationId, delta: p.delta,
-          reason: p.reason, category: p.category,
-          pointType: (p.pointType || 'individual') as 'individual' | 'collective' | 'deduction',
-          recordedBy: p.recordedBy, createdAt: p.createdAt.toISOString()
-        }));
-      })()
+      const prisma = getPrisma()!;
+      const list = await prisma.point.findMany({
+        where: { registrationId: { in: stageStudents.map(s => s.id) } }
+      });
+      return list.map(p => ({
+        id: p.id, registrationId: p.registrationId, delta: p.delta,
+        reason: p.reason, category: p.category,
+        pointType: (p.pointType || 'individual') as 'individual' | 'collective' | 'deduction',
+        recordedBy: p.recordedBy, createdAt: p.createdAt.toISOString()
+      }));
+    })()
     : await readJsonFile<PointInfo[]>(FILE_POINTS, []);
 
   const ranked = stageStudents.map(student => {
@@ -2737,9 +2777,8 @@ export async function getSetting(key: string): Promise<string | null> {
       return null;
     }
   } else {
-    const list = await readJsonFile<SettingInfo[]>(FILE_SETTINGS, []);
-    const s = list.find(x => x.key === key);
-    return s ? s.value : null;
+    const map = await readJsonFile<Record<string, string>>(FILE_SETTINGS, {});
+    return map[key] ?? null;
   }
 }
 
@@ -3006,8 +3045,10 @@ export async function createSportMatch(data: {
   if (hasDatabase) {
     const prisma = getPrisma()!;
     const r = await (prisma as any).sportMatch.create({
-      data: { ...data, homeScore: 0, awayScore: 0, status: 'scheduled',
-               matchDate: data.matchDate ?? null, notes: data.notes ?? null },
+      data: {
+        ...data, homeScore: 0, awayScore: 0, status: 'scheduled',
+        matchDate: data.matchDate ?? null, notes: data.notes ?? null
+      },
     });
     return mapSportMatch(r);
   } else {
@@ -3146,7 +3187,7 @@ export async function getSportCards(filter: { matchId?: number; leagueId?: numbe
     return list.map(mapSportCard);
   } else {
     let list = await readJsonFile<any[]>(FILE_SPORT_CARDS, []);
-    if (filter.matchId  !== undefined) list = list.filter((c: any) => c.matchId  === filter.matchId);
+    if (filter.matchId !== undefined) list = list.filter((c: any) => c.matchId === filter.matchId);
     if (filter.leagueId !== undefined) list = list.filter((c: any) => c.leagueId === filter.leagueId);
     return list.map(mapSportCard);
   }
@@ -3262,7 +3303,7 @@ export async function deleteSportBehavior(id: number): Promise<boolean> {
 export async function getLeagueStandings(leagueId: number): Promise<SportStanding[]> {
   const league = await getSportLeagueById(leagueId);
   const matches = await getSportMatches(leagueId);
-  const win  = league?.winPoints  ?? 2;
+  const win = league?.winPoints ?? 2;
   const draw = league?.drawPoints ?? 1;
   const loss = league?.lossPoints ?? 0;
 
@@ -3280,12 +3321,12 @@ export async function getLeagueStandings(leagueId: number): Promise<SportStandin
     const home = ensure(m.homeGroupId);
     const away = ensure(m.awayGroupId);
     home.played++; away.played++;
-    home.goalsFor    += m.homeScore; home.goalsAgainst += m.awayScore;
-    away.goalsFor    += m.awayScore; away.goalsAgainst += m.homeScore;
+    home.goalsFor += m.homeScore; home.goalsAgainst += m.awayScore;
+    away.goalsFor += m.awayScore; away.goalsAgainst += m.homeScore;
     if (m.homeScore > m.awayScore) {
-      home.won++; home.points += win;  away.lost++; away.points += loss;
+      home.won++; home.points += win; away.lost++; away.points += loss;
     } else if (m.homeScore < m.awayScore) {
-      away.won++; away.points += win;  home.lost++; home.points += loss;
+      away.won++; away.points += win; home.lost++; home.points += loss;
     } else {
       home.drawn++; home.points += draw; away.drawn++; away.points += draw;
     }
@@ -3329,10 +3370,10 @@ export async function applyMatchCollectivePoints(
 
   let homePts = 0, awayPts = 0, homeReason = '', awayReason = '';
   if (match.homeScore > match.awayScore) {
-    homePts = league.winPoints;  homeReason = `${REASON_PREFIX} | فوز`;
+    homePts = league.winPoints; homeReason = `${REASON_PREFIX} | فوز`;
     awayPts = league.lossPoints; awayReason = `${REASON_PREFIX} | خسارة`;
   } else if (match.homeScore < match.awayScore) {
-    awayPts = league.winPoints;  awayReason = `${REASON_PREFIX} | فوز`;
+    awayPts = league.winPoints; awayReason = `${REASON_PREFIX} | فوز`;
     homePts = league.lossPoints; homeReason = `${REASON_PREFIX} | خسارة`;
   } else {
     homePts = league.drawPoints; homeReason = `${REASON_PREFIX} | تعادل`;

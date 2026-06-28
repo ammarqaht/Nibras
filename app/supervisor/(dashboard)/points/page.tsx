@@ -52,6 +52,7 @@ export default function PointsBoardPage() {
   const { user } = useSupervisor();
   const roles = user?.role ? user.role.split(',').map(r => r.trim()) : [];
   const canAddPoints = roles.some(r => ADD_POINTS_ROLES.includes(r));
+  const canToggleVisibility = roles.some(r => ['admin', 'stage_supervisor'].includes(r));
 
   const [students, setStudents] = useState<Student[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -61,6 +62,35 @@ export default function PointsBoardPage() {
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [logSearch, setLogSearch] = useState('');
   const [leaderSearch, setLeaderSearch] = useState('');
+  const [pointsHidden, setPointsHidden] = useState(false);
+  const [visBusy, setVisBusy] = useState(false);
+  const [showVisModal, setShowVisModal] = useState(false);
+  const [teaserMsg, setTeaserMsg] = useState('النقاط مخفية مؤقتاً… استمر في التميّز، وسيتم الكشف عنها قريباً! 🌟');
+
+  useEffect(() => {
+    if (!canToggleVisibility) return;
+    fetch('/api/supervisor/points-visibility')
+      .then(r => r.json())
+      .then(d => {
+        setPointsHidden(!!d.hidden);
+        if (d.message) setTeaserMsg(d.message);
+      })
+      .catch(() => {});
+  }, [canToggleVisibility]);
+
+  async function togglePointsVisibility(hide: boolean, msg?: string) {
+    setVisBusy(true);
+    try {
+      const r = await fetch('/api/supervisor/points-visibility', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hidden: hide, message: msg }),
+      });
+      if (r.ok) {
+        setPointsHidden(hide);
+        if (msg) setTeaserMsg(msg);
+      }
+    } finally { setVisBusy(false); }
+  }
 
   useEffect(() => {
     Promise.all([
@@ -139,12 +169,27 @@ export default function PointsBoardPage() {
           <h1 className="text-2xl font-bold text-ink-900 mb-1">لوحة النقاط</h1>
           <p className="text-sm text-ink-500">ترتيب الأوائل وسجل الرصد مقسم حسب المرحلة الدراسية.</p>
         </div>
-        {canAddPoints && (
-          <Link href="/supervisor/points/add" className="btn btn-primary shrink-0 flex items-center gap-1.5 text-sm">
-            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-            رصد النقاط
-          </Link>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {canToggleVisibility && (
+            <button onClick={() => {
+              if (pointsHidden) {
+                togglePointsVisibility(false);
+              } else {
+                setShowVisModal(true);
+              }
+            }} disabled={visBusy}
+              className="btn btn-secondary flex items-center gap-1.5 text-sm"
+              title="إخفاء/إظهار النقاط في حسابات الطلاب">
+              {pointsHidden ? '👁️ إظهار النقاط' : '🙈 إخفاء النقاط'}
+            </button>
+          )}
+          {canAddPoints && (
+            <Link href="/supervisor/points/add" className="btn btn-primary flex items-center gap-1.5 text-sm">
+              <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+              رصد النقاط
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* Stage tabs */}
@@ -376,6 +421,40 @@ export default function PointsBoardPage() {
                 </ul>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {showVisModal && (
+        <div className="modal-backdrop flex items-center justify-center p-4 z-50 animate-fade-in" onClick={() => setShowVisModal(false)}>
+          <div className="modal-panel w-full max-w-md p-5 space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: 'var(--line)' }}>
+              <h3 className="font-bold text-base text-ink-900">حجب النقاط عن الطلاب</h3>
+              <button onClick={() => setShowVisModal(false)} className="btn btn-ghost p-1" aria-label="إغلاق">✕</button>
+            </div>
+            <div className="space-y-3">
+              <label className="label font-bold text-xs">الرسالة التشويقية والتحميسية للطلاب</label>
+              <textarea
+                className="field min-h-[100px] text-xs resize-none"
+                placeholder="اكتب هنا الرسالة التي ستظهر للطلاب بدلاً من نقاطهم..."
+                value={teaserMsg}
+                onChange={e => setTeaserMsg(e.target.value)}
+              />
+              <p className="text-[10px] text-ink-400">سيتم تطبيق حجب النقاط مع هذه الرسالة التشويقية والبلور على جميع الطلاب فور الحفظ.</p>
+            </div>
+            <div className="flex gap-2 pt-2 border-t" style={{ borderColor: 'var(--line)' }}>
+              <button
+                onClick={() => {
+                  togglePointsVisibility(true, teaserMsg);
+                  setShowVisModal(false);
+                }}
+                disabled={visBusy || !teaserMsg.trim()}
+                className="btn btn-primary flex-1 text-xs text-white font-bold"
+              >
+                تفعيل الحجب التشويقي
+              </button>
+              <button onClick={() => setShowVisModal(false)} className="btn btn-secondary flex-1 text-xs font-semibold">إلغاء</button>
+            </div>
           </div>
         </div>
       )}

@@ -62,6 +62,22 @@ const METHOD_LABELS: Record<string, string> = {
   ack: 'إقرار بالإنجاز',
 };
 
+// Consistent color per track (category) — hashed into a fixed palette
+const TRACK_PALETTE = [
+  { from: '#34D399', to: '#059669', solid: '#047857', soft: '#E7F6EC' },
+  { from: '#FBBF24', to: '#D97706', solid: '#B45309', soft: '#FEF3C7' },
+  { from: '#A78BFA', to: '#7C3AED', solid: '#6D28D9', soft: '#EDE9FE' },
+  { from: '#22D3EE', to: '#0891B2', solid: '#0E7490', soft: '#E0F7FA' },
+  { from: '#F472B6', to: '#DB2777', solid: '#BE185D', soft: '#FCE7F3' },
+  { from: '#60A5FA', to: '#2563EB', solid: '#1D4ED8', soft: '#E0ECFF' },
+];
+function trackColor(track: string | null) {
+  const t = track || 'عام';
+  let h = 0;
+  for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) >>> 0;
+  return TRACK_PALETTE[h % TRACK_PALETTE.length];
+}
+
 function statusRank(s: TaskItem) {
   const st = s.submission?.status;
   if (st === 'claimed' || st === 'rejected') return 0; // active — needs the student's action → first
@@ -88,6 +104,14 @@ export default function StudentTasks() {
   const fileRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+
+  // List controls + submitted popup
+  const [filterTrack, setFilterTrack] = useState('');
+  const [filterMethod, setFilterMethod] = useState('');
+  const [sortBy, setSortBy] = useState<'due' | 'points-desc' | 'points-asc'>('due');
+  const [showSubmitted, setShowSubmitted] = useState(false);
+  const [showActive, setShowActive] = useState(false);
+  const [expandedSubId, setExpandedSubId] = useState<string | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -125,7 +149,7 @@ export default function StudentTasks() {
     } finally { setActionBusy(false); }
   }
 
-  async function cancelTaskReq(item: TaskItem) {
+  async function cancelTaskReq(item: TaskItem, reselect = true) {
     if (!window.confirm('إلغاء المهمة؟ سيُعاد إليك نصف المبلغ فقط.')) return;
     setActionBusy(true); setSubErr('');
     try {
@@ -135,7 +159,7 @@ export default function StudentTasks() {
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) { setSubErr(j.error || 'تعذّر الإلغاء'); return; }
-      await refresh(item.task.id);
+      await refresh(reselect ? item.task.id : undefined);
     } finally { setActionBusy(false); }
   }
 
@@ -222,16 +246,84 @@ export default function StudentTasks() {
     }
   }
 
-  const sorted = [...items].sort((a, b) => statusRank(a) - statusRank(b) || +new Date(a.task.dueDate) - +new Date(b.task.dueDate));
+  const tracks = Array.from(new Set(items.map(i => i.task.track).filter(Boolean))) as string[];
+  const methodsAvail = Array.from(new Set(items.map(i => methodKey(i.task.submissionMethod))));
+
+  const visible = items.filter(i =>
+    (!filterTrack || i.task.track === filterTrack) &&
+    (!filterMethod || methodKey(i.task.submissionMethod) === filterMethod)
+  );
+  const sorted = [...visible].sort((a, b) => {
+    if (sortBy === 'points-desc') return b.task.maxPoints - a.task.maxPoints;
+    if (sortBy === 'points-asc') return a.task.maxPoints - b.task.maxPoints;
+    return statusRank(a) - statusRank(b) || +new Date(a.task.dueDate) - +new Date(b.task.dueDate);
+  });
+
   const activeClaimCount = items.filter(i => i.submission && ['claimed', 'pending', 'rejected'].includes(i.submission.status)).length;
+  const atLimit = activeClaimCount >= 3;
+  // Only the deposit of a not-yet-submitted (claimed) task is "locked"
+  const lockedPoints = items.filter(i => i.submission?.status === 'claimed').reduce((a, i) => a + (i.task.cost ?? 0), 0);
+  const earnedPoints = items.filter(i => i.submission?.status === 'approved').reduce((a, i) => a + (i.submission!.grade || 0), 0);
+  const submittedItems = items
+    .filter(i => i.submission && ['pending', 'approved', 'rejected'].includes(i.submission.status))
+    .sort((a, b) => +new Date(b.submission!.submittedAt) - +new Date(a.submission!.submittedAt));
+  const notSubmittedItems = items.filter(i => i.submission && ['expired', 'cancelled'].includes(i.submission.status));
+  const claimedItems = items.filter(i => i.submission?.status === 'claimed');
+  const trackTotals: Record<string, number> = {};
+  for (const i of items) if (i.submission?.status === 'approved') { const t = i.task.track || 'عام'; trackTotals[t] = (trackTotals[t] || 0) + (i.submission.grade || 0); }
+  const trackRows = Object.entries(trackTotals).map(([track, pts]) => ({ track, pts })).sort((a, b) => b.pts - a.pts);
+  const maxTrackPts = Math.max(1, ...trackRows.map(r => r.pts));
+  const motivational = earnedPoints > 0 ? 'استمر في التألق — إنجازاتك تتراكم! 🌟' : 'ابدأ أول مهمة الآن واكسب نقاطك! 🚀';
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
-      <header className="mb-5 flex items-baseline justify-between">
-        <h1 className="font-display text-2xl font-bold" style={{ color: 'var(--ink)' }}>المهام</h1>
-        <span className="text-xs" style={{ color: 'var(--ink-soft)' }}>
-          {items.length} {items.length === 1 ? 'مهمة' : 'مهام'}
-        </span>
+    <div className="max-w-5xl mx-auto px-4 py-6">
+      <header className="mb-5 space-y-4">
+        {/* Program intro / stats hero — matches the navy hero on other pages */}
+        <div className="rounded-2xl p-5 text-white relative overflow-hidden" style={{ background: 'radial-gradient(circle at 80% 10%, rgba(255,159,28,0.12) 0%, transparent 50%), radial-gradient(circle at 20% 90%, rgba(18,179,213,0.15) 0%, transparent 60%), linear-gradient(135deg, #103F91 0%, #071F4A 100%)' }}>
+          <div className="relative">
+            <h1 className="font-display text-2xl font-bold">برنامج المهام</h1>
+            <p className="text-sm opacity-90 mt-1 leading-relaxed">اطلب المهمة، أنجزها في وقتها، واكسب نقاطك. {motivational}</p>
+            <div className="grid grid-cols-3 gap-2 mt-4">
+              {([
+                { label: atLimit ? 'بلغت الحد (٣)' : 'مهام مستلَمة', value: `${activeClaimCount}/3`, icon: '📥', onClick: () => setShowActive(true) },
+                { label: 'نقاط محبوسة', value: lockedPoints, icon: '🔒' },
+                { label: 'نقاط مكتسبة', value: earnedPoints, icon: '🏆' },
+              ] as { label: string; value: string | number; icon: string; onClick?: () => void }[]).map(s => (
+                <div key={s.label} onClick={s.onClick} role={s.onClick ? 'button' : undefined} tabIndex={s.onClick ? 0 : undefined}
+                  onKeyDown={s.onClick ? (e => { if (e.key === 'Enter' || e.key === ' ') s.onClick!(); }) : undefined}
+                  className="rounded-xl px-2 py-3 text-center transition-colors font-sans"
+                  style={{ background: 'rgba(255,255,255,0.18)', cursor: s.onClick ? 'pointer' : undefined }}>
+                  <p className="text-lg leading-none">{s.icon}</p>
+                  <p className="font-display tabular-nums text-xl font-bold leading-none mt-1.5">{s.value}</p>
+                  <p className="text-[11px] opacity-90 mt-1">{s.label}{s.onClick && ' ›'}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Filters / sort / submitted */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <select className="field py-1.5 px-3 text-sm flex-1 min-w-[110px]" value={filterTrack} onChange={e => setFilterTrack(e.target.value)}>
+            <option value="">كل التصنيفات</option>
+            {tracks.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <select className="field py-1.5 px-3 text-sm flex-1 min-w-[110px]" value={filterMethod} onChange={e => setFilterMethod(e.target.value)}>
+            <option value="">كل طرق التسليم</option>
+            {methodsAvail.map(m => <option key={m} value={m}>{METHOD_LABELS[m]}</option>)}
+          </select>
+          <select className="field py-1.5 px-3 text-sm flex-1 min-w-[110px]" value={sortBy} onChange={e => setSortBy(e.target.value as 'due' | 'points-desc' | 'points-asc')}>
+            <option value="due">الأقرب موعداً</option>
+            <option value="points-desc">النقاط: الأعلى</option>
+            <option value="points-asc">النقاط: الأقل</option>
+          </select>
+          <button onClick={() => { setShowSubmitted(true); setExpandedSubId(null); }}
+            className="btn text-white text-sm px-4 py-2 shrink-0 flex items-center gap-1.5 font-bold hover:opacity-90 transition-opacity"
+            style={{ background: 'radial-gradient(circle at 80% 10%, rgba(255,159,28,0.12) 0%, transparent 50%), radial-gradient(circle at 20% 90%, rgba(18,179,213,0.15) 0%, transparent 60%), linear-gradient(135deg, #103F91 0%, #071F4A 100%)' }}>
+            📋 المهام المسلَّمة
+            {submittedItems.length > 0 && <span className="bg-white/25 rounded-full text-[11px] px-1.5 py-0.5 tabular-nums">{submittedItems.length}</span>}
+          </button>
+        </div>
       </header>
 
       {loading ? (
@@ -245,12 +337,12 @@ export default function StudentTasks() {
           <p className="text-sm" style={{ color: 'var(--ink-soft)' }}>سنُعلمك حين تُضاف مهمة جديدة.</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {sorted.map(item => {
-            const due = new Date(item.task.dueDate);
             const sub = item.submission;
+            const tc = trackColor(item.task.track);
             const claimable = !sub || sub.status === 'cancelled' || sub.status === 'expired';
-            const overdue = claimable && due.getTime() < now;
+            const dl = sub?.status === 'claimed' ? claimDeadline(item) : null;
 
             let pill: { label: string; cls: string };
             if (claimable) {
@@ -267,40 +359,27 @@ export default function StudentTasks() {
               <button
                 key={item.task.id}
                 onClick={() => openTask(item)}
-                className="card w-full p-4 text-right hover:shadow-md transition-shadow"
+                className="card p-0 text-right hover:shadow-md hover:-translate-y-0.5 transition-all overflow-hidden flex flex-col"
+                style={{ borderTop: `3px solid ${tc.solid}` }}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-display text-base font-bold" style={{ color: 'var(--ink)' }}>{item.task.title}</span>
-                      {item.task.track && (
-                        <span className="text-[11px] px-2 py-0.5 rounded-full" style={{ background: '#FBF6EC', color: 'var(--accent-deep)' }}>
-                          {item.task.track}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs mt-1 line-clamp-2" style={{ color: 'var(--ink-soft)' }}>{item.task.description}</p>
-                    <div className="flex items-center gap-3 mt-2 flex-wrap text-xs" style={{ color: overdue ? 'var(--red)' : 'var(--ink-soft)' }}>
-                      <span>🎯 {item.task.maxPoints} نقطة</span>
-                      {(item.task.cost ?? 0) > 0 && <span>💰 {item.task.cost} للطلب</span>}
-                      <span>📎 {METHOD_LABELS[methodKey(item.task.submissionMethod)]}</span>
-                      {sub?.status === 'claimed' && (() => { const dl = claimDeadline(item); return dl ? <span style={{ color: dl - now <= 0 ? 'var(--red)' : 'var(--accent-deep)', fontWeight: 700 }}>⏳ {fmtRemaining(dl - now)}</span> : null; })()}
-                    </div>
+                <div className="p-4 flex-1">
+                  <div className="flex justify-end mb-2">
+                    <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white" style={{ background: `linear-gradient(135deg,${tc.from},${tc.to})` }}>
+                      {item.task.track || 'عام'}
+                    </span>
                   </div>
-                  <div className="shrink-0">
-                    <span className={`pill ${pill.cls}`}>{pill.label}</span>
+                  <h3 className="font-display text-base font-bold mb-1.5 leading-snug" style={{ color: 'var(--ink)' }}>{item.task.title}</h3>
+                  <p className="text-xs line-clamp-2 mb-3" style={{ color: 'var(--ink-soft)' }}>{item.task.description}</p>
+                  <div className="flex flex-wrap gap-1.5 text-[11px]">
+                    <span className="inline-flex items-center gap-1 rounded-md px-2 py-1" style={{ background: '#E7F6EC', color: '#047857' }}>🏆 {item.task.maxPoints} مكافأة</span>
+                    {(item.task.cost ?? 0) > 0 && <span className="inline-flex items-center gap-1 rounded-md px-2 py-1" style={{ background: '#FEF3C7', color: '#B45309' }}>💰 {item.task.cost} مبلغ</span>}
+                    <span className="inline-flex items-center gap-1 rounded-md px-2 py-1" style={{ background: 'var(--bg-soft)', color: 'var(--ink-soft)' }}>📎 {METHOD_LABELS[methodKey(item.task.submissionMethod)]}</span>
                   </div>
                 </div>
-                {sub?.status === 'approved' && sub.feedback && (
-                  <div className="mt-3 pt-3 border-t text-xs" style={{ borderColor: 'var(--line)', color: 'var(--ink-soft)' }}>
-                    ملاحظة المشرف: {sub.feedback}
-                  </div>
-                )}
-                {sub?.status === 'rejected' && sub.feedback && (
-                  <div className="mt-3 pt-3 border-t text-xs" style={{ borderColor: 'var(--line)', color: 'var(--ink-soft)' }}>
-                    ملاحظة المشرف: {sub.feedback}
-                  </div>
-                )}
+                <div className="px-4 py-2.5 border-t flex items-center justify-between gap-2" style={{ borderColor: 'var(--line)' }}>
+                  <span className={`pill ${pill.cls} text-xs`}>{pill.label}</span>
+                  {dl != null && <span className="text-[11px] font-bold tabular-nums" style={{ color: dl - now <= 0 ? 'var(--red)' : 'var(--accent-deep)' }}>⏳ {fmtRemaining(dl - now)}</span>}
+                </div>
               </button>
             );
           })}
@@ -309,7 +388,7 @@ export default function StudentTasks() {
 
       {/* Task detail / submission modal */}
       {selected && (
-        <div className="modal-backdrop flex items-end sm:items-center justify-center p-3 sm:p-6" onClick={() => setSelected(null)}>
+        <div className="modal-backdrop flex items-center justify-center p-3 sm:p-6" onClick={() => setSelected(null)}>
           <div className="modal-panel w-full max-w-lg max-h-[92vh] overflow-y-auto scroll-soft" onClick={e => e.stopPropagation()}>
             <div className="p-5 border-b sticky top-0 bg-white z-10" style={{ borderColor: 'var(--line)' }}>
               <div className="flex items-start justify-between gap-3">
@@ -328,19 +407,13 @@ export default function StudentTasks() {
             <div className="p-5 space-y-4">
               <p className="text-sm leading-relaxed" style={{ color: 'var(--ink)' }}>{selected.task.description}</p>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl p-3" style={{ background: 'var(--bg-soft)' }}>
-                  <p className="text-xs mb-1" style={{ color: 'var(--ink-soft)' }}>الموعد النهائي</p>
-                  <p className="font-display tabular-nums text-base font-bold" style={{ color: 'var(--ink)' }} dir="ltr">
-                    {new Date(selected.task.dueDate).toLocaleDateString('ar-SA')}
-                  </p>
-                </div>
-                <div className="rounded-xl p-3" style={{ background: 'var(--bg-soft)' }}>
-                  <p className="text-xs mb-1" style={{ color: 'var(--ink-soft)' }}>الدرجة القصوى</p>
-                  <p className="font-display tabular-nums text-base font-bold" style={{ color: 'var(--ink)' }}>
-                    {selected.task.maxPoints} نقطة
-                  </p>
-                </div>
+              <div className="grid grid-cols-3 gap-2">
+                <InfoBox icon="📅" label="الموعد النهائي" color="#103F91" bg="#EAF0FB"
+                  value={<span dir="ltr">{new Date(selected.task.dueDate).toLocaleDateString('ar-SA')}</span>} />
+                <InfoBox icon="💰" label="مبلغ الطلب" color="#854D0E" bg="#FEF3C7"
+                  value={`${selected.task.cost ?? 0}`} />
+                <InfoBox icon="🏆" label={selected.submission?.status === 'approved' ? 'النقاط المكتسبة' : 'النقاط القصوى'} color="#1B7A43" bg="#E7F6EC"
+                  value={`${selected.submission?.status === 'approved' ? (selected.submission.grade ?? 0) : selected.task.maxPoints}`} />
               </div>
 
               {selected.task.imageUrl && (
@@ -413,10 +486,11 @@ export default function StudentTasks() {
                           </p>
                           <p className="text-[11px] mt-2" style={{ color: 'var(--ink-soft)' }}>لديك {activeClaimCount} من ٣ مهام نشطة — ومهمة واحدة فقط لكل قسم.</p>
                         </div>
+                        {atLimit && <p className="text-xs font-bold" style={{ color: 'var(--red)' }}>بلغتَ الحد الأقصى (٣ مهام نشطة) — أنهِ مهمة قبل طلب أخرى.</p>}
                         {subErr && <p className="err-msg">{subErr}</p>}
                         <div className="flex gap-3">
-                          <button type="button" disabled={actionBusy} onClick={() => claimTaskReq(selected)} className="btn btn-primary flex-1">
-                            {actionBusy ? 'جارٍ الطلب…' : (cost > 0 ? `طلب المهمة (${cost} نقطة)` : 'طلب المهمة')}
+                          <button type="button" disabled={actionBusy || atLimit} onClick={() => claimTaskReq(selected)} className="btn btn-primary flex-1">
+                            {actionBusy ? 'جارٍ الطلب…' : atLimit ? 'بلغت الحد الأقصى' : (cost > 0 ? `طلب المهمة (${cost} نقطة)` : 'طلب المهمة')}
                           </button>
                           <button type="button" onClick={() => setSelected(null)} className="btn btn-secondary">إغلاق</button>
                         </div>
@@ -528,6 +602,162 @@ export default function StudentTasks() {
           </div>
         </div>
       )}
+
+      {/* Active (claimed) tasks — awaiting submission */}
+      {showActive && (
+        <div className="modal-backdrop flex items-center justify-center p-3 sm:p-6" onClick={() => setShowActive(false)}>
+          <div className="modal-panel w-full max-w-lg max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b flex items-center justify-between" style={{ borderColor: 'var(--line)' }}>
+              <div>
+                <h2 className="font-display text-lg font-bold" style={{ color: 'var(--ink)' }}>مهام بانتظار التسليم</h2>
+                <p className="text-xs" style={{ color: 'var(--ink-soft)' }}>{activeClaimCount}/3 مهام نشطة</p>
+              </div>
+              <button onClick={() => setShowActive(false)} className="btn btn-ghost p-2" aria-label="إغلاق">✕</button>
+            </div>
+            <div className="p-4 overflow-y-auto scroll-soft flex-1 space-y-2">
+              {claimedItems.length === 0 ? (
+                <div className="text-center py-10">
+                  <p className="text-3xl mb-2">📥</p>
+                  <p className="text-sm" style={{ color: 'var(--ink-soft)' }}>لا توجد مهام مستلَمة بانتظار التسليم.</p>
+                </div>
+              ) : claimedItems.map(item => {
+                const dl = claimDeadline(item);
+                const remaining = dl != null ? dl - now : null;
+                const tc = trackColor(item.task.track);
+                return (
+                  <div key={item.task.id} className="card p-3" style={{ borderRight: `4px solid ${tc.solid}` }}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-sm" style={{ color: 'var(--ink)' }}>{item.task.title}</p>
+                        <p className="text-[11px] mt-0.5" style={{ color: 'var(--ink-soft)' }}>{item.task.track || 'عام'}</p>
+                      </div>
+                      <span className="pill pill-yellow text-xs shrink-0">بانتظار التسليم</span>
+                    </div>
+                    {remaining != null && (
+                      <p className="text-xs font-bold mt-2 tabular-nums" style={{ color: remaining <= 0 ? 'var(--red)' : 'var(--accent-deep)' }}>
+                        ⏳ {remaining <= 0 ? 'انتهى الوقت' : `المتبقّي: ${fmtRemaining(remaining)}`}
+                      </p>
+                    )}
+                    <div className="flex gap-2 mt-3">
+                      <button onClick={() => { setShowActive(false); openTask(item); }} className="btn btn-primary text-xs flex-1">تسليم المهمة</button>
+                      <button disabled={actionBusy} onClick={() => cancelTaskReq(item, false)} className="btn btn-secondary text-xs" style={{ color: 'var(--red)' }}>إلغاء المهمة</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Achievements / submitted-tasks dashboard */}
+      {showSubmitted && (
+        <div className="modal-backdrop flex items-center justify-center p-3 sm:p-6" onClick={() => setShowSubmitted(false)}>
+          <div className="modal-panel w-full max-w-2xl max-h-[92vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b flex items-center justify-between" style={{ borderColor: 'var(--line)' }}>
+              <div>
+                <h2 className="font-display text-lg font-bold" style={{ color: 'var(--ink)' }}>النقاط والإنجازات</h2>
+                <p className="text-xs" style={{ color: 'var(--ink-soft)' }}>تابع تقدّمك وإنجازاتك في برنامج المهام</p>
+              </div>
+              <button onClick={() => setShowSubmitted(false)} className="btn btn-ghost p-2" aria-label="إغلاق">✕</button>
+            </div>
+
+            <div className="p-4 overflow-y-auto scroll-soft flex-1 space-y-4">
+              {/* total earned */}
+              <div className="card p-5 text-center">
+                <p className="text-sm" style={{ color: 'var(--ink-soft)' }}>إجمالي النقاط المكتسبة</p>
+                <p className="font-display tabular-nums text-5xl font-bold mt-1" style={{ color: '#1B7A43' }}>{earnedPoints}</p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* points by track */}
+                <div className="card p-4">
+                  <h3 className="font-bold text-sm mb-3" style={{ color: 'var(--ink)' }}>📊 النقاط حسب المسار</h3>
+                  {trackRows.length === 0 ? <p className="text-xs text-center py-3" style={{ color: 'var(--ink-soft)' }}>لا نقاط بعد</p>
+                    : <div className="space-y-3">
+                        {trackRows.map(r => { const c = trackColor(r.track); return (
+                          <div key={r.track}>
+                            <div className="flex items-center justify-between text-xs mb-1">
+                              <span className="font-bold" style={{ color: 'var(--ink)' }}>{r.track}</span>
+                              <span className="font-bold" style={{ color: c.solid }}>{r.pts} نقطة</span>
+                            </div>
+                            <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--bg-soft)' }}>
+                              <div className="h-full rounded-full" style={{ width: `${Math.round((r.pts / maxTrackPts) * 100)}%`, background: `linear-gradient(90deg,${c.from},${c.to})` }} />
+                            </div>
+                          </div>
+                        ); })}
+                      </div>}
+                </div>
+
+                {/* completed / evaluated — accordion */}
+                <div className="card p-4">
+                  <h3 className="font-bold text-sm mb-3" style={{ color: 'var(--ink)' }}>✅ المهام المنجزة والمقيّمة</h3>
+                  {submittedItems.length === 0 ? <p className="text-xs text-center py-3" style={{ color: 'var(--ink-soft)' }}>لا مهام مسلّمة بعد</p>
+                    : <div className="space-y-1.5">
+                        {submittedItems.map(item => {
+                          const sub = item.submission!;
+                          const open = expandedSubId === item.task.id;
+                          const badge = sub.status === 'approved' ? { cls: 'pill-green', label: `+${sub.grade ?? 0}` } : sub.status === 'rejected' ? { cls: 'pill-red', label: 'مرفوضة' } : { cls: 'pill-yellow', label: 'مراجعة' };
+                          return (
+                            <div key={item.task.id} className="rounded-lg border" style={{ borderColor: 'var(--line)' }}>
+                              <button onClick={() => setExpandedSubId(id => id === item.task.id ? null : item.task.id)} className="w-full p-2.5 flex items-center gap-2 text-right">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-bold truncate" style={{ color: 'var(--ink)' }}>{item.task.title}</p>
+                                  <p className="text-[10px]" style={{ color: 'var(--ink-soft)' }}>{item.task.track || 'عام'}</p>
+                                </div>
+                                <span className={`pill ${badge.cls} text-[10px] py-0.5 px-2`}>{badge.label}</span>
+                                <svg className={`w-3.5 h-3.5 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} style={{ color: 'var(--ink-soft)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+                              </button>
+                              {open && (
+                                <div className="px-2.5 pb-2.5 text-[11px] fade-in" style={{ color: 'var(--ink-soft)' }}>
+                                  <p>{sub.feedback ? `التعليق: ${sub.feedback}` : 'لا يوجد تعليق.'}</p>
+                                  <p className="mt-1"><span dir="ltr">{new Date(sub.submittedAt).toLocaleDateString('ar-SA')}</span> · {METHOD_LABELS[methodKey(item.task.submissionMethod)]}</p>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>}
+                </div>
+              </div>
+
+              {/* not submitted */}
+              <div className="card p-4" style={{ background: '#FFF7F5', borderColor: 'rgba(196,41,16,0.2)' }}>
+                <h3 className="font-bold text-sm mb-3" style={{ color: '#C42910' }}>✖ مهام لم يتم تسليمها</h3>
+                {notSubmittedItems.length === 0 ? <p className="text-xs text-center py-2" style={{ color: 'var(--ink-soft)' }}>لا شيء — أحسنت! 👏</p>
+                  : <div className="space-y-1.5">
+                      {notSubmittedItems.map(item => {
+                        const expired = item.submission!.status === 'expired';
+                        const cost = item.task.cost ?? 0;
+                        const lost = expired ? cost : (cost - Math.floor(cost / 2));
+                        const dl = claimDeadline(item);
+                        const date = expired && dl ? new Date(dl) : new Date(item.task.dueDate);
+                        return (
+                          <div key={item.task.id} className="flex items-center gap-2 rounded-lg bg-white px-3 py-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-bold truncate" style={{ color: 'var(--ink)' }}>{item.task.title}</p>
+                              <p className="text-[10px]" style={{ color: 'var(--ink-soft)' }}>{item.task.track || 'عام'} · {expired ? 'انتهى الوقت' : 'ألغاها الطالب'} · <span dir="ltr">{date.toLocaleDateString('ar-SA')}</span></p>
+                            </div>
+                            <span className="text-xs font-bold shrink-0 tabular-nums" style={{ color: lost > 0 ? '#C42910' : 'var(--ink-soft)' }}>{lost > 0 ? `-${lost}` : '٠'}</span>
+                          </div>
+                        );
+                      })}
+                    </div>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InfoBox({ icon, label, value, color, bg }: { icon: string; label: string; value: React.ReactNode; color: string; bg: string }) {
+  return (
+    <div className="rounded-xl p-3 text-center" style={{ background: bg }}>
+      <p className="text-lg leading-none">{icon}</p>
+      <p className="font-display tabular-nums text-base font-bold leading-none mt-1.5" style={{ color }}>{value}</p>
+      <p className="text-[10px] mt-1 font-medium" style={{ color }}>{label}</p>
     </div>
   );
 }

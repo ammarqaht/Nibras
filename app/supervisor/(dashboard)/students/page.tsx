@@ -241,6 +241,7 @@ export default function StudentsPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Student | null>(null);
+  const [showHealthModal, setShowHealthModal] = useState(false);
 
   // filters
   const [search, setSearch] = useState('');
@@ -443,6 +444,12 @@ export default function StudentsPage() {
           <p className="text-sm text-ink-500">{filtered.length} طالب من أصل {approvedStudents.length}</p>
         </div>
         <div className="flex gap-2 items-center relative">
+          <button
+            onClick={() => setShowHealthModal(true)}
+            className="btn btn-secondary text-sm flex items-center gap-1.5 text-red-600 border-red-200 bg-red-50 hover:bg-red-100 font-semibold"
+          >
+            🚑 الحالات الصحية
+          </button>
           {canSeeFullStudentDetails && (
             <button
               onClick={() => setShowColSettings(!showColSettings)}
@@ -890,6 +897,51 @@ export default function StudentsPage() {
           }}
         />
 
+      )}
+
+      {showHealthModal && (
+        <div className="modal-backdrop flex items-center justify-center p-4 z-50 animate-fade-in" onClick={() => setShowHealthModal(false)}>
+          <div className="modal-panel w-full max-w-2xl max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b flex items-center justify-between">
+              <h3 className="font-bold text-lg text-ink-900 flex items-center gap-2">
+                <span>🚑</span>
+                <span>سجل الحالات الصحية للطلاب</span>
+              </h3>
+              <button onClick={() => setShowHealthModal(false)} className="btn btn-ghost p-2" aria-label="إغلاق">✕</button>
+            </div>
+            <div className="p-4 overflow-y-auto scroll-soft flex-1">
+              {students.filter(s => s.registrationStatus === 'approved' && s.hasCondition).length === 0 ? (
+                <p className="text-center py-10 text-ink-400 text-sm">لا توجد حالات صحية مسجلة للطلاب المقبولين.</p>
+              ) : (
+                <div className="overflow-x-auto border border-ink-200 rounded-xl">
+                  <table className="tbl text-right font-sans" dir="rtl">
+                    <thead>
+                      <tr className="bg-ink-50">
+                        <th className="p-3 font-bold text-xs text-ink-700">رقم العضوية</th>
+                        <th className="p-3 font-bold text-xs text-ink-700">اسم الطالب</th>
+                        <th className="p-3 font-bold text-xs text-ink-700">المرحلة والصف</th>
+                        <th className="p-3 font-bold text-xs text-ink-700">تفاصيل الحالة الصحية</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-ink-100">
+                      {students.filter(s => s.registrationStatus === 'approved' && s.hasCondition).map(s => (
+                        <tr key={s.id} className="hover:bg-cream-50/30 transition-colors">
+                          <td className="p-3 text-xs font-mono text-ink-500">#{s.membershipNo}</td>
+                          <td className="p-3 text-xs font-bold text-ink-900">{s.studentName}</td>
+                          <td className="p-3 text-xs text-ink-600">{s.stage} — {s.grade}</td>
+                          <td className="p-3 text-xs text-red-700 font-semibold bg-red-50/10 whitespace-pre-wrap">{s.conditionNote || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+            <div className="p-4 border-t flex justify-end">
+              <button onClick={() => setShowHealthModal(false)} className="btn btn-secondary text-sm px-4 py-2">إغلاق</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

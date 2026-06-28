@@ -77,6 +77,30 @@ export default function AttendancePage() {
   const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
   const [logLoading, setLogLoading] = useState(false);
 
+  /* absence excuses */
+  type Excuse = { id:string; registrationId:number; studentName:string; date:string; reason:string; status:string; createdAt:string };
+  const [excusesOpen, setExcusesOpen] = useState(false);
+  const [excuses,     setExcuses]     = useState<Excuse[]>([]);
+  const [excuseBusy,  setExcuseBusy]  = useState<string|null>(null);
+
+  const loadExcuses = async () => {
+    const r = await fetch('/api/supervisor/attendance-excuses', { cache:'no-store' });
+    const j = await r.json().catch(()=>({excuses:[]}));
+    setExcuses(j.excuses??[]);
+  };
+  const resolveExcuse = async (id:string, accept:boolean) => {
+    setExcuseBusy(id);
+    const r = await fetch('/api/supervisor/attendance-excuses', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id, accept }),
+    });
+    setExcuseBusy(null);
+    if (r.ok) {
+      setExcuses(prev => prev.map(e => e.id===id ? { ...e, status: accept?'accepted':'rejected' } : e));
+      if (accept) loadDay(date);
+    }
+  };
+  const pendingExcuses = excuses.filter(e => e.status==='pending');
+
   async function loadStatic() {
     const [sr,gr,cr] = await Promise.all([
       fetch('/api/supervisor/students',          { cache:'no-store' }),
@@ -161,6 +185,7 @@ export default function AttendancePage() {
   }, [logEntries, logSearch]);
 
   useEffect(() => { loadStatic(); }, []);
+  useEffect(() => { if (canEdit) loadExcuses(); }, [canEdit]);
   useEffect(() => { loadDay(date); }, [date]);
 
   async function mark(registrationId: number, status: string) {
@@ -408,6 +433,16 @@ export default function AttendancePage() {
             السجل
           </button>
           {canEdit && (
+            <button onClick={()=>{ setExcusesOpen(true); loadExcuses(); }}
+              className="btn btn-ghost text-sm py-2 px-3 flex items-center gap-1.5 relative">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+              </svg>
+              المعتذرون
+              {pendingExcuses.length>0 && <span className="bg-nred-600 text-white text-[10px] rounded-full px-1.5 py-0.5">{pendingExcuses.length}</span>}
+            </button>
+          )}
+          {canEdit && (
             <button onClick={()=>{ setCfgDraft(cfg); setCfgOpen(true); }}
               className="btn btn-ghost text-sm py-2 px-3 flex items-center gap-1.5">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -645,6 +680,50 @@ export default function AttendancePage() {
               );
             })}
           </ul>
+        </div>
+      )}
+
+      {/* ── Absence excuses modal ── */}
+      {excusesOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm fade-in" onClick={()=>setExcusesOpen(false)}>
+          <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl shadow-2xl border border-ink-100 pop-in flex flex-col max-h-[90dvh]" onClick={e=>e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-ink-100 shrink-0">
+              <div>
+                <h2 className="font-bold text-ink-900">طلبات عذر الغياب</h2>
+                <p className="text-xs text-ink-400 mt-0.5">{pendingExcuses.length} طلب بانتظار المراجعة</p>
+              </div>
+              <button onClick={()=>setExcusesOpen(false)} className="p-1.5 rounded-lg text-ink-300 hover:text-ink-600">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <div className="overflow-y-auto scroll-soft flex-1 divide-y divide-ink-100">
+              {excuses.length===0 ? (
+                <p className="text-center py-12 text-ink-300 text-sm">لا توجد طلبات أعذار.</p>
+              ) : excuses.map(e=>(
+                <div key={e.id} className="px-5 py-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-sm text-ink-900 truncate">{e.studentName}</p>
+                      <p className="text-xs text-ink-400"><span dir="ltr">{e.date}</span></p>
+                    </div>
+                    {e.status==='pending'
+                      ? <span className="pill pill-yellow text-[11px]">قيد المراجعة</span>
+                      : <span className={`pill text-[11px] ${e.status==='accepted'?'pill-green':'pill-red'}`}>{e.status==='accepted'?'مقبول':'مرفوض'}</span>}
+                  </div>
+                  <p className="text-sm text-ink-600 mt-1.5">{e.reason}</p>
+                  {e.status==='pending' && (
+                    <div className="flex gap-2 mt-2.5">
+                      <button disabled={excuseBusy===e.id} onClick={()=>resolveExcuse(e.id,true)} className="btn btn-primary text-xs py-1.5 px-3">قبول العذر (تعيين معتذر)</button>
+                      <button disabled={excuseBusy===e.id} onClick={()=>resolveExcuse(e.id,false)} className="btn btn-ghost text-xs py-1.5 px-3 text-red-600 border-red-200">رفض</button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="px-5 py-4 border-t border-ink-100 shrink-0">
+              <button onClick={()=>setExcusesOpen(false)} className="btn btn-ghost w-full py-2 text-sm">إغلاق</button>
+            </div>
+          </div>
         </div>
       )}
     </div>
