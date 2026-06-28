@@ -425,7 +425,7 @@ export default function TasksPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      const base64 = await compressImage(file, 200);
+      const base64 = await compressImage(file, 50);
       if (isEdit && editTask) setEditTask({ ...editTask, imageUrl: base64 });
       else setAddImage(base64);
       pushToast('info', 'تم تحميل الصورة ✓');

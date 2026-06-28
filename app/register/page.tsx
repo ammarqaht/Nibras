@@ -166,7 +166,7 @@ export default function RegisterPage() {
         return;
       }
       try {
-        const compressed = await compressImage(file, 200);
+        const compressed = await compressImage(file, 50);
         setPaymentReceipt(compressed);
       } catch (err) {
         console.error('Image compression failed', err);
@@ -444,7 +444,7 @@ export default function RegisterPage() {
     }
 
     try {
-      const compressed = await compressImage(file, 200);
+      const compressed = await compressImage(file, 50);
       setPaymentReceipt(compressed);
     } catch (err) {
       console.error('Image compression failed', err);

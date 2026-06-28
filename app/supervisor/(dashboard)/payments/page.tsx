@@ -652,7 +652,7 @@ function StudentDetailsModal({
 
     try {
       setUploadingReceipt(true);
-      const base64 = await compressImage(file, 200);
+      const base64 = await compressImage(file, 50);
       
       const r = await fetch('/api/supervisor/students', {
         method: 'PUT',
