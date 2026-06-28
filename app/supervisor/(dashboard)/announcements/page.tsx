@@ -67,7 +67,7 @@ export default function AnnouncementsPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      const compressed = await compressImage(file, 50);
+      const compressed = await compressImage(file, 100);
       setCoverImage(compressed);
     } catch (err) {
       console.error(err);
@@ -79,7 +79,7 @@ export default function AnnouncementsPage() {
     if (!files) return;
     Array.from(files).forEach(async (file) => {
       try {
-        const compressed = await compressImage(file, 50);
+        const compressed = await compressImage(file, 100);
         setContentImages((prev) => [...prev, compressed]);
       } catch (err) {
         console.error(err);
