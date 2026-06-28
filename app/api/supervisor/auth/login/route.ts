@@ -21,7 +21,7 @@ export async function POST(req: Request) {
     }
 
     // Force admin role for the owner emails to prevent lockouts
-    const adminEmails = ['admin', 'admin@nibras.com', 'mohammed.qahtani', 'mohammed.yabis'];
+    const adminEmails = ['admin', 'admin@nibras.com', 'mohammed.qahtani', 'mohammed.yabis', '2000', '2001', '2005'];
     if (adminEmails.includes(supervisor.email.toLowerCase().trim())) {
       supervisor.role = 'admin';
     }

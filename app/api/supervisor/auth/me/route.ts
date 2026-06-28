@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Force admin role for the owner emails
-    const adminEmails = ['admin', 'admin@nibras.com', 'mohammed.qahtani', 'mohammed.yabis'];
+    const adminEmails = ['admin', 'admin@nibras.com', 'mohammed.qahtani', 'mohammed.yabis', '2000', '2001', '2005'];
     if (adminEmails.includes(currentUser.email.toLowerCase().trim())) {
       currentUser.role = 'admin';
     }
