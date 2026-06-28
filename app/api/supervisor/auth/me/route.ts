@@ -16,6 +16,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ authenticated: false }, { status: 401 });
     }
 
+    // Force admin role for the owner emails
+    const adminEmails = ['admin', 'admin@nibras.com', 'mohammed.qahtani', 'mohammed.yabis'];
+    if (adminEmails.includes(currentUser.email.toLowerCase().trim())) {
+      currentUser.role = 'admin';
+    }
+
     // Role permissions from settings
     const settings = await getSettings();
     let rolePermissionsMap: Record<string, string[]> = DEFAULT_ROLE_PERMISSIONS;

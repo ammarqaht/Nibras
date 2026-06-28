@@ -20,6 +20,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' }, { status: 401 });
     }
 
+    // Force admin role for the owner emails to prevent lockouts
+    const adminEmails = ['admin', 'admin@nibras.com', 'mohammed.qahtani', 'mohammed.yabis'];
+    if (adminEmails.includes(supervisor.email.toLowerCase().trim())) {
+      supervisor.role = 'admin';
+    }
+
     const sessionData = {
       id: supervisor.id,
       email: supervisor.email,
