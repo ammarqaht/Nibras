@@ -95,7 +95,7 @@ function StageMultiSelectDropdown({
   const selectedGradesCount = selected.filter((k) => k.startsWith('grade:')).length;
 
   return (
-    <div className="relative z-[60]">
+    <div className="relative z-[120]">
       <button
         type="button"
         onClick={() => onOpenChange(!open)}
@@ -110,8 +110,8 @@ function StageMultiSelectDropdown({
       </button>
       {open && (
         <>
-          <div className="fixed inset-0 z-[70]" onClick={() => onOpenChange(false)} />
-          <div className="absolute right-0 mt-1 w-full min-w-[240px] max-h-80 overflow-y-auto bg-white border border-ink-200 rounded-xl shadow-xl z-[80] p-3 space-y-3 scroll-soft text-right" dir="rtl">
+          <div className="fixed inset-0 z-[110]" onClick={() => onOpenChange(false)} />
+          <div className="absolute right-0 mt-1 w-full min-w-[240px] max-h-80 overflow-y-auto bg-white border border-ink-200 rounded-xl shadow-xl z-[120] p-3 space-y-3 scroll-soft text-right" dir="rtl">
             {stages.map((stage) => {
               const stageKeyStr = `stage:${stage.key}`;
               const isStageChecked = selected.includes(stageKeyStr);
@@ -182,7 +182,7 @@ function MultiSelectDropdown({
   };
 
   return (
-    <div className="relative z-[60]">
+    <div className="relative z-[120]">
       <button
         type="button"
         onClick={() => onOpenChange(!open)}
@@ -193,8 +193,8 @@ function MultiSelectDropdown({
       </button>
       {open && (
         <>
-          <div className="fixed inset-0 z-[70]" onClick={() => onOpenChange(false)} />
-          <div className="absolute right-0 mt-1 w-full min-w-[200px] max-h-60 overflow-y-auto bg-white border border-ink-200 rounded-xl shadow-xl z-[80] p-2 space-y-0.5 scroll-soft">
+          <div className="fixed inset-0 z-[110]" onClick={() => onOpenChange(false)} />
+          <div className="absolute right-0 mt-1 w-full min-w-[200px] max-h-60 overflow-y-auto bg-white border border-ink-200 rounded-xl shadow-xl z-[120] p-2 space-y-0.5 scroll-soft">
             {options.length === 0 ? (
               <p className="text-center py-4 text-ink-400 text-xs">لا توجد خيارات</p>
             ) : (
@@ -600,7 +600,7 @@ export default function StudentsPage() {
       </div>
 
       {/* Filters */}
-      <div className="card p-4 mb-5">
+      <div className="card p-4 mb-5 overflow-visible">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Search Input with Clear Button */}
           <div className="relative flex items-center w-full">
