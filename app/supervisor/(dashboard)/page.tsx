@@ -151,7 +151,6 @@ function RoleActions({ roles, hasPerm }: { roles: string[]; hasPerm: (p: string)
     actions = [
       { href:'/supervisor/announcements', label:'نشر إعلان',   color:'#12B3D5', icon: iconAnn },
       { href:'/supervisor/schedule',      label:'الجدول',       color:'#103F91', icon: iconSchedule },
-      { href:'/supervisor/tasks',         label:'المهام',        color:'#8b5cf6', icon: iconTasks },
     ];
   } else {
     // fallback: any allowed links
@@ -441,16 +440,12 @@ function QuickInfoCards({ roles, isAdmin, isFinanceRole, isAttendanceRole, isPoi
   if (isMediaRole) {
     const lastAnn = stats?.announcements?.announcementsList?.[0];
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <SmallCard accent="#12B3D5"
           icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" /></svg>}
           label="إعلانات منشورة" value={stats?.announcements?.total ?? 0} sub="إجمالي الإعلانات"
         />
         <NextProgramCard program={stats?.nextCommitteeProgram ?? null} />
-        <SmallCard accent="#8b5cf6"
-          icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2Z" /></svg>}
-          label="مهام نشطة" value={stats?.tasks?.active ?? 0} sub="مهمة نشطة حالياً"
-        />
         <div className="card p-5 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-1.5 h-full bg-teal-500" />
           <div className="text-[10px] text-ink-400 font-bold mb-2">آخر إعلان</div>

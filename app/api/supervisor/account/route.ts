@@ -20,9 +20,6 @@ export async function PUT(req: NextRequest) {
     if (!me) {
       return NextResponse.json({ error: 'الحساب غير موجود' }, { status: 401 });
     }
-    if (me.role === 'admin') {
-      return NextResponse.json({ error: 'حسابات المدير العام تُدار من صفحة المشرفين' }, { status: 403 });
-    }
 
     const body = await req.json();
     const rawUsername = body.username !== undefined ? String(body.username).trim() : undefined;

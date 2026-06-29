@@ -199,7 +199,8 @@ export default function SportsLeaguePage() {
 
   // ── render ──
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative min-h-[50vh]">
+      <div style={{ filter: 'blur(8px)', pointerEvents: 'none', userSelect: 'none' }} className="space-y-6">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
           <span className="w-10 h-10 rounded-2xl flex items-center justify-center text-xl shrink-0 bg-brand/10">⚽</span>
@@ -256,6 +257,19 @@ export default function SportsLeaguePage() {
               </section>
             );
           })}
+        </div>
+      )}
+    </div>
+
+      {!loading && (
+        <div className="absolute inset-0 flex items-center justify-center p-4 z-50">
+          <div className="text-center bg-white/95 backdrop-blur-md p-8 rounded-2xl border border-ink-150 shadow-2xl max-w-sm">
+            <p className="text-5xl mb-4">🔧</p>
+            <h2 className="font-bold text-xl mb-3 text-ink-900">صفحة الدوري قيد الصيانة</h2>
+            <p className="text-sm leading-relaxed text-ink-500">
+              نعمل حالياً على تحديث لوحة التحكم الرياضية ومنافسات الدوري الرياضي للطلاب والمشرفين. ترقبوا الإطلاق قريباً! 🏆
+            </p>
+          </div>
         </div>
       )}
 

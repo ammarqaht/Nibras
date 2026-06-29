@@ -88,9 +88,7 @@ export default function AccountPage() {
 
   const strength = getPasswordStrength(password);
 
-  if (user && user.role === 'admin') {
-    return <div className="card p-10 text-center text-ink-500">حسابات المدير العام تُدار من صفحة المشرفين.</div>;
-  }
+
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
