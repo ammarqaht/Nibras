@@ -119,6 +119,7 @@ export default function StudentHome() {
   const [tasks, setTasks] = useState<TaskPeek[]>([]);
   const [points, setPoints] = useState<PointRec[]>([]);
   const [announcements, setAnnouncements] = useState<AnnouncementPeek[]>([]);
+  const [activeAnnouncement, setActiveAnnouncement] = useState<AnnouncementPeek | null>(null);
   const [family, setFamily] = useState<FamilyPeek | null>(null);
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [showLedger, setShowLedger] = useState(false);
@@ -146,6 +147,24 @@ export default function StudentHome() {
     fetch('/api/student/family').then(r => r.json()).then(d => setFamily(d));
     fetch('/api/student/excuse').then(r => r.json()).then(d => setMyExcuses(d.excuses || [])).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (announcements.length > 0) {
+      const latest = announcements[0];
+      const key = `seen_announcement_${latest.id}`;
+      const seen = localStorage.getItem(key);
+      if (!seen) {
+        setActiveAnnouncement(latest);
+      }
+    }
+  }, [announcements]);
+
+  const closeAnnouncement = () => {
+    if (activeAnnouncement) {
+      localStorage.setItem(`seen_announcement_${activeAnnouncement.id}`, 'true');
+      setActiveAnnouncement(null);
+    }
+  };
 
   // Toggle .is-in on .reveal children when in view (lightweight motion)
   useEffect(() => {
@@ -616,6 +635,34 @@ export default function StudentHome() {
                   })}
                 </ul>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {activeAnnouncement && (
+        <div className="modal-backdrop flex items-center justify-center p-4 z-50 animate-fadeIn" onClick={closeAnnouncement}>
+          <div className="modal-panel w-full max-w-md p-6 relative bg-white rounded-2xl shadow-xl border border-ink-150" onClick={e => e.stopPropagation()}>
+            <button
+              onClick={closeAnnouncement}
+              className="absolute top-4 left-4 text-2xl text-ink-400 hover:text-ink-900 transition-colors w-8 h-8 flex items-center justify-center rounded-full hover:bg-ink-50"
+              aria-label="إغلاق"
+            >
+              ×
+            </button>
+            <div className="text-center mb-4">
+              <span className="text-4xl">📢</span>
+              <h2 className="font-display text-xl font-bold mt-2" style={{ color: 'var(--ink)' }}>إعلان هـام</h2>
+            </div>
+            <div className="border-t border-b py-4 my-4 max-h-[50vh] overflow-y-auto scroll-soft text-right" style={{ borderColor: 'var(--line)' }}>
+              <h3 className="font-display text-lg font-bold mb-2" style={{ color: 'var(--accent-deep)' }}>{activeAnnouncement.title}</h3>
+              <p className="text-sm leading-relaxed whitespace-pre-line" style={{ color: 'var(--ink)' }}>
+                {activeAnnouncement.body}
+              </p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button onClick={closeAnnouncement} className="btn btn-primary w-full py-3 rounded-xl font-bold">
+                موافق، إغلاق
+              </button>
             </div>
           </div>
         </div>
