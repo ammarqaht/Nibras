@@ -229,7 +229,7 @@ export default function SupervisorShell({ children }: { children: React.ReactNod
 
           {/* mobile dropdown menu */}
           {menuOpen && (
-            <div className="lg:hidden border-t border-ink-200 bg-white fade-in">
+            <div className="lg:hidden border-t border-ink-200 bg-white fade-in overflow-y-auto max-h-[calc(100dvh-65px)]">
               <div className="px-3 py-3 flex flex-col gap-1 max-w-[90rem] mx-auto">
                 <div className="px-3 pb-2 mb-1 border-b border-ink-100">
                   <div className="text-sm font-semibold text-ink-900">{user?.name}</div>

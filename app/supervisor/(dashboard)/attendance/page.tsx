@@ -419,9 +419,20 @@ export default function AttendancePage() {
 
       {/* ── Header ── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-ink-900">تسجيل الحضور</h1>
-          <p className="text-sm text-ink-400">{date}</p>
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className="text-xl font-bold text-ink-900">تسجيل الحضور</h1>
+            <p className="text-sm text-ink-400">{date}</p>
+          </div>
+          {canEdit && (
+            <Link href="/supervisor/attendance/kiosk"
+              className="btn btn-primary text-xs md:text-sm py-1.5 px-3 flex items-center gap-1.5 shrink-0 rounded-lg shadow-sm">
+              <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+              </svg>
+              <span>شاشة التحضير</span>
+            </Link>
+          )}
         </div>
         <div className="flex items-center gap-1 bg-white border border-ink-200/80 p-1 rounded-xl shadow-sm overflow-x-auto scroll-soft w-full md:w-auto shrink-0 select-none">
           {/* Log button — visible to all */}
@@ -451,15 +462,6 @@ export default function AttendancePage() {
               </svg>
               <span>إعدادات</span>
             </button>
-          )}
-          {canEdit && (
-            <Link href="/supervisor/attendance/kiosk"
-              className="btn btn-primary text-xs md:text-sm py-1.5 px-3 flex items-center gap-1.5 shrink-0 rounded-lg">
-              <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-              </svg>
-              <span>شاشة التحضير</span>
-            </Link>
           )}
         </div>
       </div>
@@ -685,8 +687,8 @@ export default function AttendancePage() {
 
       {/* ── Absence excuses modal ── */}
       {excusesOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm fade-in" onClick={()=>setExcusesOpen(false)}>
-          <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl shadow-2xl border border-ink-100 pop-in flex flex-col max-h-[90dvh]" onClick={e=>e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-sm fade-in" onClick={()=>setExcusesOpen(false)}>
+          <div className="bg-white w-[92vw] sm:w-full sm:max-w-lg rounded-2xl shadow-2xl border border-ink-100 pop-in flex flex-col max-h-[85vh]" onClick={e=>e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-ink-100 shrink-0">
               <div>
                 <h2 className="font-bold text-ink-900">طلبات عذر الغياب</h2>

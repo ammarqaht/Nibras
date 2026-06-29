@@ -901,7 +901,7 @@ export default function StudentsPage() {
 
       {showHealthModal && (
         <div className="modal-backdrop flex items-center justify-center p-4 z-50 animate-fade-in" onClick={() => setShowHealthModal(false)}>
-          <div className="modal-panel w-full max-w-2xl max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+          <div className="modal-panel w-[92vw] sm:w-full max-w-2xl max-h-[75vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b flex items-center justify-between">
               <h3 className="font-bold text-lg text-ink-900 flex items-center gap-2">
                 <span>🚑</span>
@@ -913,27 +913,22 @@ export default function StudentsPage() {
               {students.filter(s => s.registrationStatus === 'approved' && s.hasCondition).length === 0 ? (
                 <p className="text-center py-10 text-ink-400 text-sm">لا توجد حالات صحية مسجلة للطلاب المقبولين.</p>
               ) : (
-                <div className="overflow-x-auto border border-ink-200 rounded-xl">
-                  <table className="tbl text-right font-sans" dir="rtl">
-                    <thead>
-                      <tr className="bg-ink-50">
-                        <th className="p-3 font-bold text-xs text-ink-700">رقم العضوية</th>
-                        <th className="p-3 font-bold text-xs text-ink-700">اسم الطالب</th>
-                        <th className="p-3 font-bold text-xs text-ink-700">المرحلة والصف</th>
-                        <th className="p-3 font-bold text-xs text-ink-700">تفاصيل الحالة الصحية</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-ink-100">
-                      {students.filter(s => s.registrationStatus === 'approved' && s.hasCondition).map(s => (
-                        <tr key={s.id} className="hover:bg-cream-50/30 transition-colors">
-                          <td className="p-3 text-xs font-mono text-ink-500">#{s.membershipNo}</td>
-                          <td className="p-3 text-xs font-bold text-ink-900">{s.studentName}</td>
-                          <td className="p-3 text-xs text-ink-600">{s.stage} — {s.grade}</td>
-                          <td className="p-3 text-xs text-red-700 font-semibold bg-red-50/10 whitespace-pre-wrap">{s.conditionNote || '—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="space-y-3">
+                  {students.filter(s => s.registrationStatus === 'approved' && s.hasCondition).map(s => (
+                    <div key={s.id} className="bg-cream-50/50 border border-ink-200/80 rounded-xl p-3.5 flex flex-col gap-1.5 text-right" dir="rtl">
+                      <div className="flex items-start justify-between gap-3">
+                        <span className="font-bold text-ink-900 text-sm sm:text-base">{s.studentName}</span>
+                        <span className="pill pill-red text-[10px] sm:text-xs shrink-0">{s.conditionNote || 'حالة صحية'}</span>
+                      </div>
+                      <div className="text-xs text-ink-400 flex flex-wrap items-center gap-2">
+                        <span className="font-mono bg-ink-100/80 px-1.5 py-0.5 rounded text-[10px] sm:text-xs">#{s.membershipNo}</span>
+                        <span className="text-ink-300">•</span>
+                        <span>{s.stage}</span>
+                        <span className="text-ink-300">•</span>
+                        <span>{s.grade}</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -1129,7 +1124,7 @@ function StudentModal({
 
   return (
     <div className="modal-backdrop flex items-center justify-center p-2 sm:p-6 overflow-y-auto" onClick={onClose}>
-      <div className="modal-panel w-[92vw] sm:w-full max-w-2xl my-auto max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-panel w-[92vw] sm:w-full max-w-2xl my-auto max-h-[75vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         {/* header */}
         <div className="flex items-start justify-between p-3.5 sm:p-5 border-b border-ink-200 shrink-0">
           <div>

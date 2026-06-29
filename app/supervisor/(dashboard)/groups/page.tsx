@@ -476,7 +476,7 @@ export default function GroupsPage() {
           <p className="text-sm text-ink-500">تنظيم الطلاب في مجموعات لتسهيل الحضور ورصد النقاط.</p>
         </div>
         {canManageGroups && (
-          <div className="flex flex-wrap gap-2.5">
+          <div className="flex items-center gap-1 bg-white border border-ink-200/80 p-1 rounded-xl shadow-sm overflow-x-auto scroll-soft w-full md:w-auto shrink-0 select-none">
             <button
               onClick={() => {
                 setName('');
@@ -484,26 +484,26 @@ export default function GroupsPage() {
                 setStage(isStage && supervisorStage ? supervisorStage : stages[0].key);
                 setShowCreateGroupModal(true);
               }}
-              className="btn btn-primary py-2 px-4 text-sm flex items-center gap-2 shadow-sm"
+              className="btn btn-primary text-xs md:text-sm py-1.5 px-3 flex items-center gap-1.5 shrink-0 rounded-lg shadow-sm"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="12" y1="5" x2="12" y2="19" />
                 <line x1="5" y1="12" x2="19" y2="12" />
               </svg>
-              <span>إنشاء مجموعة جديدة</span>
+              <span>إنشاء مجموعة</span>
             </button>
             <button
               onClick={downloadTemplate}
               disabled={busy || loading}
-              className="btn btn-secondary py-2 px-4 text-sm flex items-center gap-2"
+              className="btn btn-ghost text-xs md:text-sm py-1.5 px-2.5 flex items-center gap-1.5 shrink-0"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
               </svg>
               <span>تحميل القالب</span>
             </button>
-            <label className={`btn btn-secondary py-2 px-4 text-sm flex items-center gap-2 cursor-pointer ${busy || loading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <label className={`btn btn-ghost text-xs md:text-sm py-1.5 px-2.5 flex items-center gap-1.5 shrink-0 cursor-pointer ${busy || loading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+              <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
               </svg>
               <span>رفع ملف الإكسل</span>
@@ -1087,7 +1087,7 @@ export default function GroupsPage() {
       {/* نافذة إنشاء مجموعة جديدة */}
       {showCreateGroupModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden text-right" dir="rtl">
+          <div className="bg-white rounded-2xl w-full max-w-xl max-h-[75vh] flex flex-col shadow-2xl overflow-hidden text-right" dir="rtl">
             <div className="p-5 border-b border-ink-200 flex justify-between items-center bg-ink-50">
               <h3 className="text-lg font-bold text-ink-900">إنشاء مجموعة جديدة</h3>
               <button onClick={() => setShowCreateGroupModal(false)} className="text-ink-400 hover:text-ink-900 text-xl font-bold">&times;</button>
@@ -1151,7 +1151,7 @@ export default function GroupsPage() {
       {/* نافذة تفاصيل المجموعة */}
       {selectedGroupModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden text-right" dir="rtl">
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[75vh] flex flex-col shadow-2xl overflow-hidden text-right" dir="rtl">
             
             {/* الجزء العلوي: اسم المجموعة وتفاصيلها بالكامل */}
             <div className="p-5 border-b border-ink-200 bg-ink-50">

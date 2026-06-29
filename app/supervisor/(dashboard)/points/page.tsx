@@ -180,12 +180,18 @@ export default function PointsBoardPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-start justify-between gap-4">
+      <div className="mb-6 flex flex-col gap-3.5 border-b border-ink-100 pb-4">
         <div>
           <h1 className="text-2xl font-bold text-ink-900 mb-1">لوحة النقاط</h1>
           <p className="text-sm text-ink-500">ترتيب الأوائل وسجل الرصد مقسم حسب المرحلة الدراسية.</p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1 bg-white border border-ink-200/80 p-1 rounded-xl shadow-sm overflow-x-auto scroll-soft w-full md:w-auto shrink-0 select-none">
+          {canAddPoints && (
+            <Link href="/supervisor/points/add" className="btn btn-primary text-xs md:text-sm py-1.5 px-3 flex items-center gap-1.5 shrink-0 rounded-lg shadow-sm">
+              <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+              <span>رصد النقاط</span>
+            </Link>
+          )}
           {canToggleVisibility && (
             <button onClick={() => {
               if (pointsHidden) {
@@ -194,16 +200,10 @@ export default function PointsBoardPage() {
                 setShowVisModal(true);
               }
             }} disabled={visBusy}
-              className="btn btn-secondary flex items-center gap-1.5 text-sm"
+              className="btn btn-ghost text-xs md:text-sm py-1.5 px-2.5 flex items-center gap-1.5 shrink-0 text-ink-700"
               title="إخفاء/إظهار النقاط في حسابات الطلاب">
-              {pointsHidden ? '👁️ إظهار النقاط' : '🙈 إخفاء النقاط'}
+              <span>{pointsHidden ? '👁️ إظهار النقاط' : '🙈 إخفاء النقاط'}</span>
             </button>
-          )}
-          {canAddPoints && (
-            <Link href="/supervisor/points/add" className="btn btn-primary flex items-center gap-1.5 text-sm">
-              <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-              رصد النقاط
-            </Link>
           )}
         </div>
       </div>
