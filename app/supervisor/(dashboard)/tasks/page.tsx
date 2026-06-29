@@ -90,6 +90,8 @@ function getTrackPillClass(track: string | null) {
 
 export default function TasksPage() {
   const { user } = useSupervisor();
+  const roles = useMemo(() => (user?.role || '').split(',').map(r => r.trim()), [user]);
+  const isScientific = useMemo(() => roles.includes('scientific_supervisor'), [roles]);
   const [activeTab, setActiveTab] = useState<'submissions' | 'log' | 'add' | 'manage'>('manage');
   const [loading, setLoading] = useState(true);
 
@@ -507,14 +509,16 @@ export default function TasksPage() {
         >
           <span>سجل التقييمات</span>
         </button>
-        <button
-          onClick={() => setActiveTab('add')}
-          className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-2 py-3 px-5 rounded-xl text-sm font-bold transition-all shrink-0 md:mr-auto ${
-            activeTab === 'add' ? 'bg-brand text-white shadow-brand' : 'text-ink-600 hover:bg-cream-100 hover:text-ink-900'
-          }`}
-        >
-          <span>إضافة مهمة</span>
-        </button>
+        {isScientific && (
+          <button
+            onClick={() => setActiveTab('add')}
+            className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-2 py-3 px-5 rounded-xl text-sm font-bold transition-all shrink-0 md:mr-auto ${
+              activeTab === 'add' ? 'bg-brand text-white shadow-brand' : 'text-ink-600 hover:bg-cream-100 hover:text-ink-900'
+            }`}
+          >
+            <span>إضافة مهمة</span>
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -534,9 +538,11 @@ export default function TasksPage() {
                     <p className="text-[0.9rem] text-ink-500 mt-1">استعرض وعدّل وحذف جميع المهام المنشورة على المنصة.</p>
                   </div>
                 </div>
-                <button onClick={() => setActiveTab('add')} className="btn bg-ink-900 text-white hover:bg-ink-800 rounded-xl px-5 py-3 font-bold shadow-soft">
-                  + إضافة مهمة جديدة
-                </button>
+                {isScientific && (
+                  <button onClick={() => setActiveTab('add')} className="btn bg-ink-900 text-white hover:bg-ink-800 rounded-xl px-5 py-3 font-bold shadow-soft">
+                    + إضافة مهمة جديدة
+                  </button>
+                )}
               </div>
 
               {/* Stats Grid */}
@@ -624,7 +630,7 @@ export default function TasksPage() {
                               <div className="flex flex-col items-center justify-center gap-1">
                                 <div className="flex items-center gap-1.5 font-extrabold text-ink-900 text-[0.95rem]">
                                   <span>{task.maxPoints}</span>
-                                  <span className="text-brand-500 text-lg">☀️</span>
+                                  <span className="text-brand-500 text-lg">🎯</span>
                                 </div>
                                 {task.timeLimitHours && (
                                   <span className="text-ink-400 text-[0.75rem] font-bold bg-ink-50 px-2 py-0.5 rounded-md border border-ink-150">⏳ مهلة {task.timeLimitHours}س</span>
@@ -636,36 +642,42 @@ export default function TasksPage() {
                             </td>
                             <td className="py-4 px-5">
                               <div className="flex gap-2 justify-center flex-wrap">
-                                <button
-                                  className="border border-ncyan-600/30 text-ncyan-700 bg-ncyan-50/60 hover:bg-ncyan-100/60 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors"
-                                  onClick={() => setEditTask(task)}
-                                >
-                                  تعديل
-                                </button>
-                                <button
-                                  className={`border px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${task.isActive ? 'border-brand/40 text-brand-700 bg-brand-50/60 hover:bg-brand-100/60' : 'border-emerald-600/30 text-emerald-700 bg-emerald-50/60 hover:bg-emerald-100/60'}`}
-                                  onClick={() => toggleTaskActive(task)}
-                                >
-                                  {task.isActive ? 'تعطيل' : 'تفعيل'}
-                                </button>
-                                <button
-                                  className="border border-purple-500/30 text-purple-700 bg-purple-50/60 hover:bg-purple-100/60 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors"
-                                  onClick={() => { setScopeTask(task); setScopeSelected(task.visibleToIds || []); setScopeSearch(''); }}
-                                >
-                                  النطاق
-                                </button>
+                                {isScientific && (
+                                  <>
+                                    <button
+                                      className="border border-ncyan-600/30 text-ncyan-700 bg-ncyan-50/60 hover:bg-ncyan-100/60 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors"
+                                      onClick={() => setEditTask(task)}
+                                    >
+                                      تعديل
+                                    </button>
+                                    <button
+                                      className={`border px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${task.isActive ? 'border-brand/40 text-brand-700 bg-brand-50/60 hover:bg-brand-100/60' : 'border-emerald-600/30 text-emerald-700 bg-emerald-50/60 hover:bg-emerald-100/60'}`}
+                                      onClick={() => toggleTaskActive(task)}
+                                    >
+                                      {task.isActive ? 'تعطيل' : 'تفعيل'}
+                                    </button>
+                                    <button
+                                      className="border border-purple-500/30 text-purple-700 bg-purple-50/60 hover:bg-purple-100/60 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors"
+                                      onClick={() => { setScopeTask(task); setScopeSelected(task.visibleToIds || []); setScopeSearch(''); }}
+                                    >
+                                      النطاق
+                                    </button>
+                                  </>
+                                )}
                                 <button
                                   className="border border-nblue-400/30 text-nblue-700 bg-nblue-50/60 hover:bg-nblue-100/60 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors"
                                   onClick={() => { setStatsTask(task); setStatsSearch(''); setStatsFilter('all'); }}
                                 >
                                   تسليمات
                                 </button>
-                                <button
-                                  className="border border-nred-400/30 text-nred-700 bg-nred-50/60 hover:bg-nred-100/60 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors"
-                                  onClick={() => handleTaskDelete(task.id, task.title)}
-                                >
-                                  حذف
-                                </button>
+                                {isScientific && (
+                                  <button
+                                    className="border border-nred-400/30 text-nred-700 bg-nred-50/60 hover:bg-nred-100/60 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors"
+                                    onClick={() => handleTaskDelete(task.id, task.title)}
+                                  >
+                                    حذف
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -811,7 +823,7 @@ export default function TasksPage() {
           )}
 
           {/* TAB 4: ADD TASK */}
-          {activeTab === 'add' && (
+          {activeTab === 'add' && isScientific && (
             <div className="max-w-4xl mx-auto fade-in space-y-6">
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 rounded-full bg-nblue-50 flex items-center justify-center text-nblue-600 text-2xl border border-nblue-100 shadow-sm">
@@ -849,11 +861,8 @@ export default function TasksPage() {
                     <input type="date" className="field py-3 rounded-xl bg-ink-50/20 font-mono" required value={addDeadline} onChange={e => setAddDeadline(e.target.value)} />
                   </div>
                   <div>
-                    <label className="label mb-1.5 font-bold text-ink-800">نقاط الإنجاز <span className="req">*</span></label>
-                    <div className="relative">
-                       <input type="number" className="field py-3 rounded-xl bg-ink-50/20 text-center font-extrabold text-brand-600 text-lg w-full" required min={1} value={addPoints} onChange={e => setAddPoints(e.target.value.replace(/\D/g, ''))} />
-                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl">☀️</span>
-                    </div>
+                    <label className="label mb-1.5 font-bold text-ink-800">نقاط الإنجاز (🎯) <span className="req">*</span></label>
+                    <input type="number" className="field py-3 rounded-xl bg-ink-50/20 text-center font-extrabold text-brand-600 text-lg w-full" required min={1} value={addPoints} onChange={e => setAddPoints(e.target.value.replace(/\D/g, ''))} />
                   </div>
                   <div>
                     <label className="label mb-1.5 font-bold text-ink-800">طريقة التسليم <span className="req">*</span></label>
@@ -898,9 +907,9 @@ export default function TasksPage() {
                   <label className="label font-bold text-ink-800 text-base">المشرف المسؤول عن التقييم</label>
                   <p className="text-[0.85rem] text-ink-500 mb-4">اختر مشرفاً واحداً أو أكثر. عدم التحديد يعني أن جميع المشرفين يستطيعون التقييم.</p>
                   <div className="flex flex-wrap gap-2.5">
-                    <button type="button" onClick={() => setAddAdmins([])} className={`choice text-xs font-bold py-2 px-4 rounded-xl ${addAdmins.length === 0 ? 'bg-ink-800 text-white border-ink-800 shadow-sm' : 'bg-white'}`}>جميع المشرفين</button>
+                    <button type="button" onClick={() => setAddAdmins([])} className={`choice text-xs font-bold py-2 px-4 rounded-xl ${addAdmins.length === 0 ? 'is-active' : ''}`}>جميع المشرفين</button>
                     {supervisors.map(s => (
-                      <button key={s.id} type="button" onClick={() => toggleAdminChip(String(s.id), false)} className={`choice text-xs font-bold py-2 px-4 rounded-xl ${addAdmins.includes(String(s.id)) ? 'bg-ink-800 text-white border-ink-800 shadow-sm' : 'bg-white'}`}>
+                      <button key={s.id} type="button" onClick={() => toggleAdminChip(String(s.id), false)} className={`choice text-xs font-bold py-2 px-4 rounded-xl ${addAdmins.includes(String(s.id)) ? 'is-active' : ''}`}>
                         {s.name}
                       </button>
                     ))}
@@ -954,12 +963,9 @@ export default function TasksPage() {
               )}
 
               <div className="bg-white p-5 rounded-2xl border border-ink-200 shadow-sm">
-                <label className="label font-bold text-ink-900 text-[0.95rem] mb-3">النقاط الممنوحة (الحد الأقصى: {evalSub.taskMaxPoints})</label>
+                <label className="label font-bold text-ink-900 text-[0.95rem] mb-3">النقاط الممنوحة (🎯) (الحد الأقصى: {evalSub.taskMaxPoints})</label>
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                  <div className="relative">
-                     <input type="number" min={0} max={evalSub.taskMaxPoints} className="field w-28 text-center font-extrabold text-2xl py-3 text-brand-600 border-brand-200 bg-brand-50/30 rounded-xl" value={evalPoints === '' ? evalSub.taskMaxPoints : evalPoints} onChange={e => setEvalPoints(e.target.value.replace(/\D/g, ''))} />
-                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-lg">☀️</span>
-                  </div>
+                  <input type="number" min={0} max={evalSub.taskMaxPoints} className="field w-28 text-center font-extrabold text-2xl py-3 text-brand-600 border-brand-200 bg-brand-50/30 rounded-xl" value={evalPoints === '' ? evalSub.taskMaxPoints : evalPoints} onChange={e => setEvalPoints(e.target.value.replace(/\D/g, ''))} />
                   <div className="flex-1 flex gap-2">
                     <button type="button" onClick={() => setEvalPoints(String(evalSub.taskMaxPoints))} className="btn bg-ink-50 hover:bg-ink-100 text-ink-800 border-transparent text-[0.8rem] flex-1 py-3 rounded-xl font-bold">كامل</button>
                     <button type="button" onClick={() => setEvalPoints(String(Math.round(evalSub.taskMaxPoints * 0.75)))} className="btn bg-ink-50 hover:bg-ink-100 text-ink-800 border-transparent text-[0.8rem] flex-1 py-3 rounded-xl font-bold">75%</button>
@@ -987,7 +993,7 @@ export default function TasksPage() {
       )}
 
       {/* MODAL 2: EDIT TASK */}
-      {editTask && (
+      {editTask && isScientific && (
         <div className="modal-backdrop flex items-center justify-center p-4 z-50" onClick={() => setEditTask(null)}>
           <div className="modal-panel w-full max-w-2xl shadow-elevated" onClick={e => e.stopPropagation()}>
             <form onSubmit={handleUpdateTask} autoComplete="off">
@@ -1017,11 +1023,8 @@ export default function TasksPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="label font-bold text-ink-800 mb-1.5">النقاط</label>
-                    <div className="relative">
-                      <input type="number" className="field py-3 rounded-xl bg-ink-50/30 text-center font-extrabold text-brand-600 w-full" required min={1} value={editTask.maxPoints} onChange={e => setEditTask({ ...editTask, maxPoints: parseInt(e.target.value.replace(/\D/g, ''), 10) || 1 })} />
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg">☀️</span>
-                    </div>
+                    <label className="label font-bold text-ink-800 mb-1.5">النقاط (🎯)</label>
+                    <input type="number" className="field py-3 rounded-xl bg-ink-50/30 text-center font-extrabold text-brand-600 w-full" required min={1} value={editTask.maxPoints} onChange={e => setEditTask({ ...editTask, maxPoints: parseInt(e.target.value.replace(/\D/g, ''), 10) || 1 })} />
                   </div>
                   <div>
                     <label className="label font-bold text-ink-800 mb-1.5">تاريخ الاستحقاق</label>
@@ -1059,9 +1062,9 @@ export default function TasksPage() {
                 <div>
                   <label className="label font-bold text-ink-800 mb-2">المشرف المسؤول عن التقييم</label>
                   <div className="flex flex-wrap gap-2 mt-1">
-                    <button type="button" onClick={() => setEditTask({ ...editTask, assignedAdmins: [] })} className={`choice text-[0.8rem] font-bold py-2 px-4 rounded-xl ${editTask.assignedAdmins.length === 0 ? 'bg-ink-800 text-white border-ink-800 shadow-sm' : 'bg-white'}`}>جميع المشرفين</button>
+                    <button type="button" onClick={() => setEditTask({ ...editTask, assignedAdmins: [] })} className={`choice text-[0.8rem] font-bold py-2 px-4 rounded-xl ${editTask.assignedAdmins.length === 0 ? 'is-active' : ''}`}>جميع المشرفين</button>
                     {supervisors.map(s => (
-                      <button key={s.id} type="button" onClick={() => toggleAdminChip(String(s.id), true)} className={`choice text-[0.8rem] font-bold py-2 px-4 rounded-xl ${editTask.assignedAdmins.includes(String(s.id)) ? 'bg-ink-800 text-white border-ink-800 shadow-sm' : 'bg-white'}`}>
+                      <button key={s.id} type="button" onClick={() => toggleAdminChip(String(s.id), true)} className={`choice text-[0.8rem] font-bold py-2 px-4 rounded-xl ${editTask.assignedAdmins.includes(String(s.id)) ? 'is-active' : ''}`}>
                         {s.name}
                       </button>
                     ))}
@@ -1233,7 +1236,7 @@ export default function TasksPage() {
                           </td>
                           <td className="py-3 px-4 font-extrabold text-center text-[0.95rem]">
                             {item.submission?.status === 'approved' ? (
-                              <span className="text-emerald-600">{item.submission.grade} ☀️</span>
+                              <span className="text-emerald-600">{item.submission.grade} 🎯</span>
                             ) : (
                               <span className="text-ink-300">—</span>
                             )}
@@ -1303,7 +1306,7 @@ function SubmissionCard({
         <div className="font-extrabold text-ink-900 text-lg mb-1.5">{sub.taskTitle}</div>
         <div className="text-[0.8rem] text-ink-500 font-bold mb-3">المشرف المسؤول: <span className="text-ink-700 font-medium">{assignedLabel}</span></div>
         <div className="inline-flex items-center gap-1.5 bg-ink-50 text-ink-700 border border-ink-200 px-3 py-1.5 rounded-lg text-[0.8rem] font-bold shadow-sm">
-          الحد الأقصى: <span className="text-brand-600">{sub.taskMaxPoints} ☀️</span>
+          الحد الأقصى: <span className="text-brand-600">{sub.taskMaxPoints} 🎯</span>
         </div>
       </div>
 
@@ -1338,7 +1341,7 @@ function SubmissionCard({
                 ) : (
                   <>
                     <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-4 py-2 rounded-xl font-extrabold text-[0.9rem] flex items-center gap-2 shadow-sm">
-                      النقاط الممنوحة: {sub.grade} / {sub.taskMaxPoints} ☀️
+                      النقاط الممنوحة: {sub.grade} / {sub.taskMaxPoints} 🎯
                     </span>
                     <button onClick={() => { setInlineEditSub?.(sub.id); setInlinePoints?.(String(sub.grade || 0)); }} className="text-brand-600 hover:text-white bg-white hover:bg-brand-500 border border-brand-200 hover:border-brand-500 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm">
                       ✏️ تعديل النقاط

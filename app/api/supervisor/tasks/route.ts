@@ -38,7 +38,10 @@ export async function POST(req: NextRequest) {
     if (!session) {
       return NextResponse.json({ error: 'غير مصرح بالدخول' }, { status: 401 });
     }
-
+    const roles = (session.role || '').split(',').map((r: string) => r.trim());
+    if (!roles.includes('scientific_supervisor')) {
+      return NextResponse.json({ error: 'غير مصرح لك بإنشاء المهام' }, { status: 403 });
+    }
     const body = await req.json();
     const { title, description, maxPoints, dueDate, track, submissionMethod, timeLimitHours, assignedAdmins, imageUrl, resourceLink, visibility, visibleToIds } = body;
 

@@ -12,10 +12,16 @@ export async function GET(req: NextRequest) {
     const supervisors = await getAllSupervisors();
     const seenNames = new Set<string>();
     const list = [];
+    const TASKS_ROLES = ['scientific_supervisor', 'tasks_supervisor', 'admin'];
     for (const s of supervisors) {
       if (!s.name) continue;
       const cleanName = s.name.trim();
       if (seenNames.has(cleanName)) continue;
+
+      const roles = s.role.split(',').map((r: string) => r.trim());
+      const hasTaskRole = roles.some((r: string) => TASKS_ROLES.includes(r));
+      if (!hasTaskRole) continue;
+
       seenNames.add(cleanName);
       list.push({
         id: s.id,

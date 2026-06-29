@@ -8,7 +8,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (!session) {
       return NextResponse.json({ error: 'غير مصرح بالدخول' }, { status: 401 });
     }
-
+    const roles = (session.role || '').split(',').map((r: string) => r.trim());
+    if (!roles.includes('scientific_supervisor')) {
+      return NextResponse.json({ error: 'غير مصرح لك بتعديل المهام' }, { status: 403 });
+    }
     const { id } = await params;
     const body = await req.json();
 
@@ -55,7 +58,10 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     if (!session) {
       return NextResponse.json({ error: 'غير مصرح بالدخول' }, { status: 401 });
     }
-
+    const roles = (session.role || '').split(',').map((r: string) => r.trim());
+    if (!roles.includes('scientific_supervisor')) {
+      return NextResponse.json({ error: 'غير مصرح لك بحذف المهام' }, { status: 403 });
+    }
     const { id } = await params;
     const ok = await deleteTask(id);
     if (!ok) {
