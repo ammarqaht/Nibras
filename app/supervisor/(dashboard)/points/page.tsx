@@ -66,6 +66,12 @@ export default function PointsBoardPage() {
   const [visBusy, setVisBusy] = useState(false);
   const [showVisModal, setShowVisModal] = useState(false);
   const [teaserMsg, setTeaserMsg] = useState('النقاط مخفية مؤقتاً… استمر في التميّز، وسيتم الكشف عنها قريباً! 🌟');
+  const [teaserTitle, setTeaserTitle] = useState('النقاط مخفية مؤقتاً');
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!canToggleVisibility) return;
@@ -74,20 +80,22 @@ export default function PointsBoardPage() {
       .then(d => {
         setPointsHidden(!!d.hidden);
         if (d.message) setTeaserMsg(d.message);
+        if (d.title) setTeaserTitle(d.title);
       })
       .catch(() => {});
   }, [canToggleVisibility]);
 
-  async function togglePointsVisibility(hide: boolean, msg?: string) {
+  async function togglePointsVisibility(hide: boolean, msg?: string, title?: string) {
     setVisBusy(true);
     try {
       const r = await fetch('/api/supervisor/points-visibility', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hidden: hide, message: msg }),
+        body: JSON.stringify({ hidden: hide, message: msg, title: title }),
       });
       if (r.ok) {
         setPointsHidden(hide);
         if (msg) setTeaserMsg(msg);
+        if (title) setTeaserTitle(title);
       }
     } finally { setVisBusy(false); }
   }
@@ -107,7 +115,15 @@ export default function PointsBoardPage() {
         (s.paymentStatus === 'paid' || s.paymentStatus === 'exempted' || s.paymentStatus === '')
       ));
       setGroups(grj.groups ?? []);
-      setPoints(prj.points ?? []);
+      const allPoints: Point[] = prj.points ?? [];
+      const filtered = allPoints.filter(p => {
+        if (p.category === 'attendance') return false;
+        const isTask = p.category === 'tasks';
+        const isCollective = p.pointType === 'collective' || (p.reason && p.reason.endsWith('(رصد جماعي للأسرة)'));
+        const isDeduction = p.delta < 0 || p.pointType === 'deduction';
+        return isTask || isCollective || isDeduction;
+      });
+      setPoints(filtered);
       setLoading(false);
     });
   }, []);
@@ -361,7 +377,9 @@ export default function PointsBoardPage() {
                             </td>
                             <td className="text-ink-400 text-sm">{p.recordedBy || '—'}</td>
                             <td className="text-ink-400 text-xs whitespace-nowrap">
-                              {new Date(p.createdAt).toLocaleDateString('ar-SA', { year: 'numeric', month: 'short', day: 'numeric' })}
+                              {mounted
+                                ? new Date(p.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+                                : p.createdAt.split('T')[0]}
                             </td>
                           </tr>
                         );
@@ -411,7 +429,9 @@ export default function PointsBoardPage() {
                             <div>السبب: {p.reason.replace(' (رصد جماعي للأسرة)', '')}</div>
                             <div>
                               بواسطة: {p.recordedBy || '—'} ·{' '}
-                              {new Date(p.createdAt).toLocaleDateString('ar-SA', { year: 'numeric', month: 'short', day: 'numeric' })}
+                              {mounted
+                                ? new Date(p.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+                                : p.createdAt.split('T')[0]}
                             </div>
                           </div>
                         )}
@@ -433,22 +453,34 @@ export default function PointsBoardPage() {
               <button onClick={() => setShowVisModal(false)} className="btn btn-ghost p-1" aria-label="إغلاق">✕</button>
             </div>
             <div className="space-y-3">
-              <label className="label font-bold text-xs">الرسالة التشويقية والتحميسية للطلاب</label>
-              <textarea
-                className="field min-h-[100px] text-xs resize-none"
-                placeholder="اكتب هنا الرسالة التي ستظهر للطلاب بدلاً من نقاطهم..."
-                value={teaserMsg}
-                onChange={e => setTeaserMsg(e.target.value)}
-              />
-              <p className="text-[10px] text-ink-400">سيتم تطبيق حجب النقاط مع هذه الرسالة التشويقية والبلور على جميع الطلاب فور الحفظ.</p>
+              <div>
+                <label className="label font-bold text-xs mb-1 block">عنوان الحجب</label>
+                <input
+                  type="text"
+                  className="field text-xs py-2 px-3 w-full"
+                  placeholder="مثال: النقاط مخفية مؤقتاً"
+                  value={teaserTitle}
+                  onChange={e => setTeaserTitle(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="label font-bold text-xs mb-1 block">الرسالة التشويقية والتحميسية للطلاب</label>
+                <textarea
+                  className="field min-h-[100px] text-xs resize-none"
+                  placeholder="اكتب هنا الرسالة التي ستظهر للطلاب بدلاً من نقاطهم..."
+                  value={teaserMsg}
+                  onChange={e => setTeaserMsg(e.target.value)}
+                />
+              </div>
+              <p className="text-[10px] text-ink-400">سيتم تطبيق حجب النقاط مع هذا العنوان والرسالة والبلور على جميع الطلاب فور الحفظ.</p>
             </div>
             <div className="flex gap-2 pt-2 border-t" style={{ borderColor: 'var(--line)' }}>
               <button
                 onClick={() => {
-                  togglePointsVisibility(true, teaserMsg);
+                  togglePointsVisibility(true, teaserMsg, teaserTitle);
                   setShowVisModal(false);
                 }}
-                disabled={visBusy || !teaserMsg.trim()}
+                disabled={visBusy || !teaserMsg.trim() || !teaserTitle.trim()}
                 className="btn btn-primary flex-1 text-xs text-white font-bold"
               >
                 تفعيل الحجب التشويقي

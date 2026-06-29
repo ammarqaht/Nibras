@@ -266,32 +266,43 @@ export default function StudentHome() {
             <h2 className="font-display text-lg font-bold" style={{ color: 'var(--ink)' }}>النقاط</h2>
             <span className="text-xs" style={{ color: 'var(--ink-soft)' }}>تجمع حسب نوع النقطة</span>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <StatTile
-              label="فردي"
-              value={user.individual}
-              accent="#FF9F1C"
-              onClick={() => setShowBreakdown(true)}
-              icon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>}
-            />
-            <StatTile
-              label="جماعي"
-              value={user.collective}
-              accent="#12B3D5"
-              icon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.4"/><path d="M2 20a7 7 0 0 1 14 0M14 20a5 5 0 0 1 8-4"/></svg>}
-            />
-            <StatTile
-              label="الرصيد"
-              value={user.balance}
-              accent="#1B7A43"
-              icon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M3 7h18v10H3z"/><path d="M3 11h18M7 15h3"/></svg>}
-            />
-            <StatTile
-              label="الإجمالي"
-              value={user.rankScore}
-              accent="#103F91"
-              icon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M12 3l2.5 5.5L20 9.3l-4 4 1 5.7L12 16l-5 3 1-5.7-4-4 5.5-.8z"/></svg>}
-            />
+          <div className="relative">
+            <div className="grid grid-cols-2 gap-3" style={user.hidePoints ? { filter: 'blur(6px)', pointerEvents: 'none', userSelect: 'none' } : undefined}>
+              <StatTile
+                label="فردي"
+                value={user.individual}
+                accent="#FF9F1C"
+                onClick={() => setShowBreakdown(true)}
+                icon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>}
+              />
+              <StatTile
+                label="جماعي"
+                value={user.collective}
+                accent="#12B3D5"
+                icon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.4"/><path d="M2 20a7 7 0 0 1 14 0M14 20a5 5 0 0 1 8-4"/></svg>}
+              />
+              <StatTile
+                label="الرصيد"
+                value={user.balance}
+                accent="#1B7A43"
+                icon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M3 7h18v10H3z"/><path d="M3 11h18M7 15h3"/></svg>}
+              />
+              <StatTile
+                label="الإجمالي"
+                value={user.rankScore}
+                accent="#103F91"
+                icon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M12 3l2.5 5.5L20 9.3l-4 4 1 5.7L12 16l-5 3 1-5.7-4-4 5.5-.8z"/></svg>}
+              />
+            </div>
+            {user.hidePoints && (
+              <div className="absolute inset-0 flex items-center justify-center p-4 rounded-2xl" style={{ background: 'rgba(250,250,247,0.4)', zIndex: 10 }}>
+                <div className="text-center bg-white/95 backdrop-blur-md p-5 rounded-2xl border border-line shadow-lg w-full max-w-[280px]">
+                  <p className="text-3xl mb-2">🔒</p>
+                  <h3 className="font-display text-sm font-bold mb-1" style={{ color: 'var(--ink)' }}>{user.hidePointsTitle || 'النقاط مخفية مؤقتاً'}</h3>
+                  <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-soft)' }}>{user.hidePointsMessage || 'النقاط مخفية مؤقتاً… استمر في التميّز، وسيتم الكشف عنها قريباً! 🌟'}</p>
+                </div>
+              </div>
+            )}
           </div>
         </section>
       )}
@@ -464,21 +475,31 @@ export default function StudentHome() {
           <h2 className="font-display text-lg font-bold" style={{ color: 'var(--ink)' }}>سجل الرصيد</h2>
           <span className="text-xs" style={{ color: 'var(--ink-soft)' }}>{ledger.length} حركة</span>
         </div>
-        <div className="card p-0 overflow-hidden">
-          {ledger.length === 0 ? (
-            <div className="p-5"><EmptyState emoji="🧾" line="لا توجد حركات على رصيدك بعد." /></div>
-          ) : (
-            <>
-              <ul className="divide-y" style={{ ['--tw-divide-color' as any]: 'var(--line)' }}>
-                {ledger.slice(0, 5).map(p => <LedgerRow key={p.id} p={p} />)}
-              </ul>
-              {ledger.length > 5 && (
-                <button onClick={() => { setShowLedger(true); setLedgerFilter('all'); setLedgerCat(''); }}
-                  className="w-full py-3 text-sm font-medium border-t" style={{ color: 'var(--accent-deep)', borderColor: 'var(--line)' }}>
-                  عرض المزيد ({ledger.length}) ←
-                </button>
-              )}
-            </>
+        <div className="relative">
+          <div className="card p-0 overflow-hidden" style={user?.hidePoints ? { filter: 'blur(6px)', pointerEvents: 'none', userSelect: 'none' } : undefined}>
+            {ledger.length === 0 ? (
+              <div className="p-5"><EmptyState emoji="🧾" line="لا توجد حركات على رصيدك بعد." /></div>
+            ) : (
+              <>
+                <ul className="divide-y" style={{ ['--tw-divide-color' as any]: 'var(--line)' }}>
+                  {ledger.slice(0, 5).map(p => <LedgerRow key={p.id} p={p} />)}
+                </ul>
+                {ledger.length > 5 && (
+                  <button onClick={() => { setShowLedger(true); setLedgerFilter('all'); setLedgerCat(''); }}
+                    className="w-full py-3 text-sm font-medium border-t" style={{ color: 'var(--accent-deep)', borderColor: 'var(--line)' }}>
+                    عرض المزيد ({ledger.length}) ←
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+          {user?.hidePoints && (
+            <div className="absolute inset-0 flex items-center justify-center p-4 rounded-2xl" style={{ background: 'rgba(250,250,247,0.4)', zIndex: 10 }}>
+              <div className="text-center bg-white/95 backdrop-blur-md p-4 rounded-2xl border border-line shadow-md w-full max-w-[240px]">
+                <p className="text-2xl mb-1.5">🔒</p>
+                <h3 className="font-display text-xs font-bold" style={{ color: 'var(--ink)' }}>السجل مخفي</h3>
+              </div>
+            </div>
           )}
         </div>
       </section>
@@ -505,13 +526,6 @@ export default function StudentHome() {
           </div>
         )}
       </section>
-
-                <span key={k} className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded" style={{ background: ATT_COLORS[k].bg, border: `1px solid ${ATT_COLORS[k].border}` }} />{l}</span>
-              ))}
-            </div>
-          </button>
-        </section>
-      )}
 
       {/* Individual points breakdown */}
       {showBreakdown && user && (

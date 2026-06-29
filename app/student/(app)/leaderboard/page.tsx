@@ -166,7 +166,7 @@ export default function StudentLeaderboard() {
           <div className="absolute inset-0 flex items-center justify-center p-4 rounded-2xl" style={{ background: 'rgba(250,250,247,0.4)', zIndex: 10 }}>
             <div className="text-center bg-white/90 backdrop-blur-md p-6 rounded-2xl border border-line shadow-xl max-w-sm">
               <p className="text-4xl mb-3">🔒</p>
-              <h2 className="font-display text-lg font-bold mb-2" style={{ color: 'var(--ink)' }}>الترتيب مخفي مؤقتاً</h2>
+              <h2 className="font-display text-lg font-bold mb-2" style={{ color: 'var(--ink)' }}>{user.hidePointsTitle || 'الترتيب مخفي مؤقتاً'}</h2>
               <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-soft)' }}>{user.hidePointsMessage || 'سيتم الكشف عن الترتيب قريباً — استمر في التميّز! 🌟'}</p>
             </div>
           </div>

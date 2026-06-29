@@ -15,6 +15,7 @@ export async function GET(req: NextRequest) {
 
   const hidePoints = (await getSetting('hide_points')) === '1';
   const hidePointsMessage = (await getSetting('hide_points_message')) || 'النقاط مخفية مؤقتاً… استمر في التميّز، وسيتم الكشف عنها قريباً! 🌟';
+  const hidePointsTitle = (await getSetting('hide_points_title')) || 'النقاط مخفية مؤقتاً';
 
   return NextResponse.json({
     id: student.id,
@@ -25,6 +26,7 @@ export async function GET(req: NextRequest) {
     groupId: student.groupId,
     hidePoints,
     hidePointsMessage,
+    hidePointsTitle,
     ...summary,
   });
 }

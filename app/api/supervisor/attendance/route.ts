@@ -63,6 +63,8 @@ export async function POST(req: NextRequest) {
         if (isNaN(bid)) continue;
         await logAttendance(bid, date, status, session.name);
         await deleteAttendancePointsByDate(bid, date);
+        // Attendance points recording disabled per user request
+        /*
         const pts = status === 'present' ? onTimePoints
                   : status === 'late'    ? latePoints
                   : status === 'excused' ? excusedPoints
@@ -77,6 +79,7 @@ export async function POST(req: NextRequest) {
             pointType: 'individual', recordedBy: session.name,
           });
         }
+        */
         count++;
       }
       return NextResponse.json({ success: true, count });
@@ -110,7 +113,8 @@ export async function POST(req: NextRequest) {
     const excusedPoints = Number(s.att_excusedPoints ?? '0');
 
     await deleteAttendancePointsByDate(id, date);
-
+    // Attendance points recording disabled per user request
+    /*
     const pts = status === 'present' ? onTimePoints
               : status === 'late'    ? latePoints
               : status === 'excused' ? excusedPoints
@@ -129,6 +133,7 @@ export async function POST(req: NextRequest) {
         recordedBy: session.name,
       });
     }
+    */
     // ─────────────────────────────────────────────────────────────────────────
 
     return NextResponse.json({ success: true, attendance: record, student: resolvedStudent });

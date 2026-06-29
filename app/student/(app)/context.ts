@@ -14,6 +14,7 @@ export type StudentUser = {
   rankScore: number;
   hidePoints?: boolean;
   hidePointsMessage?: string;
+  hidePointsTitle?: string;
 };
 
 export const StudentContext = createContext<{ user: StudentUser | null }>({ user: null });
