@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
       for (const rId of registrationIds) {
         const id = parseInt(String(rId), 10);
         if (isNaN(id)) continue;
-        const pointType = isDeduction ? (category === 'store' ? 'deduction' : 'individual') : 'individual';
+        const pointType = isDeduction ? 'deduction' : 'individual';
         const rec = await addPointsRecord({
           registrationId: id,
           delta: dVal,
@@ -155,7 +155,7 @@ export async function POST(req: NextRequest) {
           delta: dVal,
           reason: `${reason} (رصد جماعي للأسرة)`,
           category,
-          pointType: isDeduction ? (category === 'store' ? 'deduction' : 'collective') : 'collective',
+          pointType: isDeduction ? 'deduction' : 'collective',
           recordedBy: session.name
         });
         records.push(rec);
@@ -176,7 +176,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      const pointType = isDeduction ? (category === 'store' ? 'deduction' : 'individual') : 'individual';
+      const pointType = isDeduction ? 'deduction' : 'individual';
 
       const record = await addPointsRecord({
         registrationId: rId,

@@ -116,14 +116,7 @@ export default function PointsBoardPage() {
       ));
       setGroups(grj.groups ?? []);
       const allPoints: Point[] = prj.points ?? [];
-      const filtered = allPoints.filter(p => {
-        if (p.category === 'attendance') return false;
-        const isTask = p.category === 'tasks';
-        const isCollective = p.pointType === 'collective' || (p.reason && p.reason.endsWith('(رصد جماعي للأسرة)'));
-        const isDeduction = p.delta < 0 || p.pointType === 'deduction';
-        return isTask || isCollective || isDeduction;
-      });
-      setPoints(filtered);
+      setPoints(allPoints);
       setLoading(false);
     });
   }, []);

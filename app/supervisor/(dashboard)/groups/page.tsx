@@ -12,10 +12,13 @@ type Supervisor = { id: number; name: string; groupIds: string };
 function calcPts(pts: any[]) {
   let ind = 0, col = 0, ded = 0;
   for (const p of pts) {
-    const isCollective = p.reason?.endsWith('(رصد جماعي للأسرة)') || p.pointType === 'collective';
-    if (isCollective) col += p.delta;
-    else if (p.delta < 0) ded += p.delta;
-    else ind += p.delta;
+    const t = p.pointType ?? (
+      p.reason?.endsWith('(رصد جماعي للأسرة)') ? 'collective'
+        : p.delta < 0 ? 'deduction' : 'individual'
+    );
+    if (t === 'individual') ind += p.delta;
+    else if (t === 'collective') col += p.delta;
+    else ded += p.delta;
   }
   return { individual: ind, collective: col, balance: Math.max(0, ind + col + ded), total: ind + col };
 }
@@ -97,10 +100,19 @@ export default function GroupsPage() {
   }, [students]);
 
   const studentPointsMap = useMemo(() => {
+    const byStudent = new Map<number, any[]>();
+    points.forEach((p) => {
+      if (!byStudent.has(p.registrationId)) byStudent.set(p.registrationId, []);
+      byStudent.get(p.registrationId)!.push(p);
+    });
     const m = new Map<number, number>();
-    points.forEach((p) => m.set(p.registrationId, (m.get(p.registrationId) ?? 0) + p.delta));
+    students.forEach((s) => {
+      const pts = byStudent.get(s.id) ?? [];
+      const { total } = calcPts(pts);
+      m.set(s.id, total);
+    });
     return m;
-  }, [points]);
+  }, [students, points]);
 
   const getStudentPoints = (id: number) => studentPointsMap.get(id) ?? 0;
 

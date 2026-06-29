@@ -600,7 +600,7 @@ export default function StudentsPage() {
       </div>
 
       {/* Filters */}
-      <div className="card p-4 mb-5 overflow-visible">
+      <div className="card p-4 mb-5 overflow-visible relative z-20">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Search Input with Clear Button */}
           <div className="relative flex items-center w-full">
