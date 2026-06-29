@@ -42,7 +42,9 @@ export async function POST(req: NextRequest) {
     }
 
     if (session.role !== 'admin') {
-      if (!userRoles.includes(role)) {
+      const isMediaOfficer = userRoles.includes('general_supervisor') || userRoles.includes('media_officer');
+      const isAllowedRole = userRoles.includes(role) || (isMediaOfficer && role === 'media_supervisor');
+      if (!isAllowedRole) {
         return NextResponse.json({ error: 'لا تملك الصلاحية للإضافة بهذا الدور' }, { status: 403 });
       }
     }
@@ -88,10 +90,14 @@ export async function DELETE(req: NextRequest) {
     }
 
     if (session.role !== 'admin') {
+      const isMediaOfficer = userRoles.includes('general_supervisor') || userRoles.includes('media_officer');
       const all = await getSchedules();
       const target = all.find(s => s.id === id);
-      if (target && !userRoles.includes(target.role)) {
-        return NextResponse.json({ error: 'لا يمكنك حذف برامج اللجان الأخرى' }, { status: 403 });
+      if (target) {
+        const isAllowedRole = userRoles.includes(target.role) || (isMediaOfficer && target.role === 'media_supervisor');
+        if (!isAllowedRole) {
+          return NextResponse.json({ error: 'لا يمكنك حذف برامج اللجان الأخرى' }, { status: 403 });
+        }
       }
     }
 
@@ -131,15 +137,20 @@ export async function PUT(req: NextRequest) {
     }
 
     if (session.role !== 'admin') {
-      if (!userRoles.includes(role)) {
+      const isMediaOfficer = userRoles.includes('general_supervisor') || userRoles.includes('media_officer');
+      const isAllowedRole = userRoles.includes(role) || (isMediaOfficer && role === 'media_supervisor');
+      if (!isAllowedRole) {
         return NextResponse.json({ error: 'لا تملك الصلاحية للتعديل بهذا الدور' }, { status: 403 });
       }
 
       // Check if they are allowed to modify this schedule (must belong to their committee)
       const all = await getSchedules();
       const target = all.find(s => s.id === id);
-      if (target && !userRoles.includes(target.role)) {
-        return NextResponse.json({ error: 'لا يمكنك تعديل برامج اللجان الأخرى' }, { status: 403 });
+      if (target) {
+        const isTargetAllowed = userRoles.includes(target.role) || (isMediaOfficer && target.role === 'media_supervisor');
+        if (!isTargetAllowed) {
+          return NextResponse.json({ error: 'لا يمكنك تعديل برامج اللجان الأخرى' }, { status: 403 });
+        }
       }
     }
 

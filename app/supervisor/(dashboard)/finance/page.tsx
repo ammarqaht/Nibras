@@ -737,7 +737,7 @@ function ReviewModal({
   onCancelSettle: (inv: Invoice) => void;
 }) {
   return (
-    <div className="modal-backdrop flex items-start md:items-center justify-center p-3 md:p-6 overflow-y-auto" onClick={onClose}>
+    <div className="modal-backdrop flex items-center justify-center p-3 md:p-6 overflow-y-auto" onClick={onClose}>
       <div className="modal-panel w-full max-w-xl my-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between p-5 border-b border-ink-200">
           <div>
@@ -907,7 +907,7 @@ function AddTransactionModal({
   }
 
   return (
-    <div className="modal-backdrop flex items-start md:items-center justify-center p-3 md:p-6 overflow-y-auto" onClick={onClose}>
+    <div className="modal-backdrop flex items-center justify-center p-3 md:p-6 overflow-y-auto" onClick={onClose}>
       <form onSubmit={handleSubmit} className="modal-panel w-full max-w-md my-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between p-5 border-b border-ink-200">
           <h2 className="text-xl font-bold text-ink-900">{headerText}</h2>

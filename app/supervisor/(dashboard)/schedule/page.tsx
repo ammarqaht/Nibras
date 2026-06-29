@@ -95,11 +95,15 @@ export default function SchedulePage() {
   }, [user]);
 
   const isAdmin = userRoles.includes('admin');
-  // Admins can manage all schedules; committee supervisors manage their own
-  const canManageSchedule = isAdmin || userRoles.some(r => COMMITTEE_ROLES.includes(r));
+  const isMediaOfficer = userRoles.includes('general_supervisor') || userRoles.includes('media_officer');
+  // Admins and Media Officers can manage schedule; committee supervisors manage their own
+  const canManageSchedule = isAdmin || isMediaOfficer || userRoles.some(r => COMMITTEE_ROLES.includes(r));
   const availableRoles = isAdmin
-    ? ROLES.filter(r => COMMITTEE_ROLES.includes(r.key))
-    : ROLES.filter(r => userRoles.includes(r.key) && COMMITTEE_ROLES.includes(r.key));
+    ? ROLES.filter(r => [...COMMITTEE_ROLES, 'media_supervisor'].includes(r.key))
+    : ROLES.filter(r => {
+        if (isMediaOfficer && r.key === 'media_supervisor') return true;
+        return userRoles.includes(r.key) && COMMITTEE_ROLES.includes(r.key);
+      });
 
   const weekDays = useMemo(() => {
     const [y, m, d] = selectedDate.split('-').map(Number);
@@ -355,7 +359,7 @@ export default function SchedulePage() {
                                 </div>
                                 {rowPrograms.length > 0 ? (
                                   rowPrograms.map(s => {
-                                    const canEdit = canManageSchedule && (user?.role === 'admin' || userRoles.includes(s.role));
+                                    const canEdit = canManageSchedule && (user?.role === 'admin' || userRoles.includes(s.role) || (isMediaOfficer && s.role === 'media_supervisor'));
                                     const programSlots = getProgramSlots(s);
                                     const startCol = programSlots.length > 0 ? (Math.min(...programSlots) + 1) : 1;
                                     const spanWidth = programSlots.length > 0 ? (Math.max(...programSlots) - Math.min(...programSlots) + 1) : 3;
@@ -644,7 +648,7 @@ export default function SchedulePage() {
             </div>
 
             <div className="p-4 bg-ink-50 border-t border-ink-200 flex gap-2 shrink-0">
-              {selectedDetailsSchedule && canManageSchedule && (isAdmin || userRoles.includes(selectedDetailsSchedule.role)) && (
+              {selectedDetailsSchedule && canManageSchedule && (isAdmin || userRoles.includes(selectedDetailsSchedule.role) || (isMediaOfficer && selectedDetailsSchedule.role === 'media_supervisor')) && (
                 <button
                   onClick={() => { setIsDetailsOpen(false); openEditModal(selectedDetailsSchedule); }}
                   className="btn btn-primary flex-1 text-sm font-bold flex items-center justify-center gap-1.5"

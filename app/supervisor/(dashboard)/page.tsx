@@ -12,12 +12,14 @@ const ROLE_MAP: Record<string, string> = {
   social_supervisor: 'مشرف اجتماعية',
   cultural_supervisor: 'مشرف ثقافية',
   groups_supervisor: 'مشرف أسر',
-  general_supervisor: 'مشرف عام',
+  general_supervisor: 'مسؤول الإعلامية',
+  media_officer: 'مسؤول الإعلامية',
   finance_supervisor: 'مسؤول المالية',
-  media_supervisor: 'مشرف الإعلامية',
+  media_supervisor: 'مشرف إعلامية',
   scientific_supervisor: 'مشرف العلمية',
   sports_supervisor: 'مشرف الرياضية',
-  stage_supervisor: 'مشرف مرحلة'
+  stage_supervisor: 'مشرف مرحلة',
+  tasks_supervisor: 'مشرف المهام'
 };
 
 const getRoleLabel = (roleStr: string) => {
@@ -292,12 +294,29 @@ function QuickInfoCards({ roles, isAdmin, isFinanceRole, isAttendanceRole, isPoi
   }
 
   if (isGeneralRole) {
+    const lastAnn = stats?.announcements?.announcementsList?.[0];
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-1 gap-4 max-w-sm">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <AttendanceGrid
           label="حضور اليوم"
           present={overallPresent} late={overallLate} excused={overallExcused} absent={overallAbsent}
         />
+        <SmallCard accent="#12B3D5"
+          icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" /></svg>}
+          label="إعلانات منشورة" value={stats?.announcements?.total ?? 0} sub="إجمالي الإعلانات"
+        />
+        <div className="card p-5 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-1.5 h-full bg-teal-500" />
+          <div className="text-[10px] text-ink-400 font-bold mb-2">آخر إعلان</div>
+          {lastAnn ? (
+            <>
+              <div className="text-xs font-bold text-ink-900 line-clamp-2 mb-1">{lastAnn.title}</div>
+              <div className="text-[10px] text-ink-400">{new Date(lastAnn.createdAt).toLocaleDateString('ar-SA', { month: 'short', day: 'numeric' })}</div>
+            </>
+          ) : (
+            <div className="text-xs text-ink-400 text-center py-3">لا توجد إعلانات</div>
+          )}
+        </div>
       </div>
     );
   }
@@ -630,17 +649,21 @@ export default function DashboardHome() {
   const isAttendanceRole = roles.includes('attendance_supervisor');
   const isPointsRole = roles.some(r => ['social_supervisor', 'cultural_supervisor', 'scientific_supervisor', 'sports_supervisor'].includes(r));
   const isGroupsRole = roles.includes('groups_supervisor');
-  const isGeneralRole = roles.includes('general_supervisor');
+  const isGeneralRole = roles.includes('general_supervisor') || roles.includes('media_officer');
   const isStageRole = roles.includes('stage_supervisor');
   const isMediaRole = roles.includes('media_supervisor');
   const isTasksRole = roles.includes('tasks_supervisor');
+  const isScientificRole = roles.includes('scientific_supervisor');
   const canAddPoints = isPointsRole;
 
   const isGlobal = roles.some((r) =>
-    ['admin', 'finance', 'finance_supervisor', 'media_supervisor', 'cultural_supervisor', 'social_supervisor', 'general_supervisor', 'attendance_supervisor'].includes(r)
+    ['admin', 'finance', 'finance_supervisor', 'media_supervisor', 'media_officer', 'cultural_supervisor', 'social_supervisor', 'general_supervisor', 'attendance_supervisor'].includes(r)
   );
 
-  const canAddProgram = isAdmin || roles.some(r => ['social_supervisor', 'cultural_supervisor', 'scientific_supervisor', 'sports_supervisor'].includes(r));
+  const canAddProgram = isAdmin || roles.some(r => [
+    'social_supervisor', 'cultural_supervisor', 'scientific_supervisor', 'sports_supervisor',
+    'general_supervisor', 'media_officer'
+  ].includes(r));
   const canPublishAnnouncements = hasPerm('announcements');
 
   async function loadData() {
@@ -847,23 +870,35 @@ export default function DashboardHome() {
         <div className="text-center py-16 text-ink-400 text-sm">جارٍ تحميل الإحصائيات الذكية…</div>
       ) : (
         <div className="space-y-6">
-          {(isMediaRole || isTasksRole) && (
+          {(isScientificRole || isTasksRole) && (
             <Link
               href="/supervisor/tasks?tab=submissions"
-              className="block card p-6 mb-2 hover:shadow-md transition-shadow relative overflow-hidden group cursor-pointer border-brand"
+              className={`block card p-6 mb-2 hover:shadow-md transition-shadow relative overflow-hidden group cursor-pointer border-r-4 ${
+                pendingTasksCount === 0 ? 'border-green-500' : 'border-brand'
+              }`}
             >
-              <div className="absolute top-0 right-0 w-2 h-full bg-brand" />
+              <div className={`absolute top-0 right-0 w-2 h-full ${pendingTasksCount === 0 ? 'bg-green-500' : 'bg-brand'}`} />
               <div className="flex items-center justify-between gap-4">
                 <div className="space-y-1 text-right">
-                  <h3 className="text-lg font-bold text-brand flex items-center gap-2 justify-end md:justify-start">
+                  <h3 className={`text-lg font-bold flex items-center gap-2 justify-end md:justify-start ${pendingTasksCount === 0 ? 'text-green-600' : 'text-brand'}`}>
                     <span>📋 المهام بانتظار التقييم</span>
-                    <span className="animate-pulse inline-block w-2.5 h-2.5 rounded-full bg-brand" />
+                    {pendingTasksCount > 0 && (
+                      <span className="animate-pulse inline-block w-2.5 h-2.5 rounded-full bg-brand" />
+                    )}
                   </h3>
                   <p className="text-sm text-ink-500">
-                    لديك <span className="font-semibold text-brand-600">{pendingTasksCount}</span> مهمة مستلمة بانتظار تقييمك ومراجعتك حالياً.
+                    {pendingTasksCount === 0 ? (
+                      <span className="text-green-600 font-semibold">لقد تم تقييم جميع تسليمات الطلاب بنجاح.</span>
+                    ) : (
+                      <>
+                        لديك <span className="font-semibold text-brand-600">{pendingTasksCount}</span> مهمة مستلمة بانتظار تقييمك ومراجعتك حالياً.
+                      </>
+                    )}
                   </p>
                 </div>
-                <div className="flex items-center justify-center bg-brand-50 border border-brand-200 text-brand text-2xl font-extrabold w-16 h-16 rounded-2xl group-hover:scale-105 transition-transform shrink-0">
+                <div className={`flex items-center justify-center border text-2xl font-extrabold w-16 h-16 rounded-2xl group-hover:scale-105 transition-transform shrink-0 ${
+                  pendingTasksCount === 0 ? 'bg-green-50 border-green-200 text-green-600' : 'bg-brand-50 border-brand-200 text-brand'
+                }`}>
                   {pendingTasksCount}
                 </div>
               </div>
