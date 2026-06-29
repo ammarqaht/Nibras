@@ -159,16 +159,9 @@ export default function KioskPage() {
     const student = students.find(s=>String(s.membershipNo)===mNo);
     const isDuplicate = !!(student && todayRecs[student.id]);
 
-    // For duplicates: skip the attendance write, just fetch and show current points
+    // For duplicates: show an error message directing them not to check in twice
     if (isDuplicate && student) {
-      setBusy(true);
-      const pr = await fetch(`/api/supervisor/points?studentId=${student.id}`, { cache:'no-store' });
-      const pj = await pr.json().catch(()=>({points:[]}));
-      const pts = calcPts(pj.points??[]);
-      const groupName = student.groupId ? groups.find(g=>g.id===student.groupId)?.name??'—' : '—';
-      const prevStatus = (todayRecs[student.id] ?? 'present') as 'present' | 'late';
-      setBusy(false);
-      showFlash({ kind:'ok', student, groupName, pts, status: prevStatus, duplicate: true });
+      showFlash({ kind:'err', msg: `تم تحضيرك مسبقاً يا ${student.studentName}، ولا تحضر مرتين` });
       return;
     }
 

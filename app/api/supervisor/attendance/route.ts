@@ -56,15 +56,24 @@ export async function POST(req: NextRequest) {
       const onTimePoints  = Number(cfg.att_onTimePoints  ?? '2');
       const latePoints    = Number(cfg.att_latePoints    ?? '1');
       const excusedPoints = Number(cfg.att_excusedPoints ?? '0');
+      const students = await getStudents();
 
       let count = 0;
       for (const rawId of body.registrationIds) {
         const bid = parseInt(String(rawId), 10);
         if (isNaN(bid)) continue;
+
+        const student = students.find(s => s.id === bid);
+        if (!student) continue;
+
+        // Skip unpaid/unconfirmed students in batch mode
+        if (student.paymentStatus !== 'paid' && student.paymentStatus !== 'exempted') {
+          continue;
+        }
+
         await logAttendance(bid, date, status, session.name);
         await deleteAttendancePointsByDate(bid, date);
-        // Attendance points recording disabled per user request
-        /*
+
         const pts = status === 'present' ? onTimePoints
                   : status === 'late'    ? latePoints
                   : status === 'excused' ? excusedPoints
@@ -79,7 +88,6 @@ export async function POST(req: NextRequest) {
             pointType: 'individual', recordedBy: session.name,
           });
         }
-        */
         count++;
       }
       return NextResponse.json({ success: true, count });
@@ -88,8 +96,8 @@ export async function POST(req: NextRequest) {
 
     // Resolve membershipNo → registrationId if needed
     let resolvedStudent: any = null;
+    const students = await getStudents();
     if (!registrationId && membershipNo) {
-      const students = await getStudents();
       const mNo = parseInt(membershipNo, 10);
       resolvedStudent = students.find(s => s.membershipNo === mNo) ?? null;
       if (!resolvedStudent) {
@@ -103,6 +111,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'معرّف الطالب غير صحيح' }, { status: 400 });
     }
 
+    const student = resolvedStudent || students.find(s => s.id === id);
+    if (!student) {
+      return NextResponse.json({ error: 'الطالب غير موجود' }, { status: 404 });
+    }
+
+    // ── Payment validation ──
+    if (student.paymentStatus !== 'paid' && student.paymentStatus !== 'exempted') {
+      return NextResponse.json({ error: 'توجه للمشرفين لمراجعة الدفع' }, { status: 400 });
+    }
+
+    // ── Duplicate check-in check (only when scanning/quick-presenting via membershipNo) ──
+    if (membershipNo) {
+      const allAttendance = await getAttendance();
+      const existing = allAttendance.find(a => a.registrationId === student.id && a.date === date);
+      if (existing && (existing.status === 'present' || existing.status === 'late' || existing.status === 'excused')) {
+        return NextResponse.json({ error: 'تم تحضيرك مسبقاً، ولا تحضر مرتين' }, { status: 400 });
+      }
+    }
+
     // Save attendance (upsert)
     const record = await logAttendance(id, date, status, session.name);
 
@@ -113,8 +140,7 @@ export async function POST(req: NextRequest) {
     const excusedPoints = Number(s.att_excusedPoints ?? '0');
 
     await deleteAttendancePointsByDate(id, date);
-    // Attendance points recording disabled per user request
-    /*
+
     const pts = status === 'present' ? onTimePoints
               : status === 'late'    ? latePoints
               : status === 'excused' ? excusedPoints
@@ -133,7 +159,6 @@ export async function POST(req: NextRequest) {
         recordedBy: session.name,
       });
     }
-    */
     // ─────────────────────────────────────────────────────────────────────────
 
     return NextResponse.json({ success: true, attendance: record, student: resolvedStudent });
