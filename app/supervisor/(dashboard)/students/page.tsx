@@ -1123,8 +1123,8 @@ function StudentModal({
   const studentWhatsappUrl = formattedStudentPhone ? `https://wa.me/${formattedStudentPhone}` : null;
 
   return (
-    <div className="modal-backdrop flex items-center justify-center p-2 sm:p-6 overflow-y-auto" onClick={onClose}>
-      <div className="modal-panel w-[92vw] sm:w-full max-w-2xl my-auto max-h-[75vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-backdrop flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 overflow-y-auto" onClick={onClose}>
+      <div className="modal-panel w-full sm:max-w-2xl rounded-t-3xl sm:rounded-2xl max-h-[92vh] sm:max-h-[85vh] flex flex-col shadow-elevated" onClick={(e) => e.stopPropagation()}>
         {/* header */}
         <div className="flex items-start justify-between p-3.5 sm:p-5 border-b border-ink-200 shrink-0">
           <div>
@@ -1205,7 +1205,7 @@ function StudentModal({
           ) : (
             /* ---------- VIEW MODE ---------- */
             <>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:gap-x-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 {canSeeFullDetails && <Info label="رقم الهوية" value={student.nationalId} ltr />}
                 <Info label="المرحلة / الصف" value={`${student.stage} — ${student.grade}`} />
                 {canSeeFullDetails && <Info label="الحي السكني" value={student.neighborhood} />}
@@ -1218,15 +1218,15 @@ function StudentModal({
                   <h4 className="font-bold text-xs text-ink-500">بيانات الاتصال والتواصل</h4>
                   
                   {/* Guardian contact */}
-                  <div className="flex items-center justify-between bg-cream-50 p-2.5 rounded-lg border border-line">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-cream-50 p-3 rounded-xl border border-line">
                     <div>
                       <span className="text-xs text-ink-500 block">ولي الأمر</span>
                       <span dir="ltr" className="font-mono text-xs text-ink-800">{student.guardianPhone}</span>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 w-full sm:w-auto">
                       <a
                         href={`tel:${student.guardianPhone}`}
-                        className="btn btn-secondary py-1 px-2.5 text-xs flex items-center gap-1 rounded-md"
+                        className="btn btn-secondary py-2 px-3 text-xs flex-1 sm:flex-none justify-center items-center gap-1.5 rounded-lg"
                       >
                         <svg className="w-3.5 h-3.5 text-ink-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
@@ -1237,7 +1237,7 @@ function StudentModal({
                         href={guardianWhatsappUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="btn text-white py-1.5 px-2.5 text-xs flex items-center gap-1 rounded-md"
+                        className="btn text-white py-2 px-3 text-xs flex-1 sm:flex-none justify-center items-center gap-1.5 rounded-lg"
                         style={{ background: '#128C7E' }}
                       >
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1250,15 +1250,15 @@ function StudentModal({
 
                   {/* Student contact */}
                   {student.studentPhone && (
-                    <div className="flex items-center justify-between bg-cream-50 p-2.5 rounded-lg border border-line">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-cream-50 p-3 rounded-xl border border-line">
                       <div>
                         <span className="text-xs text-ink-500 block">جوال الطالب</span>
                         <span dir="ltr" className="font-mono text-xs text-ink-800">{student.studentPhone}</span>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 w-full sm:w-auto">
                         <a
                           href={`tel:${student.studentPhone}`}
-                          className="btn btn-secondary py-1 px-2.5 text-xs flex items-center gap-1 rounded-md"
+                          className="btn btn-secondary py-2 px-3 text-xs flex-1 sm:flex-none justify-center items-center gap-1.5 rounded-lg"
                         >
                           <svg className="w-3.5 h-3.5 text-ink-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
@@ -1270,7 +1270,7 @@ function StudentModal({
                             href={studentWhatsappUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="btn text-white py-1.5 px-2.5 text-xs flex items-center gap-1 rounded-md"
+                            className="btn text-white py-2 px-3 text-xs flex-1 sm:flex-none justify-center items-center gap-1.5 rounded-lg"
                             style={{ background: '#128C7E' }}
                           >
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1427,17 +1427,17 @@ function StudentModal({
         </div>
 
         {/* footer actions */}
-        <div className="flex items-center justify-between gap-2 p-3 sm:p-4 border-t border-ink-200 flex-wrap shrink-0">
-          <div className="flex gap-2">
+        <div className="p-4 border-t border-ink-200 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-cream-50/20 shrink-0">
+          <div className="flex gap-2 w-full sm:w-auto">
             {edit ? (
               <>
-                <button onClick={saveEdit} disabled={busy} className="btn btn-primary text-xs sm:text-sm">حفظ التعديلات</button>
-                <button onClick={() => { setEdit(false); setForm(student); }} className="btn btn-ghost text-xs sm:text-sm">إلغاء</button>
+                <button onClick={saveEdit} disabled={busy} className="btn btn-primary py-2.5 px-4 text-xs sm:text-sm flex-1 sm:flex-none justify-center rounded-lg">حفظ التعديلات</button>
+                <button onClick={() => { setEdit(false); setForm(student); }} className="btn btn-ghost py-2.5 px-4 text-xs sm:text-sm flex-1 sm:flex-none justify-center rounded-lg">إلغاء</button>
               </>
             ) : (
               <>
                 {isAdmin && canSeeFullDetails && (
-                  <button onClick={() => setEdit(true)} className="btn btn-secondary text-xs sm:text-sm flex items-center gap-1">
+                  <button onClick={() => setEdit(true)} className="btn btn-secondary py-2.5 px-4 text-xs sm:text-sm flex-1 sm:flex-none justify-center items-center gap-1.5 rounded-lg">
                     <svg className="w-3.5 h-3.5 text-ink-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                       <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z" />
@@ -1445,12 +1445,12 @@ function StudentModal({
                     <span>تعديل</span>
                   </button>
                 )}
-                <button onClick={onClose} className="btn btn-secondary text-xs sm:text-sm">إغلاق</button>
+                <button onClick={onClose} className="btn btn-secondary py-2.5 px-4 text-xs sm:text-sm flex-1 sm:flex-none justify-center rounded-lg">إغلاق</button>
               </>
             )}
           </div>
           {isAdmin && !edit && canSeeFullDetails && (
-            <button onClick={del} disabled={busy} className="btn btn-danger text-xs sm:text-sm">حذف الطالب</button>
+            <button onClick={del} disabled={busy} className="btn btn-danger py-2.5 px-4 text-xs sm:text-sm w-full sm:w-auto justify-center rounded-lg">حذف الطالب</button>
           )}
         </div>
       </div>

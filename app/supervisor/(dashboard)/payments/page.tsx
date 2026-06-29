@@ -671,21 +671,21 @@ function StudentDetailsModal({
   }
 
   return (
-    <div className="modal-backdrop flex items-center justify-center p-4 z-[999]" onClick={onClose}>
-      <div className="modal-panel w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-backdrop flex items-end sm:items-center justify-center p-0 sm:p-4 z-[999]" onClick={onClose}>
+      <div className="modal-panel w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl max-h-[92vh] sm:max-h-[90vh] overflow-hidden flex flex-col shadow-elevated" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="flex justify-between items-center p-4 border-b border-line bg-cream-50/50">
+        <div className="flex justify-between items-center p-4 sm:p-5 border-b border-line bg-cream-50/50">
           <div>
-            <h3 className="font-bold text-lg text-ink-900">{student.studentName}</h3>
+            <h3 className="font-bold text-base sm:text-lg text-ink-900">{student.studentName}</h3>
             <span dir="ltr" className="text-xs font-mono text-ink-500">#{student.membershipNo}</span>
           </div>
-          <button onClick={onClose} className="text-ink-400 hover:text-ink-900 text-2xl font-bold leading-none p-1">
+          <button onClick={onClose} className="text-ink-400 hover:text-ink-900 text-3xl font-bold leading-none px-2 py-1">
             ×
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-5 overflow-y-auto space-y-4 text-sm scroll-soft flex-1">
+        <div className="p-4 sm:p-5 overflow-y-auto space-y-4 text-sm scroll-soft flex-1">
           {/* Status Indicators */}
           <div className="flex gap-2 flex-wrap">
             <span className={`pill ${student.paymentStatus === 'paid' ? 'pill-green' : student.paymentStatus === 'exempted' ? 'pill-blue' : isReview(student) ? 'pill-yellow' : 'pill-red'}`}>
@@ -697,30 +697,32 @@ function StudentDetailsModal({
           </div>
 
           {/* Student Info Grid */}
-          <div className="grid grid-cols-2 gap-4 border-t border-line pt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4 border-t border-line pt-4">
             <div>
-              <span className="text-ink-500 text-xs block mb-1">رقم الهوية</span>
+              <span className="text-ink-500 text-xs block mb-0.5">رقم الهوية</span>
               <span dir="ltr" className="font-mono text-ink-900 font-semibold">{student.nationalId}</span>
             </div>
             <div>
-              <span className="text-ink-500 text-xs block mb-1">المرحلة والصف</span>
+              <span className="text-ink-500 text-xs block mb-0.5">المرحلة والصف</span>
               <span className="text-ink-900 font-semibold">{student.stage} — {student.grade}</span>
             </div>
             <div>
-              <span className="text-ink-500 text-xs block mb-1">الحي السكني</span>
+              <span className="text-ink-500 text-xs block mb-0.5">الحي السكني</span>
               <span className="text-ink-900 font-semibold">{student.neighborhood}</span>
             </div>
             <div>
-              <span className="text-ink-500 text-xs block mb-1">حالة التسجيل</span>
-              <span className={`pill ${student.registrationStatus === 'approved' ? 'pill-green' : student.registrationStatus === 'rejected' ? 'pill-red' : student.registrationStatus === 'pending' ? 'pill-yellow' : 'pill-gray'}`}>
-                {student.registrationStatus === 'approved' ? 'مقبول' : student.registrationStatus === 'rejected' ? 'مرفوض' : student.registrationStatus === 'pending' ? 'قيد الانتظار' : 'غير محدد'}
-              </span>
+              <span className="text-ink-500 text-xs block mb-0.5">حالة التسجيل</span>
+              <div className="mt-0.5">
+                <span className={`pill ${student.registrationStatus === 'approved' ? 'pill-green' : student.registrationStatus === 'rejected' ? 'pill-red' : student.registrationStatus === 'pending' ? 'pill-yellow' : 'pill-gray'}`}>
+                  {student.registrationStatus === 'approved' ? 'مقبول' : student.registrationStatus === 'rejected' ? 'مرفوض' : student.registrationStatus === 'pending' ? 'قيد الانتظار' : 'غير محدد'}
+                </span>
+              </div>
             </div>
           </div>
 
           {/* Geographic location */}
           <div className="border-t border-line pt-4">
-            <div className="flex items-center justify-between bg-cream-50 p-2.5 rounded-lg border border-line">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-cream-50 p-3 rounded-xl border border-line">
               <div className="min-w-0">
                 <span className="text-xs text-ink-500 block">الموقع الجغرافي</span>
                 <span className="text-xs text-ink-800 font-semibold">
@@ -732,7 +734,7 @@ function StudentDetailsModal({
                   href={mapsHref}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="btn text-white py-1.5 px-2.5 text-xs flex items-center gap-1 rounded-md shrink-0"
+                  className="btn text-white py-2 px-3 text-xs flex items-center justify-center gap-1.5 rounded-lg shrink-0 w-full sm:w-auto"
                   style={{ background: '#1B7A43' }}
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -747,7 +749,7 @@ function StudentDetailsModal({
 
           {/* Condition Alert */}
           {student.hasCondition && (
-            <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs flex gap-2 items-start">
+            <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex gap-2 items-start">
               <svg className="w-4 h-4 text-red-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
                 <line x1="12" y1="9" x2="12" y2="13" />
@@ -765,15 +767,15 @@ function StudentDetailsModal({
             <h4 className="font-bold text-xs text-ink-500">بيانات الاتصال والتواصل</h4>
             
             {/* Guardian contact */}
-            <div className="flex items-center justify-between bg-cream-50 p-2.5 rounded-lg border border-line">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-cream-50 p-3 rounded-xl border border-line">
               <div>
                 <span className="text-xs text-ink-500 block">ولي الأمر</span>
                 <span dir="ltr" className="font-mono text-xs text-ink-800">{student.guardianPhone}</span>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 w-full sm:w-auto">
                 <a
                   href={`tel:${student.guardianPhone}`}
-                  className="btn btn-secondary py-1 px-2.5 text-xs flex items-center gap-1 rounded-md"
+                  className="btn btn-secondary py-2 px-3 text-xs flex-1 sm:flex-none justify-center items-center gap-1.5 rounded-lg"
                 >
                   <svg className="w-3.5 h-3.5 text-ink-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
@@ -784,7 +786,7 @@ function StudentDetailsModal({
                   href={guardianWhatsappUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="btn text-white py-1.5 px-2.5 text-xs flex items-center gap-1 rounded-md"
+                  className="btn text-white py-2 px-3 text-xs flex-1 sm:flex-none justify-center items-center gap-1.5 rounded-lg"
                   style={{ background: '#128C7E' }}
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -797,15 +799,15 @@ function StudentDetailsModal({
 
             {/* Student contact */}
             {student.studentPhone && (
-              <div className="flex items-center justify-between bg-cream-50 p-2.5 rounded-lg border border-line">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-cream-50 p-3 rounded-xl border border-line">
                 <div>
                   <span className="text-xs text-ink-500 block">جوال الطالب</span>
                   <span dir="ltr" className="font-mono text-xs text-ink-800">{student.studentPhone}</span>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 w-full sm:w-auto">
                   <a
                     href={`tel:${student.studentPhone}`}
-                    className="btn btn-secondary py-1 px-2.5 text-xs flex items-center gap-1 rounded-md"
+                    className="btn btn-secondary py-2 px-3 text-xs flex-1 sm:flex-none justify-center items-center gap-1.5 rounded-lg"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
@@ -817,7 +819,7 @@ function StudentDetailsModal({
                       href={studentWhatsappUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="btn text-white py-1.5 px-2.5 text-xs flex items-center gap-1 rounded-md"
+                      className="btn text-white py-2 px-3 text-xs flex-1 sm:flex-none justify-center items-center gap-1.5 rounded-lg"
                       style={{ background: '#128C7E' }}
                     >
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -847,7 +849,7 @@ function StudentDetailsModal({
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploadingReceipt}
-                className="btn btn-secondary py-1 px-2.5 text-xs flex items-center gap-1 rounded-md"
+                className="btn btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5 rounded-lg"
               >
                 {uploadingReceipt ? (
                   <>
@@ -877,11 +879,11 @@ function StudentDetailsModal({
             </div>
 
             {student.paymentReceipt && (
-              <div className="bg-cream-50 p-3 rounded-lg border border-line flex flex-col gap-2">
+              <div className="bg-cream-50 p-3 rounded-xl border border-line flex flex-col gap-2">
                 <span className="text-xs text-ink-500 font-semibold">تم رفع الإيصال بنجاح</span>
                 <button
                   onClick={() => openReceipt(student.paymentReceipt!)}
-                  className="btn btn-secondary py-1.5 px-3 text-xs w-full justify-center gap-1.5"
+                  className="btn btn-secondary py-2 px-3 text-xs w-full justify-center gap-1.5 rounded-lg"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
@@ -895,27 +897,28 @@ function StudentDetailsModal({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 border-t border-line bg-cream-50/50 flex items-center gap-2">
-          {/* Delete — icon-only, far right to avoid accidental taps */}
-          {isAdmin && (
-            <button
-              onClick={() => onDelete(student.id, student.studentName)}
-              disabled={busyId === student.id}
-              className="btn py-2 px-2.5 text-xs flex items-center justify-center text-red-600 border-red-200 bg-red-50 hover:bg-red-100 shrink-0"
-              title="حذف الطالب نهائياً"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="3 6 5 6 21 6" />
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-              </svg>
-            </button>
-          )}
-          <button onClick={onClose} className="btn btn-ghost py-2 px-4 text-xs shrink-0">إغلاق</button>
+        <div className="p-4 border-t border-line bg-cream-50/50 flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2">
+          <div className="flex gap-2 w-full sm:w-auto">
+            {isAdmin && (
+              <button
+                onClick={() => onDelete(student.id, student.studentName)}
+                disabled={busyId === student.id}
+                className="btn py-2 px-3 text-xs flex items-center justify-center text-red-600 border-red-200 bg-red-50 hover:bg-red-100 rounded-lg shrink-0"
+                title="حذف الطالب نهائياً"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+              </button>
+            )}
+            <button onClick={onClose} className="btn btn-ghost py-2.5 px-4 text-xs flex-1 sm:flex-none justify-center">إغلاق</button>
+          </div>
           {student.paymentStatus === 'paid' || student.paymentStatus === 'exempted' ? (
             <button
               onClick={() => onCancelConfirm(student.id)}
               disabled={busyId === student.id}
-              className="btn py-2 px-4 text-xs flex-1 flex justify-center items-center gap-1 text-red-600 border-red-200 bg-red-50 hover:bg-red-100"
+              className="btn py-2.5 px-4 text-xs flex-1 flex justify-center items-center gap-1.5 text-red-600 border-red-200 bg-red-50 hover:bg-red-100 rounded-lg w-full sm:w-auto"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M18 6 6 18M6 6l12 12" />
@@ -926,7 +929,7 @@ function StudentDetailsModal({
             <button
               onClick={() => onConfirm(student.id)}
               disabled={busyId === student.id}
-              className="btn text-white border-transparent py-2 px-4 text-xs flex-1 flex justify-center items-center gap-1"
+              className="btn text-white border-transparent py-2.5 px-4 text-xs flex-1 flex justify-center items-center gap-1.5 rounded-lg w-full sm:w-auto"
               style={{ background: '#1B7A43' }}
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

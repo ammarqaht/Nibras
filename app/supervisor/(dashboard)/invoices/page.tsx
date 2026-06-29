@@ -283,11 +283,11 @@ function AddInvoiceModal({
   }
 
   return (
-    <div className="modal-backdrop flex items-center justify-center p-3 md:p-6 overflow-y-auto" onClick={onClose}>
-      <div className="modal-panel w-full max-w-2xl my-4" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between p-5 border-b border-ink-200">
-          <h2 className="text-xl font-bold text-ink-900">إضافة فاتورة</h2>
-          <button onClick={onClose} className="text-ink-400 hover:text-ink-900 text-2xl leading-none px-2">×</button>
+    <div className="modal-backdrop flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 overflow-y-auto" onClick={onClose}>
+      <div className="modal-panel w-full sm:max-w-2xl rounded-t-3xl sm:rounded-2xl max-h-[92vh] sm:max-h-[85vh] flex flex-col shadow-elevated" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-ink-200">
+          <h2 className="text-lg sm:text-xl font-bold text-ink-900">إضافة فاتورة</h2>
+          <button onClick={onClose} className="text-ink-400 hover:text-ink-900 text-3xl font-bold leading-none px-2 py-1">×</button>
         </div>
 
         <div className="p-5 space-y-5 max-h-[72vh] overflow-y-auto scroll-soft">
@@ -317,7 +317,7 @@ function AddInvoiceModal({
             {aiExtracted && (
               <p className="hint mt-2 flex items-center justify-center gap-1.5" style={{ color: 'var(--blue)' }}>
                  <svg className="w-3.5 h-3.5 text-blue-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                   <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275z" />
+                   <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1 1.275-1.275z" />
                  </svg>
                  <span>عُبّئت الحقول تلقائياً{aiConfidence != null ? ` (ثقة ${Math.round(aiConfidence * 100)}%)` : ''} — راجعها قبل الحفظ.</span>
               </p>
@@ -361,9 +361,9 @@ function AddInvoiceModal({
           </Field>
         </div>
 
-        <div className="flex items-center justify-end gap-2 p-4 border-t border-ink-200">
-          <button onClick={onClose} className="btn btn-ghost text-sm">إلغاء</button>
-          <button onClick={submit} disabled={busy || reading} className="btn btn-primary">{busy ? 'جارٍ الحفظ…' : 'حفظ الفاتورة'}</button>
+        <div className="p-4 border-t border-ink-200 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-cream-50/20 shrink-0">
+          <button onClick={onClose} className="btn btn-ghost py-2.5 px-4 text-xs sm:text-sm flex-1 sm:flex-none justify-center rounded-lg">إلغاء</button>
+          <button onClick={submit} disabled={busy || reading} className="btn btn-primary py-2.5 px-4 text-xs sm:text-sm flex-1 sm:flex-none justify-center rounded-lg">{busy ? 'جارٍ الحفظ…' : 'حفظ الفاتورة'}</button>
         </div>
       </div>
     </div>
@@ -384,22 +384,22 @@ function ViewInvoiceModal({
   onDelete: () => void;
 }) {
   return (
-    <div className="modal-backdrop flex items-center justify-center p-3 md:p-6 overflow-y-auto" onClick={onClose}>
-      <div className="modal-panel w-full max-w-xl my-4" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start justify-between p-5 border-b border-ink-200">
+    <div className="modal-backdrop flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 overflow-y-auto" onClick={onClose}>
+      <div className="modal-panel w-full sm:max-w-xl rounded-t-3xl sm:rounded-2xl max-h-[92vh] sm:max-h-[85vh] flex flex-col shadow-elevated" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between p-4 sm:p-5 border-b border-ink-200">
           <div>
-            <h2 className="text-xl font-bold text-ink-900">{invoice.title}</h2>
+            <h2 className="text-lg sm:text-xl font-bold text-ink-900">{invoice.title}</h2>
             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-              <span dir="ltr" className="text-sm font-mono text-ink-500">#{invoice.invoiceNo}</span>
+              <span dir="ltr" className="text-xs sm:text-sm font-mono text-ink-500">#{invoice.invoiceNo}</span>
               <span className={`pill ${statusPill(invoice.status)}`}>{statusLabel(invoice.status)}</span>
               {invoice.settlement === 'handed_over' && <span className="pill pill-green">تم تسليم المبلغ</span>}
             </div>
           </div>
-          <button onClick={onClose} className="text-ink-400 hover:text-ink-900 text-2xl leading-none px-2">×</button>
+          <button onClick={onClose} className="text-ink-400 hover:text-ink-900 text-3xl font-bold leading-none px-2 py-1">×</button>
         </div>
 
-        <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto scroll-soft">
-          <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+        <div className="p-4 sm:p-5 space-y-4 flex-1 overflow-y-auto scroll-soft">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm">
             <Info label="القسم" value={departmentLabel(invoice.department)} />
             <Info label="التصنيف" value={invoice.category ? categoryLabel(invoice.category) : '—'} />
             <Info label="المورّد" value={invoice.vendor || '—'} />
@@ -409,14 +409,12 @@ function ViewInvoiceModal({
           </div>
 
           {invoice.reviewNote && (
-            <div className="text-sm rounded-md p-2.5" style={{ background: '#FDEAE6', color: '#C42910' }}>
+            <div className="text-sm rounded-xl p-3" style={{ background: '#FDEAE6', color: '#C42910' }}>
               ملاحظة المالية: {invoice.reviewNote}
             </div>
           )}
 
-
-
-          <div className="flex items-center justify-between text-lg font-bold border-t border-ink-200 pt-3">
+          <div className="flex items-center justify-between text-base sm:text-lg font-bold border-t border-ink-200 pt-3">
             <span>الإجمالي</span>
             <span dir="ltr" style={{ color: 'var(--accent-deep)' }}>{money(invoice.total)}</span>
           </div>
@@ -425,16 +423,17 @@ function ViewInvoiceModal({
             <div>
               <div className="label">صورة الفاتورة</div>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={invoice.imageData} alt="الفاتورة" className="max-h-72 rounded-lg border border-ink-200" />
+              <img src={invoice.imageData} alt="الفاتورة" className="max-h-72 rounded-lg border border-ink-200 mx-auto" />
             </div>
           )}
         </div>
 
-        {canDelete && (
-          <div className="flex justify-end p-4 border-t border-ink-200">
-            <button onClick={onDelete} className="btn btn-danger text-sm">حذف الفاتورة</button>
-          </div>
-        )}
+        <div className="p-4 border-t border-ink-200 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-cream-50/20 shrink-0">
+          <button onClick={onClose} className="btn btn-ghost py-2.5 px-4 text-xs sm:text-sm flex-1 sm:flex-none justify-center rounded-lg">إغلاق</button>
+          {canDelete && (
+            <button onClick={onDelete} className="btn btn-danger py-2.5 px-4 text-xs sm:text-sm flex-1 sm:flex-none justify-center rounded-lg">حذف الفاتورة</button>
+          )}
+        </div>
       </div>
     </div>
   );
