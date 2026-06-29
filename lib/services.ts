@@ -118,10 +118,9 @@ export type SettingInfo = {
 
 // ==================== ROLE CONSTANTS ====================
 
-/** الأدوار التي تملك صلاحية كاملة على بيانات الطلاب (شاملة الهوية والجوال والدفع) */
 export const FULL_STUDENT_DATA_ROLES = [
   'admin', 'finance', 'finance_supervisor',
-  'media_supervisor', 'stage_supervisor'
+  'general_supervisor', 'media_officer', 'stage_supervisor'
 ];
 
 /** الأدوار التي تستطيع رؤية البيانات المالية في الإحصائيات */
@@ -135,10 +134,9 @@ export const GROUP_POINTS_ROLES = [
   'scientific_supervisor', 'social_supervisor', 'stage_supervisor'
 ];
 
-/** الأدوار التي تُعامَل كـ "عامة" وترى بيانات الجميع بدون تصفية أسرة/مرحلة */
 export const GLOBAL_ROLES = [
   'admin', 'finance', 'finance_supervisor',
-  'media_supervisor',
+  'media_supervisor', 'media_officer',
   'general_supervisor', 'attendance_supervisor',
   'cultural_supervisor', 'sports_supervisor',
   'scientific_supervisor', 'social_supervisor',

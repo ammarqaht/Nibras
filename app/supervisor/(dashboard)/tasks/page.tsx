@@ -93,6 +93,16 @@ export default function TasksPage() {
   const [activeTab, setActiveTab] = useState<'submissions' | 'log' | 'add' | 'manage'>('manage');
   const [loading, setLoading] = useState(true);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab');
+      if (tabParam === 'submissions' || tabParam === 'log' || tabParam === 'add' || tabParam === 'manage') {
+        setActiveTab(tabParam);
+      }
+    }
+  }, []);
+
   const [students, setStudents] = useState<Student[]>([]);
   const [supervisors, setSupervisors] = useState<SupervisorUser[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);

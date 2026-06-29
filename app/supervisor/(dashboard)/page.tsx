@@ -585,6 +585,7 @@ export default function DashboardHome() {
   const [stats, setStats] = useState<any>(null);
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pendingTasksCount, setPendingTasksCount] = useState(0);
 
   // Schedule stage filter
   const [scheduleStage, setScheduleStage] = useState<string>('ابتدائي');
@@ -632,6 +633,7 @@ export default function DashboardHome() {
   const isGeneralRole = roles.includes('general_supervisor');
   const isStageRole = roles.includes('stage_supervisor');
   const isMediaRole = roles.includes('media_supervisor');
+  const isTasksRole = roles.includes('tasks_supervisor');
   const canAddPoints = isPointsRole;
 
   const isGlobal = roles.some((r) =>
@@ -643,9 +645,10 @@ export default function DashboardHome() {
 
   async function loadData() {
     try {
-      const [statsRes, studentsRes] = await Promise.all([
+      const [statsRes, studentsRes, submissionsRes] = await Promise.all([
         fetch('/api/supervisor/dashboard/stats', { cache: 'no-store' }),
-        fetch('/api/supervisor/students?scope=all', { cache: 'no-store' })
+        fetch('/api/supervisor/students?scope=all', { cache: 'no-store' }),
+        fetch('/api/supervisor/submissions', { cache: 'no-store' }).catch(() => null)
       ]);
       
       const statsJson = await statsRes.json();
@@ -655,6 +658,12 @@ export default function DashboardHome() {
       if (studentsJson.students) {
         // Only allow awarding points to approved students
         setStudents(studentsJson.students.filter((s: any) => s.registrationStatus === 'approved'));
+      }
+
+      if (submissionsRes) {
+        const subJson = await submissionsRes.json().catch(() => ({ submissions: [] }));
+        const pendingCount = (subJson.submissions ?? []).filter((s: any) => s.status === 'pending').length;
+        setPendingTasksCount(pendingCount);
       }
 
     } catch (err) {
@@ -838,6 +847,28 @@ export default function DashboardHome() {
         <div className="text-center py-16 text-ink-400 text-sm">جارٍ تحميل الإحصائيات الذكية…</div>
       ) : (
         <div className="space-y-6">
+          {(isMediaRole || isTasksRole) && (
+            <Link
+              href="/supervisor/tasks?tab=submissions"
+              className="block card p-6 mb-2 hover:shadow-md transition-shadow relative overflow-hidden group cursor-pointer border-brand"
+            >
+              <div className="absolute top-0 right-0 w-2 h-full bg-brand" />
+              <div className="flex items-center justify-between gap-4">
+                <div className="space-y-1 text-right">
+                  <h3 className="text-lg font-bold text-brand flex items-center gap-2 justify-end md:justify-start">
+                    <span>📋 المهام بانتظار التقييم</span>
+                    <span className="animate-pulse inline-block w-2.5 h-2.5 rounded-full bg-brand" />
+                  </h3>
+                  <p className="text-sm text-ink-500">
+                    لديك <span className="font-semibold text-brand-600">{pendingTasksCount}</span> مهمة مستلمة بانتظار تقييمك ومراجعتك حالياً.
+                  </p>
+                </div>
+                <div className="flex items-center justify-center bg-brand-50 border border-brand-200 text-brand text-2xl font-extrabold w-16 h-16 rounded-2xl group-hover:scale-105 transition-transform shrink-0">
+                  {pendingTasksCount}
+                </div>
+              </div>
+            </Link>
+          )}
           
           {/* Quick Nav — role-based shortcuts */}
           <QuickNav roles={roles} hasPerm={hasPerm} isAdmin={isAdmin} />

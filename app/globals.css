@@ -562,3 +562,44 @@ select.input {
               box-shadow 250ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Smooth Page & Element Entry Animations */
+@keyframes smoothFadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Apply globally to main containers, cards, tables, forms, headers, buttons */
+main,
+.card,
+.tbl,
+table,
+form,
+h1, h2, h3, h4,
+.btn,
+.choice {
+  animation: smoothFadeInUp 0.65s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Stagger delays for better visual hierarchy */
+.card { animation-delay: 0.05s; }
+.tbl, table { animation-delay: 0.1s; }
+
+/* Interactive hover transitions */
+.card,
+.btn,
+.choice,
+input,
+select,
+textarea,
+tr,
+.pill {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+

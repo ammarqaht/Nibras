@@ -10,7 +10,10 @@ export const DEPARTMENTS = [
   { key: 'social_supervisor', label: 'الاجتماعية' },
   { key: 'attendance_supervisor', label: 'التحضير' },
   { key: 'groups_supervisor', label: 'الأسر' },
-  { key: 'general_supervisor', label: 'العام' }
+  { key: 'general_supervisor', label: 'العام' },
+  { key: 'media_officer', label: 'الإعلامية (مسؤول)' },
+  { key: 'media_supervisor', label: 'الإعلامية (مشرف)' },
+  { key: 'tasks_supervisor', label: 'المهام' }
 ] as const;
 
 export const departmentLabel = (key: string) =>

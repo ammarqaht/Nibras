@@ -220,12 +220,12 @@ export default function StudentsPage() {
   const isAdmin = user?.role === 'admin';
   const roles = user?.role ? user.role.split(',').map((r) => r.trim()) : [];
   const isGlobal = roles.some((r) =>
-    ['admin', 'finance', 'finance_supervisor', 'media_supervisor',
+    ['admin', 'finance', 'finance_supervisor', 'media_supervisor', 'media_officer', 'tasks_supervisor',
      'cultural_supervisor', 'social_supervisor', 'scientific_supervisor', 'sports_supervisor',
      'general_supervisor', 'attendance_supervisor'].includes(r)
   );
   const canSeeFullStudentDetails = roles.some((r) =>
-    ['admin', 'finance', 'finance_supervisor', 'media_supervisor', 'stage_supervisor'].includes(r)
+    ['admin', 'finance', 'finance_supervisor', 'general_supervisor', 'media_officer', 'stage_supervisor'].includes(r)
   );
   const isStageSup  = !isGlobal && roles.includes('stage_supervisor');
   const isGroupsSup = !isGlobal && !isStageSup && roles.includes('groups_supervisor');
@@ -1074,15 +1074,21 @@ function StudentModal({
       : student.locationLat && student.locationLng
       ? `https://maps.google.com/?q=${student.locationLat},${student.locationLng}`
       : 'غير محدد';
-    const msg =
-      `*بيانات تسجيل الطالب في نادي نبراس:*\n` +
-      `اسم الطالب: ${student.studentName}\n` +
-      `رقم العضوية: #${student.membershipNo}\n` +
-      `رقم الهوية: ${student.nationalId}\n` +
-      `المرحلة: ${student.stage} - ${student.grade}\n` +
-      (isGlobal ? `جوال ولي الأمر: ${student.guardianPhone}\n` : '') +
-      `الحي: ${student.neighborhood}\n` +
-      `الموقع: ${locLine}`;
+    const msg = !canSeeFullDetails
+      ? `*بيانات تسجيل الطالب في نادي نبراس:*\n` +
+        `اسم الطالب: ${student.studentName}\n` +
+        `رقم العضوية: #${student.membershipNo}\n` +
+        `المرحلة: ${student.stage} - ${student.grade}\n` +
+        `المجموعة: ${groups.find((g) => g.id === student.groupId)?.name || 'غير محدد'}\n` +
+        `الحالة الصحية: ${student.hasCondition ? (student.conditionNote || 'نعم') : 'لا'}`
+      : `*بيانات تسجيل الطالب في نادي نبراس:*\n` +
+        `اسم الطالب: ${student.studentName}\n` +
+        `رقم العضوية: #${student.membershipNo}\n` +
+        `رقم الهوية: ${student.nationalId}\n` +
+        `المرحلة: ${student.stage} - ${student.grade}\n` +
+        (isGlobal ? `جوال ولي الأمر: ${student.guardianPhone}\n` : '') +
+        `الحي: ${student.neighborhood}\n` +
+        `الموقع: ${locLine}`;
     navigator.clipboard.writeText(msg).then(
       () => pushToast('success', 'تم نسخ بيانات الطالب'),
       () => pushToast('error', 'تعذّر النسخ')
