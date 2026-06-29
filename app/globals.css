@@ -585,8 +585,13 @@ h1, h2, h3, h4,
   animation: smoothFadeInUp 0.65s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+@keyframes simpleFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
 main {
-  animation: fadeIn 0.4s ease both;
+  animation: simpleFadeIn 0.4s ease both;
 }
 
 /* Stagger delays for better visual hierarchy */
@@ -603,6 +608,13 @@ textarea,
 tr,
 .pill {
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Scroll lock when modal is open */
+body.modal-open,
+body:has(.modal-backdrop) {
+  overflow: hidden !important;
+  height: 100vh !important;
 }
 
 

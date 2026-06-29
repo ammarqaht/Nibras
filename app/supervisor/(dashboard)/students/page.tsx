@@ -975,6 +975,13 @@ function StudentModal({
 
   useEffect(() => setForm(student), [student]);
 
+  useEffect(() => {
+    document.body.classList.add('modal-open');
+    return () => {
+      document.body.classList.remove('modal-open');
+    };
+  }, []);
+
   const stageDef = stages.find((s) => s.key === form.stage);
 
   async function put(patch: Partial<Student>) {
