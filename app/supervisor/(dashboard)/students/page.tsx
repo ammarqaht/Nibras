@@ -45,12 +45,14 @@ function regPill(status: string) {
 function StageMultiSelectDropdown({
   selected,
   onChange,
+  open,
+  onOpenChange,
 }: {
   selected: string[];
   onChange: (val: string[]) => void;
+  open: boolean;
+  onOpenChange: (value: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
-
   const toggleGrade = (grade: string, stageKey: string) => {
     const gradeKey = `grade:${grade}`;
     let nextSelected = selected.includes(gradeKey)
@@ -96,7 +98,7 @@ function StageMultiSelectDropdown({
     <div className="relative z-[60]">
       <button
         type="button"
-        onClick={() => setOpen(!open)}
+        onClick={() => onOpenChange(!open)}
         className="field flex items-center justify-between gap-2 text-right w-full bg-white select-none"
       >
         <span>
@@ -108,8 +110,8 @@ function StageMultiSelectDropdown({
       </button>
       {open && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 mt-1 w-full min-w-[240px] max-h-80 overflow-y-auto bg-white border border-ink-200 rounded-xl shadow-xl z-50 p-3 space-y-3 scroll-soft text-right" dir="rtl">
+          <div className="fixed inset-0 z-[70]" onClick={() => onOpenChange(false)} />
+          <div className="absolute right-0 mt-1 w-full min-w-[240px] max-h-80 overflow-y-auto bg-white border border-ink-200 rounded-xl shadow-xl z-[80] p-3 space-y-3 scroll-soft text-right" dir="rtl">
             {stages.map((stage) => {
               const stageKeyStr = `stage:${stage.key}`;
               const isStageChecked = selected.includes(stageKeyStr);
@@ -161,13 +163,16 @@ function MultiSelectDropdown({
   options,
   selected,
   onChange,
+  open,
+  onOpenChange,
 }: {
   label: string;
   options: { value: string; label: string }[];
   selected: string[];
   onChange: (val: string[]) => void;
+  open: boolean;
+  onOpenChange: (value: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const toggle = (val: string) => {
     if (selected.includes(val)) {
       onChange(selected.filter((s) => s !== val));
@@ -180,7 +185,7 @@ function MultiSelectDropdown({
     <div className="relative z-[60]">
       <button
         type="button"
-        onClick={() => setOpen(!open)}
+        onClick={() => onOpenChange(!open)}
         className="field flex items-center justify-between gap-2 text-right w-full bg-white select-none"
       >
         <span>{selected.length > 0 ? `${label} (${selected.length})` : label}</span>
@@ -188,8 +193,8 @@ function MultiSelectDropdown({
       </button>
       {open && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 mt-1 w-full min-w-[200px] max-h-60 overflow-y-auto bg-white border border-ink-200 rounded-xl shadow-xl z-50 p-2 space-y-0.5 scroll-soft">
+          <div className="fixed inset-0 z-[70]" onClick={() => onOpenChange(false)} />
+          <div className="absolute right-0 mt-1 w-full min-w-[200px] max-h-60 overflow-y-auto bg-white border border-ink-200 rounded-xl shadow-xl z-[80] p-2 space-y-0.5 scroll-soft">
             {options.length === 0 ? (
               <p className="text-center py-4 text-ink-400 text-xs">لا توجد خيارات</p>
             ) : (
@@ -248,6 +253,7 @@ export default function StudentsPage() {
   const [fStages, setFStages] = useState<string[]>([]);
   const [fGroups, setFGroups] = useState<string[]>([]);
   const [fNeighborhoods, setFNeighborhoods] = useState<string[]>([]);
+  const [openFilterMenu, setOpenFilterMenu] = useState<'stage' | 'groups' | 'neighborhood' | null>(null);
 
   const [visibleCols, setVisibleCols] = useState({
     index: true,
@@ -621,6 +627,8 @@ export default function StudentsPage() {
               <StageMultiSelectDropdown
                 selected={fStages}
                 onChange={setFStages}
+                open={openFilterMenu === 'stage'}
+                onOpenChange={(value) => setOpenFilterMenu(value ? 'stage' : null)}
               />
             </div>
             {fStages.length > 0 && (
@@ -643,6 +651,8 @@ export default function StudentsPage() {
                   options={groups.map((g) => ({ value: String(g.id), label: g.name }))}
                   selected={fGroups}
                   onChange={setFGroups}
+                  open={openFilterMenu === 'groups'}
+                  onOpenChange={(value) => setOpenFilterMenu(value ? 'groups' : null)}
                 />
               </div>
               {fGroups.length > 0 && (
@@ -666,6 +676,8 @@ export default function StudentsPage() {
                 options={neighborhoods.map((n) => ({ value: n, label: n }))}
                 selected={fNeighborhoods}
                 onChange={setFNeighborhoods}
+                open={openFilterMenu === 'neighborhood'}
+                onOpenChange={(value) => setOpenFilterMenu(value ? 'neighborhood' : null)}
               />
             </div>
             {fNeighborhoods.length > 0 && (
