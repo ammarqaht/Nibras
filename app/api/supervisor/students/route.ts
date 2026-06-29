@@ -148,7 +148,7 @@ export async function PUT(req: NextRequest) {
 
     // Auto-set registrationStatus based on paymentStatus
     let registrationStatus = body.registrationStatus;
-    if (body.paymentStatus === 'paid') {
+    if (body.paymentStatus === 'paid' || body.paymentStatus === 'exempted') {
       registrationStatus = 'approved';
     } else if (body.paymentStatus === 'unpaid' || body.paymentStatus === 'apple_pay') {
       // Only override if we're explicitly changing payment status

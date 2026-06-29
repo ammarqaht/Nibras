@@ -93,7 +93,7 @@ function StageMultiSelectDropdown({
   const selectedGradesCount = selected.filter((k) => k.startsWith('grade:')).length;
 
   return (
-    <div className="relative">
+    <div className="relative z-[60]">
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -177,7 +177,7 @@ function MultiSelectDropdown({
   };
 
   return (
-    <div className="relative">
+    <div className="relative z-[60]">
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -349,7 +349,7 @@ export default function StudentsPage() {
 
   const approvedStudents = useMemo(() => {
     return students.filter((s) =>
-      s.registrationStatus === 'approved' &&
+      (s.registrationStatus === 'approved' || s.paymentStatus === 'exempted') &&
       (s.paymentStatus === 'paid' || s.paymentStatus === 'exempted' || s.paymentStatus === '')
     );
   }, [students]);
@@ -443,7 +443,7 @@ export default function StudentsPage() {
           <h1 className="text-2xl font-bold text-ink-900 mb-1">سجل الطلاب</h1>
           <p className="text-sm text-ink-500">{filtered.length} طالب من أصل {approvedStudents.length}</p>
         </div>
-        <div className="flex gap-2 items-center relative">
+        <div className="flex gap-2 items-center relative z-[60]">
           <button
             onClick={() => setShowHealthModal(true)}
             className="btn btn-secondary text-sm flex items-center gap-1.5 text-red-600 border-red-200 bg-red-50 hover:bg-red-100 font-semibold"
@@ -464,7 +464,7 @@ export default function StudentsPage() {
           )}
           
           {canSeeFullStudentDetails && showColSettings && (
-            <div className="absolute left-0 top-full mt-2 w-64 bg-white border border-ink-200 rounded-xl shadow-xl z-50 p-4 font-sans text-right" dir="rtl">
+            <div className="absolute left-0 top-full mt-2 w-64 bg-white border border-ink-200 rounded-xl shadow-xl z-[60] p-4 font-sans text-right" dir="rtl">
               <h3 className="font-bold text-ink-900 mb-3 text-sm border-b border-ink-100 pb-2">تخصيص الأعمدة المعروضة</h3>
               <div className="space-y-2 max-h-60 overflow-y-auto scroll-soft">
                 <label className="flex items-center gap-2.5 text-sm text-ink-700 cursor-pointer hover:bg-cream-50 p-1.5 rounded-lg select-none">
@@ -1123,8 +1123,8 @@ function StudentModal({
   const studentWhatsappUrl = formattedStudentPhone ? `https://wa.me/${formattedStudentPhone}` : null;
 
   return (
-    <div className="modal-backdrop flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 overflow-y-auto" onClick={onClose}>
-      <div className="modal-panel w-full sm:max-w-2xl rounded-t-3xl sm:rounded-2xl max-h-[92vh] sm:max-h-[85vh] flex flex-col shadow-elevated" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-backdrop flex items-end sm:items-center justify-center p-0 sm:p-4 z-[60] overflow-y-auto" onClick={onClose}>
+      <div className="modal-panel w-full sm:max-w-xl rounded-t-3xl sm:rounded-2xl max-h-[82vh] sm:max-h-[72vh] flex flex-col shadow-elevated" onClick={(e) => e.stopPropagation()}>
         {/* header */}
         <div className="flex items-start justify-between p-3.5 sm:p-5 border-b border-ink-200 shrink-0">
           <div>
