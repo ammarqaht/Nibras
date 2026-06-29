@@ -60,6 +60,12 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
+  // Reset points modal states
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetPassword, setResetPassword] = useState('');
+  const [resetConfirmed, setResetConfirmed] = useState(false);
+  const [resetBusy, setResetBusy] = useState(false);
+
   useEffect(() => {
     (async () => {
       const r = await fetch('/api/supervisor/settings', { cache: 'no-store' });
@@ -102,6 +108,31 @@ export default function SettingsPage() {
     else pushToast('error', 'تعذّر حفظ بعض الإعدادات');
   }
 
+  async function resetPoints() {
+    if (resetPassword !== '123asd' || !resetConfirmed) return;
+    setResetBusy(true);
+    try {
+      const r = await fetch('/api/supervisor/reset-points', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: resetPassword })
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok) {
+        pushToast('success', 'تم تصفير جميع نقاط الطلاب وحذف السجل بنجاح.');
+        setShowResetModal(false);
+        setResetPassword('');
+        setResetConfirmed(false);
+      } else {
+        pushToast('error', j.error || 'تعذّر تصفير النقاط');
+      }
+    } catch {
+      pushToast('error', 'حدث خطأ في الاتصال بالخادم');
+    } finally {
+      setResetBusy(false);
+    }
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
@@ -109,7 +140,17 @@ export default function SettingsPage() {
           <h1 className="text-2xl font-bold text-ink-900 mb-1">الإعدادات</h1>
           <p className="text-sm text-ink-500">نصوص الموقع العام، تفاصيل النادي، والحساب البنكي. اتركها فارغة لاستخدام القيمة الافتراضية.</p>
         </div>
-        <button onClick={saveAll} disabled={busy || loading} className="btn btn-primary">{busy ? 'جارٍ الحفظ…' : 'حفظ كل التغييرات'}</button>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <button
+              onClick={() => setShowResetModal(true)}
+              className="btn bg-red-600 hover:bg-red-750 text-white font-bold shrink-0"
+            >
+              تصفير النقاط
+            </button>
+          )}
+          <button onClick={saveAll} disabled={busy || loading} className="btn btn-primary">{busy ? 'جارٍ الحفظ…' : 'حفظ كل التغييرات'}</button>
+        </div>
       </div>
 
       {loading ? (
@@ -146,8 +187,73 @@ export default function SettingsPage() {
             </div>
           ))}
 
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            {isAdmin && (
+              <button
+                onClick={() => setShowResetModal(true)}
+                className="btn bg-red-600 hover:bg-red-750 text-white font-bold shrink-0"
+              >
+                تصفير النقاط
+              </button>
+            )}
             <button onClick={saveAll} disabled={busy} className="btn btn-primary">{busy ? 'جارٍ الحفظ…' : 'حفظ كل التغييرات'}</button>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {showResetModal && (
+        <div className="modal-backdrop flex items-center justify-center p-3 sm:p-6" onClick={() => setShowResetModal(false)}>
+          <div className="modal-panel w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between pb-4 border-b border-ink-150 mb-4">
+              <h3 className="text-lg font-bold text-red-600">تنبيه حرج: تصفير نقاط الطلاب</h3>
+              <button onClick={() => setShowResetModal(false)} className="text-ink-400 hover:text-ink-900 text-xl font-bold leading-none p-1">×</button>
+            </div>
+            <div className="space-y-4 text-right" dir="rtl">
+              <p className="text-sm text-ink-600 leading-relaxed">
+                سيقوم هذا الإجراء بحذف سجل النقاط والرصيد بالكامل لجميع الطلاب وإعادة أرصدتهم ونقاطهم إلى صفر. هذا الإجراء نهائي ولا يمكن التراجع عنه.
+              </p>
+
+              <div>
+                <label className="label text-sm font-semibold">أدخل كلمة مرور التأكيد (123asd)</label>
+                <input
+                  type="password"
+                  className="field w-full text-left"
+                  dir="ltr"
+                  value={resetPassword}
+                  onChange={e => setResetPassword(e.target.value)}
+                  placeholder="كلمة المرور"
+                />
+              </div>
+
+              <label className="flex items-start gap-2.5 cursor-pointer text-xs select-none">
+                <input
+                  type="checkbox"
+                  checked={resetConfirmed}
+                  onChange={e => setResetConfirmed(e.target.checked)}
+                  className="rounded border-ink-300 text-red-600 focus:ring-red-500 w-4 h-4 mt-0.5"
+                />
+                <span className="text-red-600 font-bold leading-normal">
+                  أقر برغبتي في تصفير جميع نقاط الطلاب وحذف سجل النقاط بالكامل. هذا الإجراء نهائي ولحالات الطوارئ فقط.
+                </span>
+              </label>
+
+              <div className="flex gap-2.5 pt-2">
+                <button
+                  onClick={resetPoints}
+                  disabled={resetBusy || resetPassword !== '123asd' || !resetConfirmed}
+                  className="btn bg-red-600 hover:bg-red-750 text-white font-bold flex-1 disabled:opacity-50"
+                >
+                  {resetBusy ? 'جاري تصفير النقاط...' : 'تأكيد تصفير النقاط'}
+                </button>
+                <button
+                  onClick={() => setShowResetModal(false)}
+                  className="btn btn-ghost border border-ink-200 text-ink-700 flex-1"
+                >
+                  إلغاء
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

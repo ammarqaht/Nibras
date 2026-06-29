@@ -3389,3 +3389,12 @@ export async function applyMatchCollectivePoints(
     });
   }
 }
+
+export async function resetAllPoints(): Promise<void> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    await prisma.point.deleteMany({});
+  } else {
+    await writeJsonFile(FILE_POINTS, []);
+  }
+}
