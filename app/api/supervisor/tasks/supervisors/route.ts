@@ -10,16 +10,20 @@ export async function GET(req: NextRequest) {
     }
 
     const supervisors = await getAllSupervisors();
-    // Only return supervisors who are scientific_supervisor or tasks_supervisor
-    const TASKS_ROLES = ['scientific_supervisor', 'tasks_supervisor', 'admin'];
-    const list = supervisors
-      .filter(s => s.role.split(',').map((r: string) => r.trim()).some((r: string) => TASKS_ROLES.includes(r)))
-      .map(s => ({
+    const seenNames = new Set<string>();
+    const list = [];
+    for (const s of supervisors) {
+      if (!s.name) continue;
+      const cleanName = s.name.trim();
+      if (seenNames.has(cleanName)) continue;
+      seenNames.add(cleanName);
+      list.push({
         id: s.id,
-        name: s.name,
+        name: cleanName,
         email: s.email,
         role: s.role,
-      }));
+      });
+    }
 
     return NextResponse.json({ supervisors: list });
   } catch (error) {

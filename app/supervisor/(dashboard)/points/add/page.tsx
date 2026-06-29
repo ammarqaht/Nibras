@@ -201,7 +201,7 @@ export default function AddPointsPage() {
       </div>
 
       <div className="max-w-lg">
-        <form onSubmit={submit} className="card p-6 space-y-4">
+        <form onSubmit={submit} className="card p-6 space-y-4" autoComplete="off">
           {/* Mode toggle */}
           {canAddGroupPoints && (
             <div className="flex gap-2">

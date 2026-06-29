@@ -823,7 +823,7 @@ export default function TasksPage() {
                 </div>
               </div>
 
-              <form onSubmit={handleAddTask} className="bg-white rounded-2xl p-6 md:p-8 space-y-6 border border-ink-150 shadow-soft">
+              <form onSubmit={handleAddTask} className="bg-white rounded-2xl p-6 md:p-8 space-y-6 border border-ink-150 shadow-soft" autoComplete="off">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="md:col-span-2">
                     <label className="label mb-1.5 font-bold text-ink-800">عنوان المهمة <span className="req">*</span></label>
@@ -990,7 +990,7 @@ export default function TasksPage() {
       {editTask && (
         <div className="modal-backdrop flex items-center justify-center p-4 z-50" onClick={() => setEditTask(null)}>
           <div className="modal-panel w-full max-w-2xl shadow-elevated" onClick={e => e.stopPropagation()}>
-            <form onSubmit={handleUpdateTask}>
+            <form onSubmit={handleUpdateTask} autoComplete="off">
               <div className="flex items-center justify-between p-6 border-b border-ink-150 bg-ink-50/50 rounded-t-2xl">
                 <h3 className="text-xl font-extrabold text-ink-900">تعديل بيانات المهمة</h3>
                 <button type="button" className="text-3xl text-ink-400 hover:text-ink-900" onClick={() => setEditTask(null)}>×</button>

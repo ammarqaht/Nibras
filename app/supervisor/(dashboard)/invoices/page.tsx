@@ -293,7 +293,7 @@ function AddInvoiceModal({
         <div className="p-5 space-y-5 max-h-[72vh] overflow-y-auto scroll-soft">
           {/* photo / AI */}
           <div className="rounded-xl border border-dashed border-ink-300 p-4 text-center">
-            <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onPickFile} />
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickFile} />
             {image ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={image} alt="الفاتورة" className="max-h-44 mx-auto rounded-lg border border-ink-200" />

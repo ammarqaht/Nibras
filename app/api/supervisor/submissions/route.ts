@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { getSubmissions, upsertSubmission } from '@/lib/services';
+import { getSubmissions, upsertSubmission, getTasks } from '@/lib/services';
 
 export async function GET(req: NextRequest) {
   try {
@@ -13,8 +13,22 @@ export async function GET(req: NextRequest) {
     const taskId = searchParams.get('taskId');
 
     let list = await getSubmissions();
+
+    // Supervisors who are not admin or scientific_supervisor only see submissions for their assigned tasks
+    const roles = (session.role || '').split(',').map((r: string) => r.trim());
+    const isSpecialist = !roles.includes('scientific_supervisor') && !roles.includes('admin');
+
     if (taskId) {
       list = list.filter(s => s.taskId === taskId);
+    } else if (isSpecialist) {
+      const supervisorId = String(session.id);
+      const allTasks = await getTasks();
+      const myTaskIds = new Set(
+        allTasks
+          .filter(t => t.assignedAdmins.length === 0 || t.assignedAdmins.map(String).includes(supervisorId))
+          .map(t => t.id)
+      );
+      list = list.filter(s => myTaskIds.has(s.taskId));
     }
 
     return NextResponse.json({ submissions: list });

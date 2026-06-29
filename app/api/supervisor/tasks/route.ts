@@ -17,6 +17,14 @@ export async function GET(req: NextRequest) {
       list = list.filter(t => t.isActive);
     }
 
+    // Supervisors who are not admin or scientific_supervisor only see tasks assigned to them (or everyone)
+    const roles = (session.role || '').split(',').map((r: string) => r.trim());
+    const isSpecialist = !roles.includes('scientific_supervisor') && !roles.includes('admin');
+    if (isSpecialist) {
+      const supervisorId = String(session.id);
+      list = list.filter(t => t.assignedAdmins.length === 0 || t.assignedAdmins.map(String).includes(supervisorId));
+    }
+
     return NextResponse.json({ tasks: list });
   } catch (error) {
     console.error('tasks GET error', error);
