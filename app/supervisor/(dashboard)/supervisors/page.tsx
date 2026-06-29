@@ -465,23 +465,24 @@ export default function SupervisorsPage() {
                 {filteredList.map((s) => {
                   const primary = s.email === 'admin' || s.email === 'admin@nibras.com';
                   return (
-                    <li key={s.id} className="py-3 flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-ink-900 truncate">{s.name}</span>
-                          <span className={`pill shrink-0 ${s.role === 'admin' ? 'pill-blue' : s.role === 'finance' ? 'pill-green' : 'pill-gray'}`}>
+                    <li key={s.id} className="py-4 flex flex-col gap-3 text-right" dir="rtl">
+                      <div className="w-full">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-bold text-ink-900 text-base">{s.name}</span>
+                          <span className={`pill shrink-0 text-xs ${s.role === 'admin' ? 'pill-blue' : s.role === 'finance' ? 'pill-green' : 'pill-gray'}`}>
                             {getRoleLabel(s.role)}
                           </span>
                         </div>
-                        <div dir="ltr" className="text-xs text-ink-400 mt-0.5 text-right truncate">{s.email}</div>
-                        <div className="text-xs text-ink-500 mt-0.5">
-                          المجموعات: {s.role === 'admin' ? 'الكل' : groupNames(s.groupIds) || '—'}
+                        <div dir="ltr" className="text-xs text-ink-400 mt-1 text-right font-mono truncate">{s.email}</div>
+                        <div className="text-xs text-ink-500 mt-1">
+                          <span className="text-ink-400">المجموعات: </span>
+                          <span className="font-medium">{s.role === 'admin' ? 'الكل' : groupNames(s.groupIds) || '—'}</span>
                         </div>
                       </div>
-                      <div className="flex flex-col gap-1.5 shrink-0 items-end">
-                        <button onClick={() => startEdit(s)} className="btn btn-secondary py-1 px-3 text-xs">تعديل</button>
+                      <div className="flex items-center gap-2 w-full mt-1">
+                        <button onClick={() => startEdit(s)} className="btn btn-secondary py-2 flex-1 text-sm font-semibold rounded-lg shadow-sm">تعديل</button>
                         {!primary && (
-                          <button onClick={() => del(s)} className="btn btn-danger py-1 px-3 text-xs">حذف</button>
+                          <button onClick={() => del(s)} className="btn btn-danger py-2 flex-1 text-sm font-semibold rounded-lg shadow-sm">حذف</button>
                         )}
                       </div>
                     </li>
