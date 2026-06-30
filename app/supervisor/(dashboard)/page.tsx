@@ -33,6 +33,16 @@ const getRoleLabel = (roleStr: string) => {
     .join('، ') || 'مشرف';
 };
 
+function formatTime12(timeStr: string): string {
+  if (!timeStr) return '';
+  const [hStr, mStr] = timeStr.split(':');
+  let h = parseInt(hStr, 10);
+  const ampm = h >= 12 ? 'م' : 'ص';
+  h = h % 12;
+  if (h === 0) h = 12;
+  return `${String(h).padStart(2, '0')}:${mStr} ${ampm}`;
+}
+
 const ALL_LINKS = [
   { id: 'students', href: '/supervisor/students', label: 'إدارة الطلاب', perm: 'students' },
   { id: 'attendance', href: '/supervisor/attendance', label: 'تسجيل الحضور', perm: 'attendance' },
@@ -256,7 +266,7 @@ function NextProgramCard({ program }: { program: { title: string; date: string; 
         {program ? (
           <>
             <div className="text-sm font-bold text-ink-900 truncate">{program.title}</div>
-            <div className="text-[10px] text-indigo-600 font-semibold">{formatDate(program.date)} · {program.startTime}</div>
+            <div className="text-[10px] text-indigo-600 font-semibold">{formatDate(program.date)} · {formatTime12(program.startTime)}</div>
           </>
         ) : (
           <div className="text-sm font-bold text-ink-400">لا يوجد برنامج قادم</div>
@@ -704,11 +714,10 @@ export default function DashboardHome() {
 
   useEffect(() => {
     if (!isStageRole || !user?.stage) return;
-    fetch('/api/supervisor/leaderboard-settings')
+    fetch('/api/supervisor/points-visibility')
       .then(r => r.json())
       .then(d => {
-        const stages: string[] = d.disabledStages || [];
-        setLeaderboardDisabled(stages.includes(user.stage || ''));
+        setLeaderboardDisabled(!!d.hidden);
       })
       .catch(() => {});
   }, [isStageRole, user?.stage]);
@@ -942,10 +951,10 @@ export default function DashboardHome() {
                 onClick={async () => {
                   setLeaderboardBusy(true);
                   try {
-                    const r = await fetch('/api/supervisor/leaderboard-settings', {
+                    const r = await fetch('/api/supervisor/points-visibility', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ stage: user.stage, disabled: !leaderboardDisabled }),
+                      body: JSON.stringify({ hidden: !leaderboardDisabled }),
                     });
                     if (r.ok) setLeaderboardDisabled(!leaderboardDisabled);
                   } finally {
@@ -1064,7 +1073,7 @@ export default function DashboardHome() {
                                       <svg className="w-3.5 h-3.5 text-ink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                                       </svg>
-                                      <span>{prog.startTime} - {prog.endTime}</span>
+                                      <span>{formatTime12(prog.startTime)} - {formatTime12(prog.endTime)}</span>
                                     </div>
                                     {prog.notes && <p className="text-[11px] text-ink-400 mt-2 bg-cream-50/50 p-2 rounded-lg border border-ink-100">{prog.notes}</p>}
                                   </div>

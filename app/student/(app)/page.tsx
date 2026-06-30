@@ -18,6 +18,16 @@ function withTitle(name: string | null | undefined) {
   if (!name || name === 'النظام') return name || '';
   return `أ. ${name}`;
 }
+
+function formatTime12(timeStr: string): string {
+  if (!timeStr) return '';
+  const [hStr, mStr] = timeStr.split(':');
+  let h = parseInt(hStr, 10);
+  const ampm = h >= 12 ? 'م' : 'ص';
+  h = h % 12;
+  if (h === 0) h = 12;
+  return `${String(h).padStart(2, '0')}:${mStr} ${ampm}`;
+}
 type FamilyPeek = { group: { id: number; name: string; stage: string } | null };
 type AnnouncementPeek = { id: number; title: string; body: string; createdAt: string };
 
@@ -286,7 +296,7 @@ export default function StudentHome() {
             <span className="text-xs" style={{ color: 'var(--ink-soft)' }}>تجمع حسب نوع النقطة</span>
           </div>
           <div className="relative">
-            <div className="grid grid-cols-2 gap-3" style={user.hidePoints ? { filter: 'blur(6px)', pointerEvents: 'none', userSelect: 'none' } : undefined}>
+            <div className="grid grid-cols-2 gap-3">
               <StatTile
                 label="فردي"
                 value={user.individual}
@@ -313,15 +323,6 @@ export default function StudentHome() {
                 icon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M12 3l2.5 5.5L20 9.3l-4 4 1 5.7L12 16l-5 3 1-5.7-4-4 5.5-.8z"/></svg>}
               />
             </div>
-            {user.hidePoints && (
-              <div className="absolute inset-0 flex items-center justify-center p-4 rounded-2xl" style={{ background: 'rgba(250,250,247,0.4)', zIndex: 10 }}>
-                <div className="text-center bg-white/95 backdrop-blur-md p-5 rounded-2xl border border-line shadow-lg w-full max-w-[280px]">
-                  <p className="text-3xl mb-2">🔒</p>
-                  <h3 className="font-display text-sm font-bold mb-1" style={{ color: 'var(--ink)' }}>{user.hidePointsTitle || 'النقاط مخفية مؤقتاً'}</h3>
-                  <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-soft)' }}>{user.hidePointsMessage || 'النقاط مخفية مؤقتاً… استمر في التميّز، وسيتم الكشف عنها قريباً! 🌟'}</p>
-                </div>
-              </div>
-            )}
           </div>
         </section>
       )}
@@ -365,7 +366,7 @@ export default function StudentHome() {
                         </span>
                       </div>
                       <p className="tabular-nums text-xs mt-1" style={{ color: 'var(--ink-soft)' }} dir="ltr">
-                        {item.startTime} – {item.endTime}
+                        {formatTime12(item.startTime)} – {formatTime12(item.endTime)}
                       </p>
                       {item.notes && <p className="text-xs mt-1" style={{ color: 'var(--ink-soft)' }}>{item.notes}</p>}
                     </div>
@@ -495,7 +496,7 @@ export default function StudentHome() {
           <span className="text-xs" style={{ color: 'var(--ink-soft)' }}>{ledger.length} حركة</span>
         </div>
         <div className="relative">
-          <div className="card p-0 overflow-hidden" style={user?.hidePoints ? { filter: 'blur(6px)', pointerEvents: 'none', userSelect: 'none' } : undefined}>
+          <div className="card p-0 overflow-hidden">
             {ledger.length === 0 ? (
               <div className="p-5"><EmptyState emoji="🧾" line="لا توجد حركات على رصيدك بعد." /></div>
             ) : (
@@ -512,14 +513,6 @@ export default function StudentHome() {
               </>
             )}
           </div>
-          {user?.hidePoints && (
-            <div className="absolute inset-0 flex items-center justify-center p-4 rounded-2xl" style={{ background: 'rgba(250,250,247,0.4)', zIndex: 10 }}>
-              <div className="text-center bg-white/95 backdrop-blur-md p-4 rounded-2xl border border-line shadow-md w-full max-w-[240px]">
-                <p className="text-2xl mb-1.5">🔒</p>
-                <h3 className="font-display text-xs font-bold" style={{ color: 'var(--ink)' }}>السجل مخفي</h3>
-              </div>
-            </div>
-          )}
         </div>
       </section>
 
