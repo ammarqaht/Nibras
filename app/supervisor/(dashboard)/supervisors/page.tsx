@@ -37,7 +37,8 @@ const ROLE_MAP: Record<string, string> = {
   scientific_supervisor: 'مشرف العلمية',
   sports_supervisor: 'مشرف الرياضية',
   stage_supervisor: 'مشرف مرحلة',
-  tasks_supervisor: 'مشرف المهام'
+  tasks_supervisor: 'مشرف المهام',
+  family_supervisor: 'مشرف الأسرية'
 };
 
 const getRoleLabel = (roleStr: string) => {
@@ -301,7 +302,8 @@ export default function SupervisorsPage() {
                   { key: 'scientific_supervisor', label: 'مشرف العلمية' },
                   { key: 'sports_supervisor', label: 'مشرف الرياضية' },
                   { key: 'stage_supervisor', label: 'مشرف مرحلة' },
-                  { key: 'tasks_supervisor', label: 'مشرف المهام' }
+                  { key: 'tasks_supervisor', label: 'مشرف المهام' },
+                  { key: 'family_supervisor', label: 'مشرف الأسرية' }
                 ].map((r) => {
                   const active = selectedRoles.includes(r.key);
                   return (

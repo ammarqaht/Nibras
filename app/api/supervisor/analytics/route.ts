@@ -36,6 +36,7 @@ const SCHEDULE_ROLES: Record<string, string> = {
   general_supervisor: 'الإدارة',
   scientific_supervisor: 'العلمية',
   sports_supervisor: 'الرياضية',
+  family_supervisor: 'الأسرية',
 };
 
 export async function GET(req: NextRequest) {
@@ -221,7 +222,9 @@ export async function GET(req: NextRequest) {
     function calcPtDetail(pts: any[]) {
       let ind = 0, col = 0, ded = 0;
       for (const p of pts) {
-        const t = p.pointType ?? (p.reason?.endsWith('(رصد جماعي للأسرة)') ? 'collective' : p.delta < 0 ? 'deduction' : 'individual');
+        const t = p.delta < 0 ? 'deduction' : (
+          p.pointType ?? (p.reason?.endsWith('(رصد جماعي للأسرة)') ? 'collective' : 'individual')
+        );
         if (t === 'individual') ind += p.delta;
         else if (t === 'collective') col += p.delta;
         else ded += p.delta;

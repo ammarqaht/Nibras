@@ -27,9 +27,8 @@ const ADD_POINTS_ROLES = [
 function calcSummary(pts: Point[]) {
   let individual = 0, collective = 0, deduction = 0;
   for (const p of pts) {
-    const t = p.pointType ?? (
-      p.reason.endsWith('(رصد جماعي للأسرة)') ? 'collective'
-        : p.delta < 0 ? 'deduction' : 'individual'
+    const t = p.delta < 0 ? 'deduction' : (
+      p.pointType ?? (p.reason.endsWith('(رصد جماعي للأسرة)') ? 'collective' : 'individual')
     );
     if (t === 'individual') individual += p.delta;
     else if (t === 'collective') collective += p.delta;

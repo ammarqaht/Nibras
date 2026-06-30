@@ -19,7 +19,8 @@ const ROLE_MAP: Record<string, string> = {
   scientific_supervisor: 'مشرف العلمية',
   sports_supervisor: 'مشرف الرياضية',
   stage_supervisor: 'مشرف مرحلة',
-  tasks_supervisor: 'مشرف المهام'
+  tasks_supervisor: 'مشرف المهام',
+  family_supervisor: 'مشرف الأسرية'
 };
 
 const getRoleLabel = (roleStr: string) => {
@@ -54,7 +55,8 @@ const SCHEDULE_ROLES = [
   { key: 'attendance_supervisor', label: 'لجنة التحضير', color: 'border-gray-500 text-gray-700 bg-gray-50' },
   { key: 'general_supervisor', label: 'الإدارة', color: 'border-slate-500 text-slate-700 bg-slate-50' },
   { key: 'scientific_supervisor', label: 'اللجنة العلمية', color: 'border-indigo-500 text-indigo-700 bg-indigo-50' },
-  { key: 'sports_supervisor', label: 'اللجنة الرياضية', color: 'border-orange-500 text-orange-700 bg-orange-50' }
+  { key: 'sports_supervisor', label: 'اللجنة الرياضية', color: 'border-orange-500 text-orange-700 bg-orange-50' },
+  { key: 'family_supervisor', label: 'اللجنة الأسرية', color: 'border-rose-500 text-rose-700 bg-rose-50' }
 ];
 
 const DEFAULT_SLOTS = [

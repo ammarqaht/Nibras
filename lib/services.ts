@@ -140,7 +140,7 @@ export const GLOBAL_ROLES = [
   'general_supervisor', 'attendance_supervisor',
   'cultural_supervisor', 'sports_supervisor',
   'scientific_supervisor', 'social_supervisor',
-  'tasks_supervisor'
+  'tasks_supervisor', 'family_supervisor'
 ];
 
 export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
@@ -154,6 +154,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
   media_supervisor: ['announcements', 'schedule', 'students', 'analytics', 'points'],
   stage_supervisor: ['groups', 'students', 'points', 'attendance', 'analytics'],
   tasks_supervisor: ['tasks', 'students', 'analytics'],
+  family_supervisor: ['points', 'students', 'groups', 'schedule', 'analytics'],
 };
 
 /**
@@ -169,8 +170,8 @@ export function calcPointSummary(points: PointInfo[]): {
 } {
   let individual = 0, collective = 0, deduction = 0;
   for (const p of points) {
-    const t = p.pointType ?? (
-      p.reason.endsWith('(رصد جماعي للأسرة)') ? 'collective' : p.delta < 0 ? 'deduction' : 'individual'
+    const t = p.delta < 0 ? 'deduction' : (
+      p.pointType ?? (p.reason.endsWith('(رصد جماعي للأسرة)') ? 'collective' : 'individual')
     );
     if (t === 'individual') individual += p.delta;
     else if (t === 'collective') collective += p.delta;

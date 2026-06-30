@@ -28,7 +28,9 @@ function todayStr() {
 function calcPts(pts: PtRec[]) {
   let ind=0, col=0, ded=0;
   for (const p of pts) {
-    const t = p.pointType ?? ((p.reason??'').endsWith('(رصد جماعي للأسرة)') ? 'collective' : p.delta<0 ? 'deduction' : 'individual');
+    const t = p.delta < 0 ? 'deduction' : (
+      p.pointType ?? ((p.reason??'').endsWith('(رصد جماعي للأسرة)') ? 'collective' : 'individual')
+    );
     if (t==='individual') ind+=p.delta; else if (t==='collective') col+=p.delta; else ded+=p.delta;
   }
   return { individual:ind, collective:col, balance:Math.max(0,ind+col+ded), total:ind+col };

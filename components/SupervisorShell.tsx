@@ -27,7 +27,8 @@ const ROLE_MAP: Record<string, string> = {
   scientific_supervisor: 'مشرف العلمية',
   sports_supervisor: 'مشرف الرياضية',
   stage_supervisor: 'مشرف مرحلة',
-  tasks_supervisor: 'مشرف المهام'
+  tasks_supervisor: 'مشرف المهام',
+  family_supervisor: 'مشرف الأسرية'
 };
 
 const getRoleLabel = (roleStr: string) => {
@@ -44,10 +45,10 @@ const LINKS: NavLink[] = [
   { id: 'home', href: '/supervisor', label: 'الرئيسية' },
   { id: 'students', href: '/supervisor/students', label: 'الطلاب' },
   { id: 'attendance', href: '/supervisor/attendance', label: 'الحضور' },
-  { id: 'points', href: '/supervisor/points', label: 'النقاط', roles: ['social_supervisor', 'cultural_supervisor', 'sports_supervisor', 'scientific_supervisor', 'groups_supervisor', 'stage_supervisor'] },
+  { id: 'points', href: '/supervisor/points', label: 'النقاط', roles: ['social_supervisor', 'cultural_supervisor', 'sports_supervisor', 'scientific_supervisor', 'groups_supervisor', 'stage_supervisor', 'family_supervisor'] },
   { id: 'tasks', href: '/supervisor/tasks', label: 'المهام', roles: ['scientific_supervisor', 'tasks_supervisor'] },
   { id: 'schedule', href: '/supervisor/schedule', label: 'الجدول' },
-  { id: 'groups', href: '/supervisor/groups', label: 'المجموعات', roles: ['groups_supervisor', 'general_supervisor', 'stage_supervisor', 'cultural_supervisor', 'social_supervisor', 'scientific_supervisor', 'sports_supervisor', 'attendance_supervisor'] },
+  { id: 'groups', href: '/supervisor/groups', label: 'المجموعات', roles: ['groups_supervisor', 'general_supervisor', 'stage_supervisor', 'cultural_supervisor', 'social_supervisor', 'scientific_supervisor', 'sports_supervisor', 'attendance_supervisor', 'family_supervisor'] },
   { id: 'payments', href: '/supervisor/payments', label: 'المدفوعات', roles: ['finance', 'finance_supervisor'] },
   { id: 'invoices', href: '/supervisor/invoices', label: 'الفواتير' },
   { id: 'finance', href: '/supervisor/finance', label: 'المالية', roles: ['finance', 'finance_supervisor'] },

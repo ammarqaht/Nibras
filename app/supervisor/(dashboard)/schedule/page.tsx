@@ -26,6 +26,7 @@ const ROLES = [
   { key: 'general_supervisor', label: 'الإدارة', color: 'bg-slate-100 text-slate-800 border-slate-300' },
   { key: 'scientific_supervisor', label: 'اللجنة العلمية', color: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
   { key: 'sports_supervisor', label: 'اللجنة الرياضية', color: 'bg-orange-100 text-orange-800 border-orange-200' },
+  { key: 'family_supervisor', label: 'اللجنة الأسرية', color: 'bg-rose-100 text-rose-800 border-rose-200' },
 ];
 
 const DEFAULT_SLOTS = [
@@ -52,7 +53,7 @@ function getProgramSlots(s: ScheduleInfo): number[] {
 }
 
 // Only these committees can add/edit programs
-const COMMITTEE_ROLES = ['social_supervisor','cultural_supervisor','scientific_supervisor','sports_supervisor'];
+const COMMITTEE_ROLES = ['social_supervisor','cultural_supervisor','scientific_supervisor','sports_supervisor','groups_supervisor','family_supervisor'];
 
 export default function SchedulePage() {
   const { user } = useSupervisor();
@@ -343,6 +344,33 @@ export default function SchedulePage() {
                           const stageList = (s.stage || 'الكل').split(',').map((x: string) => x.trim());
                           return stageList.includes('الكل') || stageList.includes(key);
                         });
+                        const sortedRowPrograms = [...rowPrograms].sort((a, b) => {
+                          const aSlots = getProgramSlots(a);
+                          const bSlots = getProgramSlots(b);
+                          const aStart = aSlots.length > 0 ? Math.min(...aSlots) : 999;
+                          const bStart = bSlots.length > 0 ? Math.min(...bSlots) : 999;
+                          return aStart - bStart;
+                        });
+
+                        // Row-assignment algorithm to prevent staggering when slots do not overlap
+                        const occupiedRows: number[][] = [];
+                        const programsWithRow = sortedRowPrograms.map(s => {
+                          const slots = getProgramSlots(s);
+                          let targetRowIndex = 0;
+                          while (true) {
+                            if (!occupiedRows[targetRowIndex]) {
+                              occupiedRows[targetRowIndex] = [];
+                            }
+                            const hasOverlap = slots.some(slot => occupiedRows[targetRowIndex].includes(slot));
+                            if (!hasOverlap) {
+                              occupiedRows[targetRowIndex].push(...slots);
+                              break;
+                            }
+                            targetRowIndex++;
+                          }
+                          return { ...s, gridRow: targetRowIndex + 1 };
+                        });
+
                         return (
                           <tr key={key} className="border-b border-ink-100 last:border-0">
                             <td className="border-l border-ink-100 p-1 align-middle">
@@ -357,8 +385,8 @@ export default function SchedulePage() {
                                   <div className="border-l border-dashed border-ink-200/30 h-full"></div>
                                   <div className="h-full"></div>
                                 </div>
-                                {rowPrograms.length > 0 ? (
-                                  rowPrograms.map(s => {
+                                {programsWithRow.length > 0 ? (
+                                  programsWithRow.map(s => {
                                     const canEdit = canManageSchedule && (user?.role === 'admin' || userRoles.includes(s.role) || (isMediaOfficer && s.role === 'media_supervisor'));
                                     const programSlots = getProgramSlots(s);
                                     const startCol = programSlots.length > 0 ? (Math.min(...programSlots) + 1) : 1;
@@ -368,7 +396,7 @@ export default function SchedulePage() {
                                         key={s.id}
                                         onClick={() => openDetailsModal(s)}
                                         className={`p-1.5 md:p-2 rounded-lg border text-[10px] md:text-xs relative z-10 group ${getRoleStyle(s.role)} shadow-sm flex flex-col justify-between cursor-pointer`}
-                                        style={{ gridColumn: `${startCol} / span ${spanWidth}` }}
+                                        style={{ gridColumn: `${startCol} / span ${spanWidth}`, gridRow: `${s.gridRow}` }}
                                       >
                                         {canEdit && (
                                           <div className="absolute top-1 left-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -416,8 +444,8 @@ export default function SchedulePage() {
 
       {/* نافذة الإضافة / التعديل */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden pop-in max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden pop-in max-h-[85vh] flex flex-col">
             <div className="p-4 border-b border-ink-200 flex justify-between items-center bg-ink-50 shrink-0">
               <h3 className="text-lg font-bold text-ink-900">
                 {editingScheduleId ? 'تعديل البرنامج' : 'إضافة برنامج للجدول'}
@@ -430,7 +458,7 @@ export default function SchedulePage() {
               </button>
             </div>
             
-            <form onSubmit={submit} className="p-5 space-y-4 overflow-y-auto scroll-soft flex-1">
+            <form onSubmit={submit} className="p-4 space-y-3 overflow-y-auto scroll-soft flex-1">
               <div>
                 <label className="label">اسم البرنامج</label>
                 <input className="field" value={title} onChange={e => setTitle(e.target.value)} placeholder="مثال: دوري البلايستيشن" required />
@@ -440,10 +468,10 @@ export default function SchedulePage() {
                 <input type="date" className="field" value={date} onChange={e => setDate(e.target.value)} required />
               </div>
               
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div>
                   <label className="label">المرحلة :</label>
-                  <div className="flex flex-wrap gap-2.5 p-3 bg-cream-100/50 rounded-xl border border-ink-200">
+                  <div className="flex flex-wrap gap-2 p-2.5 bg-cream-100/50 rounded-xl border border-ink-200">
                     <label className="flex items-center gap-1.5 cursor-pointer text-sm font-semibold select-none">
                       <input 
                         type="checkbox" 
@@ -512,7 +540,7 @@ export default function SchedulePage() {
                 
                 <div>
                   <label className="label">الأوقات / الفقرات</label>
-                  <div className="flex flex-col gap-2.5 p-3 bg-cream-100/50 rounded-xl border border-ink-200">
+                  <div className="flex flex-col gap-2 p-2.5 bg-cream-100/50 rounded-xl border border-ink-200">
                     {DEFAULT_SLOTS.map((slot, idx) => (
                       <label key={idx} className="flex items-center gap-2 cursor-pointer text-sm font-semibold select-none">
                         <input 
@@ -537,7 +565,7 @@ export default function SchedulePage() {
               <div>
                 <label className="label">ملاحظات (اختياري)</label>
                 <textarea 
-                  className="field min-h-[80px]" 
+                  className="field min-h-[60px]" 
                   value={notes} 
                   onChange={e => setNotes(e.target.value)} 
                   placeholder="اكتب أي ملاحظات للبرنامج هنا..."
@@ -563,7 +591,7 @@ export default function SchedulePage() {
                 </div>
               ) : null}
               
-              <div className="pt-2 flex gap-2">
+              <div className="pt-2 flex gap-2 bg-white shrink-0">
                 <button type="submit" disabled={busy} className="btn btn-primary flex-1">
                   {busy ? '...' : editingScheduleId ? 'حفظ التعديلات' : 'حفظ'}
                 </button>
@@ -576,7 +604,7 @@ export default function SchedulePage() {
 
       {/* نافذة عرض تفاصيل البرنامج */}
       {isDetailsOpen && selectedDetailsSchedule && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setIsDetailsOpen(false)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4" onClick={() => setIsDetailsOpen(false)}>
           <div 
             className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden pop-in border border-ink-200 max-h-[90vh] flex flex-col"
             onClick={e => e.stopPropagation()}
