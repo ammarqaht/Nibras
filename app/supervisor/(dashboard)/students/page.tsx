@@ -95,7 +95,7 @@ function StageMultiSelectDropdown({
   const selectedGradesCount = selected.filter((k) => k.startsWith('grade:')).length;
 
   return (
-    <div className="relative z-[120]">
+    <div className={`relative ${open ? 'z-[150]' : 'z-10'}`}>
       <button
         type="button"
         onClick={() => onOpenChange(!open)}
@@ -182,7 +182,7 @@ function MultiSelectDropdown({
   };
 
   return (
-    <div className="relative z-[120]">
+    <div className={`relative ${open ? 'z-[150]' : 'z-10'}`}>
       <button
         type="button"
         onClick={() => onOpenChange(!open)}
@@ -912,8 +912,8 @@ export default function StudentsPage() {
       )}
 
       {showHealthModal && (
-        <div className="modal-backdrop flex items-center justify-center p-4 z-50 animate-fade-in" onClick={() => setShowHealthModal(false)}>
-          <div className="modal-panel w-[92vw] sm:w-full max-w-2xl max-h-[75vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="modal-backdrop flex items-center justify-center p-3 sm:p-4 z-50 animate-fade-in" onClick={() => setShowHealthModal(false)}>
+          <div className="modal-panel w-[92vw] sm:w-full max-w-2xl max-h-[70vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b flex items-center justify-between">
               <h3 className="font-bold text-lg text-ink-900 flex items-center gap-2">
                 <span>🚑</span>
@@ -1135,8 +1135,8 @@ function StudentModal({
   const studentWhatsappUrl = formattedStudentPhone ? `https://wa.me/${formattedStudentPhone}` : null;
 
   return (
-    <div className="modal-backdrop flex items-end sm:items-center justify-center p-0 sm:p-4 z-[60] overflow-y-auto" onClick={onClose}>
-      <div className="modal-panel w-full sm:max-w-xl rounded-t-3xl sm:rounded-2xl max-h-[82vh] sm:max-h-[72vh] flex flex-col shadow-elevated" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-backdrop flex items-center justify-center p-3 sm:p-4 z-[60] overflow-y-auto" onClick={onClose}>
+      <div className="modal-panel w-[92vw] sm:w-full sm:max-w-xl rounded-2xl max-h-[70vh] sm:max-h-[70vh] flex flex-col shadow-elevated" onClick={(e) => e.stopPropagation()}>
         {/* header */}
         <div className="flex items-start justify-between p-3.5 sm:p-5 border-b border-ink-200 shrink-0">
           <div>

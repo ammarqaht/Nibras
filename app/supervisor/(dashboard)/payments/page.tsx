@@ -63,6 +63,7 @@ export default function PaymentsPage() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [expandedIds, setExpandedIds] = useState<Record<number, boolean>>({});
+  const [openFilterMenu, setOpenFilterMenu] = useState<'stage' | 'neighborhood' | 'payStatus' | null>(null);
 
   const toggleExpand = (id: number) => {
     setExpandedIds((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -238,7 +239,7 @@ export default function PaymentsPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-start justify-between gap-3 flex-wrap">
+      <div className="mb-6 flex items-start justify-between gap-3 flex-wrap relative z-30">
         <div>
           <h1 className="text-2xl font-bold text-ink-900 mb-1">المدفوعات</h1>
           <p className="text-sm text-ink-500">مراجعة إيصالات التحويل وتأكيد استلام الرسوم.</p>
@@ -252,7 +253,7 @@ export default function PaymentsPage() {
       </div>
 
       {/* Filters — matching the students page layout */}
-      <div className="card p-4 mb-5">
+      <div className="card p-4 mb-5 relative z-20">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Search */}
           <div className="relative flex items-center w-full">
@@ -270,7 +271,12 @@ export default function PaymentsPage() {
           {/* Stages */}
           <div className="flex items-center gap-1.5 w-full">
             <div className="flex-1 min-w-0">
-              <StageMultiSelectDropdown selected={fStages} onChange={setFStages} />
+              <StageMultiSelectDropdown
+                selected={fStages}
+                onChange={setFStages}
+                open={openFilterMenu === 'stage'}
+                onOpenChange={(op) => setOpenFilterMenu(op ? 'stage' : null)}
+              />
             </div>
             {fStages.length > 0 && (
               <button onClick={() => setFStages([])} className="text-ink-400 hover:text-ink-900 text-xl font-bold p-1 leading-none shrink-0" title="مسح تصفية المراحل">×</button>
@@ -280,7 +286,14 @@ export default function PaymentsPage() {
           {/* Neighborhoods */}
           <div className="flex items-center gap-1.5 w-full">
             <div className="flex-1 min-w-0">
-              <MultiSelectDropdown label="تصفية الأحياء" options={neighborhoods.map((n) => ({ value: n, label: n }))} selected={fNeighborhoods} onChange={setFNeighborhoods} />
+              <MultiSelectDropdown
+                label="تصفية الأحياء"
+                options={neighborhoods.map((n) => ({ value: n, label: n }))}
+                selected={fNeighborhoods}
+                onChange={setFNeighborhoods}
+                open={openFilterMenu === 'neighborhood'}
+                onOpenChange={(op) => setOpenFilterMenu(op ? 'neighborhood' : null)}
+              />
             </div>
             {fNeighborhoods.length > 0 && (
               <button onClick={() => setFNeighborhoods([])} className="text-ink-400 hover:text-ink-900 text-xl font-bold p-1 leading-none shrink-0" title="مسح تصفية الأحياء">×</button>
@@ -290,7 +303,14 @@ export default function PaymentsPage() {
           {/* Payment status */}
           <div className="flex items-center gap-1.5 w-full">
             <div className="flex-1 min-w-0">
-              <MultiSelectDropdown label="حالة الدفع" options={PAY_STATUS_OPTIONS} selected={fPayStatus} onChange={setFPayStatus} />
+              <MultiSelectDropdown
+                label="حالة الدفع"
+                options={PAY_STATUS_OPTIONS}
+                selected={fPayStatus}
+                onChange={setFPayStatus}
+                open={openFilterMenu === 'payStatus'}
+                onOpenChange={(op) => setOpenFilterMenu(op ? 'payStatus' : null)}
+              />
             </div>
             {fPayStatus.length > 0 && (
               <button onClick={() => setFPayStatus([])} className="text-ink-400 hover:text-ink-900 text-xl font-bold p-1 leading-none shrink-0" title="مسح تصفية حالة الدفع">×</button>
@@ -671,8 +691,8 @@ function StudentDetailsModal({
   }
 
   return (
-    <div className="modal-backdrop flex items-end sm:items-center justify-center p-0 sm:p-4 z-[999]" onClick={onClose}>
-      <div className="modal-panel w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl max-h-[92vh] sm:max-h-[90vh] overflow-hidden flex flex-col shadow-elevated" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-backdrop flex items-center justify-center p-3 sm:p-4 z-[999] overflow-y-auto" onClick={onClose}>
+      <div className="modal-panel w-[92vw] sm:w-full sm:max-w-lg my-auto rounded-2xl max-h-[70vh] sm:max-h-[70vh] overflow-hidden flex flex-col shadow-elevated" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="flex justify-between items-center p-4 sm:p-5 border-b border-line bg-cream-50/50">
           <div>

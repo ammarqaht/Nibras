@@ -763,8 +763,30 @@ export async function resolveAttendanceExcuse(id: string, accept: boolean, recor
   list[idx].status = accept ? 'accepted' : 'rejected';
   await saveSetting('attendance_excuses', JSON.stringify(list));
   if (accept) {
+    const regId = list[idx].registrationId;
+    const date = list[idx].date;
     // Mark the student as excused for that day
-    await logAttendance(list[idx].registrationId, list[idx].date, 'excused', recordedBy);
+    await logAttendance(regId, date, 'excused', recordedBy);
+
+    // Manage points:
+    // 1. Delete existing attendance points for this student on this day
+    await deleteAttendancePointsByDate(regId, date);
+
+    // 2. Fetch excused points from config
+    const settings = await getSettings();
+    const excusedPoints = Number(settings.att_excusedPoints ?? '0');
+
+    // 3. Add points if greater than zero
+    if (excusedPoints > 0) {
+      await addPointsRecord({
+        registrationId: regId,
+        delta: excusedPoints,
+        reason: `حضور بعذر | ${date}`,
+        category: 'attendance',
+        pointType: 'individual',
+        recordedBy: recordedBy,
+      });
+    }
   }
   return list[idx];
 }

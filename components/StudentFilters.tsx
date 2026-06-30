@@ -6,11 +6,17 @@ import { stages } from '@/content';
 export function StageMultiSelectDropdown({
   selected,
   onChange,
+  open: controlledOpen,
+  onOpenChange,
 }: {
   selected: string[];
   onChange: (val: string[]) => void;
+  open?: boolean;
+  onOpenChange?: (value: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = onOpenChange || setInternalOpen;
 
   const toggleGrade = (grade: string, stageKey: string) => {
     const gradeKey = `grade:${grade}`;
@@ -54,7 +60,7 @@ export function StageMultiSelectDropdown({
   const selectedGradesCount = selected.filter((k) => k.startsWith('grade:')).length;
 
   return (
-    <div className="relative">
+    <div className={`relative ${open ? 'z-[150]' : 'z-10'}`}>
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -69,8 +75,8 @@ export function StageMultiSelectDropdown({
       </button>
       {open && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 mt-1 w-full min-w-[240px] max-h-80 overflow-y-auto bg-white border border-ink-200 rounded-xl shadow-xl z-50 p-3 space-y-3 scroll-soft text-right" dir="rtl">
+          <div className="fixed inset-0 z-[110]" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 mt-1 w-full min-w-[240px] max-h-80 overflow-y-auto bg-white border border-ink-200 rounded-xl shadow-xl z-[120] p-3 space-y-3 scroll-soft text-right" dir="rtl">
             {stages.map((stage) => {
               const stageKeyStr = `stage:${stage.key}`;
               const isStageChecked = selected.includes(stageKeyStr);
@@ -122,13 +128,19 @@ export function MultiSelectDropdown({
   options,
   selected,
   onChange,
+  open: controlledOpen,
+  onOpenChange,
 }: {
   label: string;
   options: { value: string; label: string }[];
   selected: string[];
   onChange: (val: string[]) => void;
+  open?: boolean;
+  onOpenChange?: (value: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = onOpenChange || setInternalOpen;
   const toggle = (val: string) => {
     if (selected.includes(val)) {
       onChange(selected.filter((s) => s !== val));
@@ -138,7 +150,7 @@ export function MultiSelectDropdown({
   };
 
   return (
-    <div className="relative">
+    <div className={`relative ${open ? 'z-[150]' : 'z-10'}`}>
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -149,8 +161,8 @@ export function MultiSelectDropdown({
       </button>
       {open && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 mt-1 w-full min-w-[200px] max-h-60 overflow-y-auto bg-white border border-ink-200 rounded-xl shadow-xl z-50 p-2 space-y-0.5 scroll-soft">
+          <div className="fixed inset-0 z-[110]" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 mt-1 w-full min-w-[200px] max-h-60 overflow-y-auto bg-white border border-ink-200 rounded-xl shadow-xl z-[120] p-2 space-y-0.5 scroll-soft">
             {options.length === 0 ? (
               <p className="text-center py-4 text-ink-400 text-xs">لا توجد خيارات</p>
             ) : (
