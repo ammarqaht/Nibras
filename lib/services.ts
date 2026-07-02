@@ -304,9 +304,8 @@ export async function seedDefaultAdminIfNeeded(): Promise<void> {
         });
       }
     } catch (err) {
-      console.error("Database seed failed, disabling DB client and falling back to JSON:", err);
-      databaseAvailable = false;
-      disableDatabase();
+      console.error("Database seed failed:", err);
+      throw err;
     }
   }
 
@@ -355,30 +354,22 @@ export async function seedDefaultAdminIfNeeded(): Promise<void> {
 export async function getSupervisorByEmail(email: string): Promise<SupervisorInfo | null> {
   await seedDefaultAdminIfNeeded();
   if (databaseAvailable) {
-    try {
-      const prisma = getPrisma()!;
-      const sup = await prisma.supervisor.findUnique({ where: { email } });
-      if (!sup) return null;
-      return {
-        id: sup.id,
-        name: sup.name,
-        email: sup.email,
-        passwordHash: sup.passwordHash,
-        role: sup.role,
-        groupIds: sup.groupIds,
-        departments: sup.departments,
-        customPermissions: sup.customPermissions,
-        stage: sup.stage,
-        createdAt: sup.createdAt.toISOString()
-      };
-    } catch (err) {
-      console.error("Database query failed, falling back to JSON:", err);
-      databaseAvailable = false;
-      disableDatabase();
-    }
-  }
-
-  if (!databaseAvailable) {
+    const prisma = getPrisma()!;
+    const sup = await prisma.supervisor.findUnique({ where: { email } });
+    if (!sup) return null;
+    return {
+      id: sup.id,
+      name: sup.name,
+      email: sup.email,
+      passwordHash: sup.passwordHash,
+      role: sup.role,
+      groupIds: sup.groupIds,
+      departments: sup.departments,
+      customPermissions: sup.customPermissions,
+      stage: sup.stage,
+      createdAt: sup.createdAt.toISOString()
+    };
+  } else {
     const supervisors = await readJsonFile<SupervisorInfo[]>(FILE_SUPERVISORS, []);
     return supervisors.find(s => s.email === email) || null;
   }
@@ -529,62 +520,57 @@ export async function updateSupervisor(
 // ==================== STUDENT / REGISTRATION SERVICES ====================
 export async function getStudents(): Promise<StudentInfo[]> {
   if (hasDatabase) {
-    try {
-      const prisma = getPrisma()!;
-      const list = await prisma.registration.findMany({
-        orderBy: { createdAt: 'desc' }
-      });
-      return list.map(r => ({
-        id: r.id,
-        membershipNo: r.membershipNo,
-        studentName: r.studentName,
-        nationalId: r.nationalId,
-        guardianPhone: r.guardianPhone,
-        studentPhone: r.studentPhone,
-        stage: r.stage,
-        grade: r.grade,
-        neighborhood: r.neighborhood,
-        locationLat: r.locationLat,
-        locationLng: r.locationLng,
-        mapLink: r.mapLink,
-        hasCondition: r.hasCondition,
-        conditionNote: r.conditionNote,
-        createdAt: r.createdAt.toISOString(),
-        paymentStatus: r.paymentStatus,
-        groupId: r.groupId,
-        registrationStatus: r.registrationStatus,
-        paymentType: r.paymentType,
-        paymentReceipt: r.paymentReceipt
-      }));
-    } catch (err) {
-      console.error("Database query failed in getStudents, falling back to JSON:", err);
-      disableDatabase();
-    }
+    const prisma = getPrisma()!;
+    const list = await prisma.registration.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+    return list.map(r => ({
+      id: r.id,
+      membershipNo: r.membershipNo,
+      studentName: r.studentName,
+      nationalId: r.nationalId,
+      guardianPhone: r.guardianPhone,
+      studentPhone: r.studentPhone,
+      stage: r.stage,
+      grade: r.grade,
+      neighborhood: r.neighborhood,
+      locationLat: r.locationLat,
+      locationLng: r.locationLng,
+      mapLink: r.mapLink,
+      hasCondition: r.hasCondition,
+      conditionNote: r.conditionNote,
+      createdAt: r.createdAt.toISOString(),
+      paymentStatus: r.paymentStatus,
+      groupId: r.groupId,
+      registrationStatus: r.registrationStatus,
+      paymentType: r.paymentType,
+      paymentReceipt: r.paymentReceipt
+    }));
+  } else {
+    const list = await readJsonFile<any[]>(FILE_REGISTRATIONS, []);
+    return list.map((r, index) => ({
+      id: r.id || index + 1,
+      membershipNo: r.membershipNo,
+      studentName: r.studentName,
+      nationalId: r.nationalId,
+      guardianPhone: r.guardianPhone,
+      studentPhone: r.studentPhone || null,
+      stage: r.stage,
+      grade: r.grade,
+      neighborhood: r.neighborhood,
+      locationLat: r.locationLat ?? null,
+      locationLng: r.locationLng ?? null,
+      mapLink: r.mapLink || null,
+      hasCondition: !!r.hasCondition,
+      conditionNote: r.conditionNote || null,
+      createdAt: r.createdAt || new Date().toISOString(),
+      paymentStatus: r.paymentStatus || 'unpaid',
+      groupId: r.groupId ?? null,
+      registrationStatus: r.registrationStatus || 'pending',
+      paymentType: r.paymentType || 'later',
+      paymentReceipt: r.paymentReceipt || null
+    }));
   }
-
-  const list = await readJsonFile<any[]>(FILE_REGISTRATIONS, []);
-  return list.map((r, index) => ({
-    id: r.id || index + 1,
-    membershipNo: r.membershipNo,
-    studentName: r.studentName,
-    nationalId: r.nationalId,
-    guardianPhone: r.guardianPhone,
-    studentPhone: r.studentPhone || null,
-    stage: r.stage,
-    grade: r.grade,
-    neighborhood: r.neighborhood,
-    locationLat: r.locationLat ?? null,
-    locationLng: r.locationLng ?? null,
-    mapLink: r.mapLink || null,
-    hasCondition: !!r.hasCondition,
-    conditionNote: r.conditionNote || null,
-    createdAt: r.createdAt || new Date().toISOString(),
-    paymentStatus: r.paymentStatus || 'unpaid',
-    groupId: r.groupId ?? null,
-    registrationStatus: r.registrationStatus || 'pending',
-    paymentType: r.paymentType || 'later',
-    paymentReceipt: r.paymentReceipt || null
-  }));
 }
 
 export async function updateStudent(id: number, data: Partial<Omit<StudentInfo, 'id' | 'membershipNo'>>): Promise<StudentInfo | null> {
@@ -1110,20 +1096,16 @@ export async function deleteAnnouncement(id: number): Promise<boolean> {
 // ==================== SETTINGS / CONFIG SYNC SERVICES ====================
 export async function getSettings(): Promise<Record<string, string>> {
   if (hasDatabase) {
-    try {
-      const prisma = getPrisma()!;
-      const list = await prisma.setting.findMany();
-      const map: Record<string, string> = {};
-      for (const item of list) {
-        map[item.key] = item.value;
-      }
-      return map;
-    } catch (err) {
-      console.error("Database query failed in getSettings, falling back to JSON:", err);
-      disableDatabase();
+    const prisma = getPrisma()!;
+    const list = await prisma.setting.findMany();
+    const map: Record<string, string> = {};
+    for (const item of list) {
+      map[item.key] = item.value;
     }
+    return map;
+  } else {
+    return readJsonFile<Record<string, string>>(FILE_SETTINGS, {});
   }
-  return readJsonFile<Record<string, string>>(FILE_SETTINGS, {});
 }
 
 import { site as origSite, landing as origLanding, clubDetails as origClubDetails, footer as origFooter, defaultBankDetails as origDefaultBankDetails } from '../content';
