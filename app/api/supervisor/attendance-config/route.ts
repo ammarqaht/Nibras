@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { getSettings, saveSetting } from '@/lib/services';
 
+export const dynamic = 'force-dynamic';
+
 const DEFAULTS = {
   attendanceStart: '07:30',
   lateAfter:       '08:15',

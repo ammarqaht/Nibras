@@ -1271,114 +1271,94 @@ function SubmissionCard({
   const isRejected = sub.status === 'rejected';
 
   const borderColor = isPending ? 'border-brand-500' : isApproved ? 'border-emerald-500' : 'border-nred-500';
-  
   const assignedLabel = sub.taskAssignedAdmins?.length === 0 ? 'جميع المشرفين' : sub.taskAssignedAdmins?.map((id: string) => supervisors.find((s: any) => String(s.id) === id)?.name).filter(Boolean).join('، ');
-  
+
   return (
-    <div className={`bg-white rounded-2xl p-5 md:p-6 relative transition-all duration-200 hover:shadow-md border border-ink-150 border-r-4 ${borderColor} mb-4 shadow-sm`}>
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-5">
+    <div className={`bg-white rounded-xl p-4 transition-all duration-200 hover:shadow-md border border-ink-150 border-r-4 ${borderColor} mb-3 shadow-sm`}>
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         
-        {/* Right side (RTL): Avatar & Name */}
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 font-extrabold flex items-center justify-center text-xl shrink-0 border border-emerald-100 shadow-sm">
+        {/* Right Section: Avatar + Student & Task details */}
+        <div className="flex items-center gap-3 min-w-[240px] max-w-full lg:max-w-[35%]">
+          <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 font-extrabold flex items-center justify-center text-lg shrink-0 border border-emerald-100 shadow-sm">
             {sub.studentName?.charAt(0) || 'ط'}
           </div>
-          <div>
-            <h4 className="font-extrabold text-ink-900 text-[1.05rem]">{sub.studentName}</h4>
-            <span className="text-[0.75rem] text-ink-400 font-mono inline-block mt-0.5 font-medium">
-              تاريخ التسليم: {sub.submittedAt.split('T')[0]}
-            </span>
+          <div className="min-w-0">
+            <h4 className="font-extrabold text-ink-900 text-[0.9rem] truncate">{sub.studentName}</h4>
+            <div className="text-xs font-bold text-brand-600 truncate mt-0.5" title={sub.taskTitle}>{sub.taskTitle}</div>
           </div>
         </div>
 
-        {/* Left side (RTL): Badges */}
-        <div className="flex items-center gap-2 self-start sm:self-center">
-          <span className={`px-3 py-1 rounded-full font-bold text-[0.7rem] ${getTrackPillClass(sub.taskTrack)}`}>
+        {/* Middle Section: Metadata, Track, Status, and Scores */}
+        <div className="flex flex-wrap items-center gap-2 text-[0.75rem] text-ink-500 font-medium">
+          <span className="font-mono bg-ink-50 px-2 py-0.5 rounded border border-ink-150 text-[0.7rem] font-bold" title="تاريخ التسليم">
+            📅 {sub.submittedAt.split('T')[0]}
+          </span>
+          <span className={`px-2.5 py-0.5 rounded-full font-bold text-[0.65rem] ${getTrackPillClass(sub.taskTrack)}`}>
             {sub.taskTrack || 'عام'}
           </span>
-          <span className={`px-3 py-1 rounded-full text-[0.7rem] font-bold shadow-sm ${isPending ? 'bg-brand-50 text-brand-700 border border-brand-200' : isApproved ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-nred-50 text-nred-700 border border-nred-200'}`}>
+          <span className={`px-2.5 py-0.5 rounded-full text-[0.65rem] font-bold shadow-sm ${isPending ? 'bg-brand-50 text-brand-700 border border-brand-200' : isApproved ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-nred-50 text-nred-700 border border-nred-200'}`}>
             {statusLabel(sub.status)}
           </span>
-        </div>
-      </div>
-
-      <div className="mb-5">
-        <div className="font-extrabold text-ink-900 text-lg mb-1.5">{sub.taskTitle}</div>
-        <div className="text-[0.8rem] text-ink-500 font-bold mb-3">المشرف المسؤول: <span className="text-ink-700 font-medium">{assignedLabel}</span></div>
-        <div className="inline-flex items-center gap-1.5 bg-ink-50 text-ink-700 border border-ink-200 px-3 py-1.5 rounded-lg text-[0.8rem] font-bold shadow-sm">
-          الحد الأقصى: <span className="text-brand-600">{sub.taskMaxPoints} 🎯</span>
-        </div>
-      </div>
-
-      {sub.fileUrl && (
-        <div className="bg-cream-100/60 p-5 rounded-2xl border border-ink-150 mb-5 shadow-inner">
-          <div className="text-[0.8rem] text-ink-400 font-bold mb-3">محتوى التسليم المرفق</div>
-          {sub.fileUrl.startsWith('data:image') || sub.fileUrl.startsWith('http') && sub.fileUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={sub.fileUrl} alt="إثبات الإنجاز" className="max-h-56 rounded-xl border border-ink-200 cursor-zoom-in shadow-sm mx-auto" onClick={() => window.open(sub.fileUrl, '_blank')} />
-          ) : sub.fileUrl === 'admin://manual-mark' ? (
-            <div className="text-[0.9rem] text-ink-600 font-medium italic text-center py-3">إقرار تسليم يدوي مباشر من المشرف</div>
-          ) : (
-            <a href={sub.fileUrl} target="_blank" rel="noopener noreferrer" className="text-brand-600 bg-white hover:bg-brand-50 border border-ink-200 font-bold text-[0.9rem] block text-center py-3 rounded-xl transition-colors shadow-sm">
-              📄 عرض المستند المرفق (اضغط للفتح)
-            </a>
+          
+          {/* Display grade or status */}
+          {!isPending && isApproved && (
+            <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-lg font-extrabold">
+              النقاط: {sub.grade} / {sub.taskMaxPoints} 🎯
+            </span>
           )}
-        </div>
-      )}
+          {!isPending && isRejected && (
+            <span className="bg-nred-50 text-nred-700 border border-nred-200 px-2.5 py-0.5 rounded-lg font-extrabold">
+              تم الرد ✗
+            </span>
+          )}
 
-      {/* Reviewer / Grade / Feedback */}
-      {!isPending && (
-        <div className="pt-5 border-t border-ink-150">
-          {isApproved && (
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
-              <div className="flex items-center gap-3">
-                {inlineEditSub === sub.id ? (
-                  <div className="flex items-center gap-2 bg-ink-50/50 p-2 rounded-xl border border-ink-200" onClick={e => e.stopPropagation()}>
-                    <input type="number" min={0} max={sub.taskMaxPoints} className="field py-1.5 px-3 w-24 text-center font-extrabold text-[0.95rem] text-brand-600 rounded-lg border-brand-200" value={inlinePoints} onChange={e => setInlinePoints?.(e.target.value.replace(/\D/g, ''))} />
-                    <button onClick={() => saveInlinePoints?.(sub)} disabled={inlineBusy} className="btn bg-brand-500 hover:bg-brand-600 text-white py-1.5 px-4 rounded-lg text-xs font-bold shadow-sm">حفظ</button>
-                    <button onClick={() => setInlineEditSub?.(null)} className="btn bg-white border-ink-200 text-ink-600 py-1.5 px-4 rounded-lg text-xs font-bold shadow-sm">إلغاء</button>
-                  </div>
-                ) : (
-                  <>
-                    <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-4 py-2 rounded-xl font-extrabold text-[0.9rem] flex items-center gap-2 shadow-sm">
-                      النقاط الممنوحة: {sub.grade} / {sub.taskMaxPoints} 🎯
-                    </span>
-                    <button onClick={() => { setInlineEditSub?.(sub.id); setInlinePoints?.(String(sub.grade || 0)); }} className="text-brand-600 hover:text-white bg-white hover:bg-brand-500 border border-brand-200 hover:border-brand-500 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm">
-                      ✏️ تعديل النقاط
-                    </button>
-                  </>
-                )}
-              </div>
-              {sub.feedback && (
-                <div className="text-[0.85rem] text-ink-500 font-medium italic mt-2 sm:mt-0 bg-ink-50/50 px-4 py-2 rounded-lg border border-ink-150">
-                  <span className="font-bold text-ink-700">التعليق:</span> "{sub.feedback}"
-                </div>
-              )}
+          {/* Inline Edit Points for approved submissions */}
+          {!isPending && isApproved && inlineEditSub === sub.id && (
+            <div className="flex items-center gap-1 bg-ink-50 p-1 rounded-lg border border-ink-200" onClick={e => e.stopPropagation()}>
+              <input type="number" min={0} max={sub.taskMaxPoints} className="field py-0.5 px-2 w-16 text-center font-extrabold text-[0.8rem] text-brand-600 rounded border-brand-200 bg-white" value={inlinePoints} onChange={e => setInlinePoints?.(e.target.value.replace(/\D/g, ''))} />
+              <button onClick={() => saveInlinePoints?.(sub)} disabled={inlineBusy} className="bg-brand text-white px-2 py-0.5 rounded text-[10px] font-bold shadow-sm cursor-pointer hover:bg-brand/90">حفظ</button>
+              <button onClick={() => setInlineEditSub?.(null)} className="bg-white border border-ink-200 text-ink-600 px-2 py-0.5 rounded text-[10px] font-bold shadow-sm cursor-pointer hover:bg-ink-100">إلغاء</button>
             </div>
           )}
-          {isRejected && (
-             <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-               <span className="text-nred-600 font-extrabold bg-nred-50 py-1.5 px-4 rounded-xl border border-nred-200 text-[0.85rem] shadow-sm">
-                 تم رد المهمة
-               </span>
-               {sub.feedback && (
-                 <div className="text-[0.85rem] text-nred-600 font-medium italic bg-nred-50/50 px-4 py-2 rounded-lg border border-nred-100">
-                   <span className="font-bold">السبب:</span> "{sub.feedback}"
-                 </div>
-               )}
-             </div>
+          {!isPending && isApproved && inlineEditSub !== sub.id && (
+            <button onClick={() => { setInlineEditSub?.(sub.id); setInlinePoints?.(String(sub.grade || 0)); }} className="text-brand hover:underline font-bold text-[0.7rem] mr-1 cursor-pointer">
+              ✏️ تعديل النقاط
+            </button>
+          )}
+
+          {/* Feedback comment placeholder if exists */}
+          {sub.feedback && (
+            <span className="text-[0.7rem] text-ink-500 bg-ink-50 px-2 py-0.5 rounded border border-ink-150 max-w-[150px] truncate" title={sub.feedback}>
+              💬 {sub.feedback}
+            </span>
           )}
         </div>
-      )}
 
-      {/* Evaluate Buttons */}
-      {isPending && onEvaluate && (
-        <div className="mt-4 flex justify-end pt-5 border-t border-ink-150">
-           <button onClick={() => onEvaluate(sub)} className="btn bg-brand-500 hover:bg-brand-600 text-white font-bold py-2.5 px-8 rounded-xl text-[0.9rem] shadow-brand transition-colors w-full sm:w-auto">
-              مراجعة وتقييم التسليم
-           </button>
+        {/* Left Section: File Link & Main Action Button */}
+        <div className="flex items-center gap-2 justify-end self-end lg:self-auto shrink-0">
+          {sub.fileUrl && sub.fileUrl !== 'admin://manual-mark' && (
+            <a 
+              href={sub.fileUrl} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="text-brand bg-brand-50 hover:bg-brand-100 border border-brand-200/50 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer"
+            >
+              📄 الملف
+            </a>
+          )}
+          
+          {isPending && onEvaluate && (
+            <button onClick={() => onEvaluate(sub)} className="btn bg-brand-500 hover:bg-brand-600 text-white font-bold py-1.5 px-4 rounded-lg text-xs shadow-brand transition-colors whitespace-nowrap cursor-pointer">
+              مراجعة وتقييم
+            </button>
+          )}
+          {!isPending && onEvaluate && (
+            <button onClick={() => onEvaluate(sub)} className="text-brand-600 bg-brand-50 hover:bg-brand-100 border border-brand-200 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer">
+              عرض التفاصيل
+            </button>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

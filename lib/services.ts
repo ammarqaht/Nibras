@@ -131,7 +131,8 @@ export const FINANCE_ANALYTICS_ROLES = [
 /** الأدوار التي تستطيع إضافة نقاط جماعية للمجموعات */
 export const GROUP_POINTS_ROLES = [
   'admin', 'cultural_supervisor', 'sports_supervisor',
-  'scientific_supervisor', 'social_supervisor', 'stage_supervisor'
+  'scientific_supervisor', 'social_supervisor', 'stage_supervisor',
+  'family_supervisor'
 ];
 
 export const GLOBAL_ROLES = [

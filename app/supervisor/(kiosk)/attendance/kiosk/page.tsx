@@ -25,6 +25,16 @@ function todayStr() {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
+function formatTime12(timeStr: string): string {
+  if (!timeStr) return '';
+  const [hStr, mStr] = timeStr.split(':');
+  let h = parseInt(hStr, 10);
+  const ampm = h >= 12 ? 'م' : 'ص';
+  h = h % 12;
+  if (h === 0) h = 12;
+  return `${String(h).padStart(2, '0')}:${mStr} ${ampm}`;
+}
+
 function calcPts(pts: PtRec[]) {
   let ind=0, col=0, ded=0;
   for (const p of pts) {
@@ -264,7 +274,7 @@ export default function KioskPage() {
                   setInput(val);
                   if (val && !busy && students.find(s => String(s.membershipNo) === val)) doCheckIn(val);
                 }}
-                disabled={busy} autoFocus autoComplete="off" dir="ltr" placeholder="(0000)"
+                disabled={busy} autoFocus autoComplete="new-password" dir="ltr" placeholder="0000"
                 className="w-full text-center rounded-2xl border-2 border-ink-200 focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/15 transition-all bg-white placeholder:text-ink-200 py-5 text-5xl font-bold tracking-[0.2em]"
                 style={{fontFamily:'ui-monospace,monospace'}}
               />
@@ -284,10 +294,10 @@ export default function KioskPage() {
           <div className="flex gap-2 justify-center flex-wrap" onClick={e=>e.stopPropagation()}>
             <span className="inline-flex items-center gap-1.5 text-xs bg-green-50 text-green-700 border border-green-100 rounded-full px-3 py-1">
               <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"/>
-              حضور قبل {cfg.lateAfter} · +{cfg.onTimePoints} نقطة
+              حضور من {formatTime12(cfg.attendanceStart)} إلى {formatTime12(cfg.lateAfter)} · +{cfg.onTimePoints} نقطة
             </span>
             <span className="inline-flex items-center gap-1.5 text-xs bg-yellow-50 text-yellow-600 border border-yellow-200 rounded-full px-3 py-1">
-              ⏰ متأخر بعد {cfg.lateAfter} · +{cfg.latePoints} نقطة
+              ⏰ متأخر بعد {formatTime12(cfg.lateAfter)} · +{cfg.latePoints} نقطة
             </span>
           </div>
         </div>
