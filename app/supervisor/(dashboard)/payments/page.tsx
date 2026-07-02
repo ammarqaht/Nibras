@@ -55,6 +55,8 @@ export default function PaymentsPage() {
   const allowed = (user?.role ?? '').split(',').map((r) => r.trim()).some((r) => r === 'admin' || r === 'finance' || r === 'finance_supervisor');
 
   const [students, setStudents] = useState<Student[]>([]);
+  const [groups, setGroups] = useState<{ id: number; name: string; stage: string }[]>([]);
+  const [showAddStudentModal, setShowAddStudentModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [fStages, setFStages] = useState<string[]>([]);
@@ -70,8 +72,16 @@ export default function PaymentsPage() {
   };
 
   async function load() {
-    const sr = await fetch('/api/supervisor/students', { cache: 'no-store' });
-    setStudents((await sr.json().catch(() => ({ students: [] }))).students ?? []);
+    const [sr, gr] = await Promise.all([
+      fetch('/api/supervisor/students', { cache: 'no-store' }),
+      fetch('/api/supervisor/groups', { cache: 'no-store' }).catch(() => null)
+    ]);
+    if (sr) {
+      setStudents((await sr.json().catch(() => ({ students: [] }))).students ?? []);
+    }
+    if (gr) {
+      setGroups((await gr.json().catch(() => ({ groups: [] }))).groups ?? []);
+    }
     setLoading(false);
   }
   useEffect(() => { if (allowed) load(); else setLoading(false); }, [allowed]);
@@ -244,12 +254,21 @@ export default function PaymentsPage() {
           <h1 className="text-2xl font-bold text-ink-900 mb-1">المدفوعات</h1>
           <p className="text-sm text-ink-500">مراجعة إيصالات التحويل وتأكيد استلام الرسوم.</p>
         </div>
-        <button onClick={exportCsv} className="btn btn-secondary text-sm flex items-center gap-1.5">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
-          </svg>
-          <span>تنزيل بيانات الطلاب (CSV)</span>
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => setShowAddStudentModal(true)} className="btn btn-primary text-sm flex items-center gap-1.5 cursor-pointer">
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            <span>إضافة طالب يدوياً</span>
+          </button>
+          <button onClick={exportCsv} className="btn btn-secondary text-sm flex items-center gap-1.5 cursor-pointer">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
+            </svg>
+            <span>تنزيل بيانات الطلاب (CSV)</span>
+          </button>
+        </div>
       </div>
 
       {/* Filters — matching the students page layout */}
@@ -587,6 +606,17 @@ export default function PaymentsPage() {
           onCancelConfirm={cancelConfirm}
           onUpdateStudentReceipt={updateStudentReceipt}
           onDelete={deleteStudent}
+        />
+      )}
+
+      {showAddStudentModal && (
+        <AddStudentModal
+          groups={groups}
+          onClose={() => setShowAddStudentModal(false)}
+          onCreated={() => {
+            setShowAddStudentModal(false);
+            load();
+          }}
         />
       )}
     </div>
@@ -959,6 +989,138 @@ function StudentDetailsModal({
             </button>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function AddStudentModal({
+  groups,
+  onClose,
+  onCreated
+}: {
+  groups: { id: number; name: string; stage: string }[];
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const [studentName, setStudentName] = useState('');
+  const [nationalId, setNationalId] = useState('');
+  const [guardianPhone, setGuardianPhone] = useState('');
+  const [studentPhone, setStudentPhone] = useState('');
+  const [stage, setStage] = useState('ابتدائي');
+  const [grade, setGrade] = useState('');
+  const [neighborhood, setNeighborhood] = useState('');
+  const [paymentStatus, setPaymentStatus] = useState('unpaid');
+  const [groupId, setGroupId] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const STAGES_CONFIG = [
+    { key: 'ابتدائي', label: 'ابتدائي', grades: ['رابع ابتدائي', 'خامس ابتدائي', 'سادس ابتدائي'] },
+    { key: 'متوسط', label: 'متوسط', grades: ['أول متوسط', 'ثاني متوسط', 'ثالث متوسط'] },
+    { key: 'ثانوي', label: 'ثانوي', grades: ['أول ثانوي', 'ثاني ثانوي', 'ثالث ثانوي'] },
+  ];
+
+  const availableGrades = STAGES_CONFIG.find(s => s.key === stage)?.grades || [];
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!studentName.trim() || !nationalId.trim() || !guardianPhone.trim() || !stage || !grade || !neighborhood.trim()) {
+      return pushToast('error', 'يرجى إكمال الحقول الإلزامية');
+    }
+    setBusy(true);
+    const res = await fetch('/api/supervisor/students', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studentName,
+        nationalId,
+        guardianPhone,
+        studentPhone: studentPhone || null,
+        stage,
+        grade,
+        neighborhood,
+        paymentStatus,
+        groupId: groupId ? parseInt(groupId, 10) : null,
+      })
+    });
+    setBusy(false);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      return pushToast('error', data.error || 'حدث خطأ أثناء إضافة الطالب');
+    }
+    pushToast('success', 'تم إضافة الطالب يدوياً بنجاح');
+    onCreated();
+  };
+
+  return (
+    <div className="modal-backdrop flex items-center justify-center p-3 sm:p-4 z-[60] overflow-y-auto" onClick={onClose}>
+      <div className="modal-panel w-[92vw] sm:w-full sm:max-w-xl rounded-2xl max-h-[75vh] sm:max-h-[75vh] flex flex-col shadow-elevated" onClick={e => e.stopPropagation()}>
+        <div className="flex items-start justify-between p-3.5 sm:p-5 border-b border-ink-200 shrink-0">
+          <div>
+            <h2 className="text-lg sm:text-xl font-bold text-ink-900">إضافة طالب جديد يدوياً</h2>
+          </div>
+          <button onClick={onClose} className="text-ink-400 hover:text-ink-900 text-2xl leading-none px-2">×</button>
+        </div>
+
+        <form onSubmit={submit} className="flex-1 flex flex-col overflow-hidden">
+          <div className="p-3.5 sm:p-5 space-y-3.5 sm:space-y-5 flex-1 overflow-y-auto scroll-soft">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-ink-500">اسم الطالب الرباعي <span className="text-red-500">*</span></span>
+                <input className="field" value={studentName} onChange={e => setStudentName(e.target.value)} required />
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-ink-500">رقم الهوية <span className="text-red-500">*</span></span>
+                <input className="field" dir="ltr" maxLength={10} value={nationalId} onChange={e => setNationalId(e.target.value.replace(/\D/g, ''))} required />
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-ink-500">جوال ولي الأمر <span className="text-red-500">*</span></span>
+                <input className="field" dir="ltr" maxLength={10} value={guardianPhone} onChange={e => setGuardianPhone(e.target.value.replace(/\D/g, ''))} required />
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-ink-500">جوال الطالب (اختياري)</span>
+                <input className="field" dir="ltr" maxLength={10} value={studentPhone} onChange={e => setStudentPhone(e.target.value.replace(/\D/g, ''))} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-ink-500">المرحلة <span className="text-red-500">*</span></span>
+                <select className="field" value={stage} onChange={e => { setStage(e.target.value); setGrade(''); }}>
+                  {STAGES_CONFIG.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-ink-500">الصف <span className="text-red-500">*</span></span>
+                <select className="field" value={grade} onChange={e => setGrade(e.target.value)} required>
+                  <option value="">اختر الصف</option>
+                  {availableGrades.map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-ink-500">الحي السكني <span className="text-red-500">*</span></span>
+                <input className="field" value={neighborhood} onChange={e => setNeighborhood(e.target.value)} required />
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-ink-500">حالة الدفع</span>
+                <select className="field" value={paymentStatus} onChange={e => setPaymentStatus(e.target.value)}>
+                  <option value="unpaid">غير مدفوع</option>
+                  <option value="paid">مدفوع</option>
+                  <option value="exempted">معفى</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-1 sm:col-span-2">
+                <span className="text-xs font-semibold text-ink-500">المجموعة / الأسرة</span>
+                <select className="field" value={groupId} onChange={e => setGroupId(e.target.value)}>
+                  <option value="">غير محدد</option>
+                  {groups.filter(g => g.stage === stage).map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-3.5 sm:p-5 border-t border-ink-200 flex justify-end gap-2 shrink-0 bg-ink-50/50 rounded-b-2xl">
+            <button type="button" onClick={onClose} className="btn btn-secondary px-6">إلغاء</button>
+            <button type="submit" disabled={busy} className="btn btn-primary px-6">{busy ? 'جاري الإضافة...' : 'إضافة الطالب'}</button>
+          </div>
+        </form>
       </div>
     </div>
   );

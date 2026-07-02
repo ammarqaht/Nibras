@@ -127,6 +127,13 @@ export default function RegisterPage() {
     accountOwner: 'جمعية وثبة لتنمية الشباب والنشء'
   });
 
+  const [disabledStages, setDisabledStages] = useState({
+    primary: false,
+    intermediate: false,
+    secondary: false,
+  });
+  const [settingsLoading, setSettingsLoading] = useState(true);
+
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
 
@@ -205,7 +212,7 @@ export default function RegisterPage() {
       setTimeout(forceScroll, 800)
     ];
 
-    // Fetch dynamic bank credentials
+    // Fetch dynamic bank credentials and settings
     fetch('/api/supervisor/settings')
       .then(res => res.json())
       .then(data => {
@@ -217,9 +224,15 @@ export default function RegisterPage() {
             iban: s.bankIban || 'SA7905000068206153287000',
             accountOwner: s.bankOwner || 'جمعية وثبة لتنمية الشباب والنشء'
           });
+          setDisabledStages({
+            primary: s.disable_registration_primary === 'true',
+            intermediate: s.disable_registration_intermediate === 'true',
+            secondary: s.disable_registration_secondary === 'true',
+          });
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setSettingsLoading(false));
 
     return () => {
       if (typeof window !== 'undefined' && window.history && 'scrollRestoration' in window.history && originalScrollRestoration) {
@@ -334,8 +347,21 @@ export default function RegisterPage() {
     if (nationalId.length !== 10) e.nationalId = 'رقم الهوية يجب أن يتكوّن من 10 أرقام.';
     if (guardianPhone.length < 10) e.guardianPhone = 'أدخل رقم جوال صحيح (10 أرقام).';
     if (studentPhone && studentPhone.length < 10) e.studentPhone = 'رقم الجوال غير مكتمل.';
-    if (!stage) e.stage = 'يرجى اختيار المرحلة الدراسية.';
-    else if (!grade) e.grade = 'يرجى اختيار الصف.';
+    
+    if (!stage) {
+      e.stage = 'يرجى اختيار المرحلة الدراسية.';
+    } else {
+      if (stage === 'ابتدائي' && disabledStages.primary) {
+        e.stage = 'نعتذر لكم، تم اكتمال المقاعد المتاحة للمرحلة الابتدائية وإيقاف التسجيل بها.';
+      } else if (stage === 'متوسط' && disabledStages.intermediate) {
+        e.stage = 'نعتذر لكم، تم اكتمال المقاعد المتاحة للمرحلة المتوسطة وإيقاف التسجيل بها.';
+      } else if (stage === 'ثانوي' && disabledStages.secondary) {
+        e.stage = 'نعتذر لكم، تم اكتمال المقاعد المتاحة للمرحلة الثانوية وإيقاف التسجيل بها.';
+      } else if (!grade) {
+        e.grade = 'يرجى اختيار الصف.';
+      }
+    }
+    
     if (!neighborhood.trim()) e.neighborhood = 'يرجى إدخال الحي السكني.';
     if (!coords && !mapLink.trim())
       e.location = 'يرجى تحديد موقعك على الخريطة أو إدخال رابط قوقل ماب الخاص بك.';
@@ -457,6 +483,22 @@ export default function RegisterPage() {
   };
 
   const showErr = (k: string) => submitted && errors[k];
+  const allStagesDisabled = disabledStages.primary && disabledStages.intermediate && disabledStages.secondary;
+
+  if (settingsLoading) {
+    return (
+      <main className="min-h-screen flex flex-col">
+        <SiteHeader showCta={false} />
+        <section className="flex-1 px-6 py-12 sm:py-16 flex items-center justify-center">
+          <div className="text-center space-y-4">
+            <div className="w-10 h-10 border-4 border-brand border-t-transparent rounded-full animate-spin mx-auto" />
+            <p className="text-ink-500 text-sm font-semibold">جارٍ تحميل إعدادات التسجيل...</p>
+          </div>
+        </section>
+        <Footer />
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen flex flex-col">
@@ -464,8 +506,25 @@ export default function RegisterPage() {
 
       <section className="flex-1 px-6 py-12 sm:py-16">
         <div className="mx-auto max-w-2xl">
-          {/* Step Progress Bar */}
-          <div className="reveal-hero flex items-center justify-center max-w-md mx-auto mb-16 select-none relative px-4">
+          {allStagesDisabled ? (
+            <div className="reveal-hero text-center py-10 max-w-xl mx-auto fade-in">
+              <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6 text-4xl shadow-sm border border-red-100">
+                🚫
+              </div>
+              <h1 className="font-display text-2xl sm:text-3xl text-ink-900 font-bold mb-4">اكتمال العدد ونعتذر عن إمكانية التسجيل</h1>
+              <div className="card p-6 sm:p-8 space-y-4 border border-red-200 bg-red-50/20 shadow-sm rounded-2xl">
+                <p className="text-ink-700 text-sm sm:text-base leading-relaxed font-semibold">
+                  أهلاً بك في نادي نبراس. نود إحاطتكم بأنه قد تم اكتمال المقاعد المتاحة وإيقاف التسجيل في جميع المراحل الدراسية (الابتدائي، المتوسط، والثانوي) لهذا الفصل.
+                </p>
+                <p className="text-ink-500 text-xs sm:text-sm">
+                  شاكرين لكم اهتمامكم وثقتكم الكبيرة بنا، ونسعد بتواصلكم معنا في الفرص القادمة إن شاء الله.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Step Progress Bar */}
+              <div className="reveal-hero flex items-center justify-center max-w-md mx-auto mb-16 select-none relative px-4">
             <div className="flex items-center w-full relative">
               {/* Line Connector Background */}
               <div className="absolute top-[15px] left-0 right-0 h-[3px] bg-ink-200 z-0 rounded-full" />
@@ -596,8 +655,25 @@ export default function RegisterPage() {
                     onStageChange={setStage}
                     onGradeChange={setGrade}
                     invalid={submitted}
+                    disabledStages={[
+                      disabledStages.primary && 'ابتدائي',
+                      disabledStages.intermediate && 'متوسط',
+                      disabledStages.secondary && 'ثانوي'
+                    ].filter(Boolean) as string[]}
                   />
                   {showErr('stage') && <p className="err-msg mt-2">{errors.stage}</p>}
+
+                  {/* التنبيه لاكتمال عدد المرحلة */}
+                  {stage && (
+                    (stage === 'ابتدائي' && disabledStages.primary) ||
+                    (stage === 'متوسط' && disabledStages.intermediate) ||
+                    (stage === 'ثانوي' && disabledStages.secondary)
+                  ) && (
+                    <div className="p-4 bg-red-50 border border-red-200 text-red-800 text-xs font-semibold rounded-xl mt-3 flex items-center gap-2 fade-in">
+                      <span className="text-base">⚠️</span>
+                      <span>نعتذر منكم، تم اكتمال المقاعد المتاحة لهذه المرحلة حالياً وإيقاف التسجيل بها.</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* الحي السكني */}
@@ -680,10 +756,18 @@ export default function RegisterPage() {
 
                 <button
                   type="submit"
-                  disabled={busy}
+                  disabled={busy || !!(stage && (
+                    (stage === 'ابتدائي' && disabledStages.primary) ||
+                    (stage === 'متوسط' && disabledStages.intermediate) ||
+                    (stage === 'ثانوي' && disabledStages.secondary)
+                  ))}
                   className="btn btn-lg w-full font-bold text-white bg-brand hover:bg-brand-600 hover:shadow-[0_8px_24px_rgba(255,159,28,0.22)] hover:-translate-y-0.5 border-none transition-all duration-300 disabled:opacity-50 disabled:pointer-events-none"
                 >
-                  التالي: طريقة السداد
+                  {(stage && (
+                    (stage === 'ابتدائي' && disabledStages.primary) ||
+                    (stage === 'متوسط' && disabledStages.intermediate) ||
+                    (stage === 'ثانوي' && disabledStages.secondary)
+                  )) ? 'التسجيل مغلق لاكتمال العدد' : 'التالي: طريقة السداد'}
                 </button>
               </form>
             </div>
@@ -924,6 +1008,8 @@ export default function RegisterPage() {
                 </div>
               </form>
             </div>
+          )}
+          </>
           )}
         </div>
       </section>

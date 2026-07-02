@@ -816,8 +816,22 @@ export async function deleteAttendancePointsByDate(registrationId: number, date:
 
 // ==================== POINTS SERVICES ====================
 export async function getPoints(): Promise<PointInfo[]> {
+  const fiveDaysAgo = new Date();
+  fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
+
   if (hasDatabase) {
     const prisma = getPrisma()!;
+    try {
+      await prisma.point.deleteMany({
+        where: {
+          createdAt: {
+            lt: fiveDaysAgo
+          }
+        }
+      });
+    } catch (err) {
+      console.warn("Failed to clean up old points:", err);
+    }
     const list = await prisma.point.findMany({
       orderBy: { createdAt: 'desc' }
     });
@@ -834,7 +848,12 @@ export async function getPoints(): Promise<PointInfo[]> {
       createdAt: p.createdAt.toISOString()
     }));
   } else {
-    return readJsonFile<PointInfo[]>(FILE_POINTS, []);
+    const list = await readJsonFile<PointInfo[]>(FILE_POINTS, []);
+    const filtered = list.filter(p => new Date(p.createdAt) >= fiveDaysAgo);
+    if (filtered.length !== list.length) {
+      await writeJsonFile(FILE_POINTS, filtered);
+    }
+    return filtered;
   }
 }
 
@@ -2645,7 +2664,11 @@ export async function getStageLeaderboard(stage: string): Promise<{
   balance: number;
 }[]> {
   const students = await getStudents();
-  const stageStudents = students.filter(s => s.stage === stage);
+  const stageStudents = students.filter(s =>
+    s.stage === stage &&
+    (s.registrationStatus === 'approved' || s.paymentStatus === 'exempted') &&
+    (s.paymentStatus === 'paid' || s.paymentStatus === 'exempted' || s.paymentStatus === '')
+  );
 
   const allPoints = hasDatabase
     ? await (async () => {

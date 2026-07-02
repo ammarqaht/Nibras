@@ -110,7 +110,7 @@ export default function AttendancePage() {
     const sj = await sr.json().catch(()=>({students:[]}));
     const gj = await gr.json().catch(()=>({groups:[]}));
     const cj = await cr.json().catch(()=>({}));
-    setStudents((sj.students??[]).filter((s:Student) => s.registrationStatus==='approved'));
+    setStudents((sj.students??[]).filter((s:Student) => s.registrationStatus==='approved' || s.paymentStatus==='exempted'));
     setGroups(gj.groups??[]);
     if (cj.lateAfter) { setCfg(cj); setCfgDraft(cj); }
   }
@@ -500,7 +500,7 @@ export default function AttendancePage() {
           <form onSubmit={quickPresent}>
             <label className="label">تحضير سريع</label>
             <div className="flex gap-2">
-              <input ref={quickRef} className="field flex-1" dir="ltr" placeholder="رقم العضوية"
+              <input ref={quickRef} className="field flex-1" dir="ltr" placeholder="(0000)"
                 value={quick} onChange={e=>setQuick(e.target.value)} inputMode="numeric"/>
               <button type="submit" className="btn btn-primary px-4">✓</button>
             </div>

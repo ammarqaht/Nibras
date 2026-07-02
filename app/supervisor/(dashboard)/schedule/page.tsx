@@ -444,21 +444,19 @@ export default function SchedulePage() {
 
       {/* نافذة الإضافة / التعديل */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden pop-in max-h-[85vh] flex flex-col">
-            <div className="p-4 border-b border-ink-200 flex justify-between items-center bg-ink-50 shrink-0">
-              <h3 className="text-lg font-bold text-ink-900">
-                {editingScheduleId ? 'تعديل البرنامج' : 'إضافة برنامج للجدول'}
-              </h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-ink-400 hover:text-ink-900 p-1.5 rounded-lg hover:bg-ink-100 transition-colors cursor-pointer" aria-label="إغلاق">
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
+        <div className="modal-backdrop flex items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto" onClick={() => setIsModalOpen(false)}>
+          <div className="modal-panel w-[92vw] sm:w-full sm:max-w-xl rounded-2xl max-h-[70vh] sm:max-h-[70vh] flex flex-col shadow-elevated" onClick={e => e.stopPropagation()}>
+            <div className="flex items-start justify-between p-3.5 sm:p-5 border-b border-ink-200 shrink-0">
+              <div>
+                <h2 className="text-lg sm:text-xl font-bold text-ink-900">
+                  {editingScheduleId ? 'تعديل البرنامج' : 'إضافة برنامج للجدول'}
+                </h2>
+              </div>
+              <button onClick={() => setIsModalOpen(false)} className="text-ink-400 hover:text-ink-900 text-2xl leading-none px-2">×</button>
             </div>
             
-            <form onSubmit={submit} className="p-4 space-y-3 overflow-y-auto scroll-soft flex-1">
+            <form onSubmit={submit} className="flex-1 flex flex-col overflow-hidden">
+              <div className="p-3.5 sm:p-5 space-y-3.5 sm:space-y-5 flex-1 overflow-y-auto scroll-soft">
               <div>
                 <label className="label">اسم البرنامج</label>
                 <input className="field" value={title} onChange={e => setTitle(e.target.value)} placeholder="مثال: دوري البلايستيشن" required />
@@ -591,7 +589,9 @@ export default function SchedulePage() {
                 </div>
               ) : null}
               
-              <div className="pt-2 flex gap-2 bg-white shrink-0">
+              </div>
+              
+              <div className="p-3.5 sm:p-5 border-t border-ink-200 flex justify-end gap-2 shrink-0 bg-ink-50/50 rounded-b-2xl">
                 <button type="submit" disabled={busy} className="btn btn-primary flex-1">
                   {busy ? '...' : editingScheduleId ? 'حفظ التعديلات' : 'حفظ'}
                 </button>

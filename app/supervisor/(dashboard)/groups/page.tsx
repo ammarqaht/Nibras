@@ -81,7 +81,7 @@ export default function GroupsPage() {
     setSupervisors(suj.supervisors ?? []);
     setPoints(prj.points ?? []);
     const allSt: Student[] = srj.students ?? [];
-    setStudents(allSt.filter((s) => s.registrationStatus === 'approved' && (s.paymentStatus === 'paid' || s.paymentStatus === 'exempted' || s.paymentStatus === '')));
+    setStudents(allSt.filter((s) => (s.registrationStatus === 'approved' || s.paymentStatus === 'exempted') && (s.paymentStatus === 'paid' || s.paymentStatus === 'exempted' || s.paymentStatus === '')));
     setLoading(false);
   }
   useEffect(() => { load(); }, []);

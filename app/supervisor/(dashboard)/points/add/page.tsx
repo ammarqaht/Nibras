@@ -75,7 +75,7 @@ export default function AddPointsPage() {
       const grj = await gr.json().catch(() => ({ groups: [] }));
       const allSt: Student[] = srj.students ?? [];
       setStudents(allSt.filter(s =>
-        s.registrationStatus === 'approved' &&
+        (s.registrationStatus === 'approved' || s.paymentStatus === 'exempted') &&
         (s.paymentStatus === 'paid' || s.paymentStatus === 'exempted' || s.paymentStatus === '')
       ));
       setGroups(grj.groups ?? []);

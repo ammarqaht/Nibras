@@ -692,7 +692,7 @@ export default function DashboardHome() {
       if (statsJson.stats) setStats(statsJson.stats);
       if (studentsJson.students) {
         // Only allow awarding points to approved students
-        setStudents(studentsJson.students.filter((s: any) => s.registrationStatus === 'approved'));
+        setStudents(studentsJson.students.filter((s: any) => s.registrationStatus === 'approved' || s.paymentStatus === 'exempted'));
       }
 
       if (submissionsRes) {

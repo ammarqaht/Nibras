@@ -30,15 +30,16 @@ const ROLE_MAP: Record<string, string> = {
   social_supervisor: 'مشرف اجتماعية',
   cultural_supervisor: 'مشرف ثقافية',
   groups_supervisor: 'مشرف أسر',
-  general_supervisor: 'مسؤول الإعلامية',
+  family_supervisor: 'مشرف أسر',
+  families_supervisor: 'مشرف أسر',
+  general_supervisor: 'مشرف عام',
   media_officer: 'مسؤول الإعلامية',
   finance_supervisor: 'مسؤول المالية',
   media_supervisor: 'مشرف إعلامية',
   scientific_supervisor: 'مشرف العلمية',
   sports_supervisor: 'مشرف الرياضية',
   stage_supervisor: 'مشرف مرحلة',
-  tasks_supervisor: 'مشرف المهام',
-  family_supervisor: 'مشرف الأسرية'
+  tasks_supervisor: 'مشرف المهام'
 };
 
 const getRoleLabel = (roleStr: string) => {

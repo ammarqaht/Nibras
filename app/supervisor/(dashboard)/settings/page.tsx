@@ -5,7 +5,7 @@ import { pushToast } from '@/components/Toast';
 import { useSupervisor } from '@/components/SupervisorShell';
 import { site, landing, clubDetails, footer, defaultBankDetails, confirmation } from '@/content';
 
-type Field = { key: string; label: string; def: string; type?: 'text' | 'textarea'; ltr?: boolean };
+type Field = { key: string; label: string; def: string; type?: 'text' | 'textarea' | 'boolean'; ltr?: boolean };
 type Section = { title: string; fields: Field[] };
 
 const SECTIONS: Section[] = [
@@ -50,6 +50,14 @@ const SECTIONS: Section[] = [
     title: 'الإشعارات',
     fields: [
       { key: 'confirmationNotices', label: 'الإشعارات', def: confirmation.notices.join('\n'), type: 'textarea' }
+    ]
+  },
+  {
+    title: 'إيقاف التسجيل للمراحل الدراسية',
+    fields: [
+      { key: 'disable_registration_primary', label: 'إيقاف تسجيل المرحلة الابتدائية', def: 'false', type: 'boolean' },
+      { key: 'disable_registration_intermediate', label: 'إيقاف تسجيل المرحلة المتوسطة', def: 'false', type: 'boolean' },
+      { key: 'disable_registration_secondary', label: 'إيقاف تسجيل المرحلة الثانوية', def: 'false', type: 'boolean' }
     ]
   }
 ];
@@ -164,7 +172,20 @@ export default function SettingsPage() {
                 {sec.fields.map((f) => (
                   <div key={f.key} className={f.type === 'textarea' ? 'sm:col-span-2' : ''}>
                     <label className="label">{f.label}</label>
-                    {f.type === 'textarea' ? (
+                    {f.type === 'boolean' ? (
+                      <div className="flex items-center mt-2 h-10 select-none">
+                        <input
+                          type="checkbox"
+                          id={f.key}
+                          className="rounded text-brand w-5 h-5 cursor-pointer focus:ring-brand accent-brand"
+                          checked={values[f.key] === 'true'}
+                          onChange={(e) => set(f.key, e.target.checked ? 'true' : 'false')}
+                        />
+                        <label htmlFor={f.key} className="mr-2 text-sm text-ink-700 cursor-pointer">
+                          موقوف (اكتمال العدد)
+                        </label>
+                      </div>
+                    ) : f.type === 'textarea' ? (
                       <textarea
                         className="field"
                         rows={3}

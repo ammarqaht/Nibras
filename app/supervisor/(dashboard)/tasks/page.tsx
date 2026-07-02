@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import { pushToast } from '@/components/Toast';
 import { useSupervisor } from '@/components/SupervisorShell';
 
-type Student = { id: number; membershipNo: number; studentName: string; stage: string; grade: string; registrationStatus: string };
+type Student = { id: number; membershipNo: number; studentName: string; stage: string; grade: string; registrationStatus: string; paymentStatus?: string };
 type SupervisorUser = { id: number; name: string; email: string };
 type Task = {
   id: string;
@@ -424,7 +424,7 @@ export default function TasksPage() {
   // Statistics modal helper
   const statsStudentList = useMemo(() => {
     if (!statsTask) return [];
-    const activeStudents = students.filter(s => s.registrationStatus === 'approved');
+    const activeStudents = students.filter(s => s.registrationStatus === 'approved' || s.paymentStatus === 'exempted');
     const scopedStudents = statsTask.visibility === 'restricted' ? activeStudents.filter(s => statsTask.visibleToIds.includes(s.id)) : activeStudents;
     const taskSubmissionsMap = new Map(submissions.filter(s => s.taskId === statsTask.id).map(s => [s.registrationId, s]));
 
@@ -442,7 +442,7 @@ export default function TasksPage() {
 
   const statsCounts = useMemo(() => {
     if (!statsTask) return { total: 0, submitted: 0, missing: 0, pending: 0 };
-    const activeStudents = students.filter(s => s.registrationStatus === 'approved');
+    const activeStudents = students.filter(s => s.registrationStatus === 'approved' || s.paymentStatus === 'exempted');
     const scopedStudents = statsTask.visibility === 'restricted' ? activeStudents.filter(s => statsTask.visibleToIds.includes(s.id)) : activeStudents;
     const taskSubmissions = submissions.filter(s => s.taskId === statsTask.id);
     const submittedIds = new Set(taskSubmissions.map(s => s.registrationId));
@@ -1121,7 +1121,7 @@ export default function TasksPage() {
                     <div className="flex gap-2 w-full sm:w-auto">
                       <button type="button" className="btn bg-ink-100 hover:bg-ink-200 text-ink-800 py-2 px-3 text-[0.75rem] font-bold rounded-lg flex-1 sm:flex-none" onClick={() => {
                         const query = scopeSearch.trim().toLowerCase();
-                        const toSelect = students.filter(s => s.registrationStatus === 'approved' && (!query || s.studentName.toLowerCase().includes(query))).map(s => s.id);
+                        const toSelect = students.filter(s => (s.registrationStatus === 'approved' || s.paymentStatus === 'exempted') && (!query || s.studentName.toLowerCase().includes(query))).map(s => s.id);
                         setScopeSelected(Array.from(new Set([...scopeSelected, ...toSelect])));
                       }}>
                         تحديد النتائج
@@ -1133,7 +1133,7 @@ export default function TasksPage() {
                   </div>
 
                   <div className="max-h-60 overflow-y-auto border border-ink-200 rounded-xl p-3 space-y-2 scroll-soft bg-ink-50/30">
-                    {students.filter(s => s.registrationStatus === 'approved' && (!scopeSearch.trim() || s.studentName.toLowerCase().includes(scopeSearch.trim().toLowerCase()))).map(student => {
+                    {students.filter(s => (s.registrationStatus === 'approved' || s.paymentStatus === 'exempted') && (!scopeSearch.trim() || s.studentName.toLowerCase().includes(scopeSearch.trim().toLowerCase()))).map(student => {
                       const checked = scopeSelected.includes(student.id);
                       return (
                         <label key={student.id} className="flex items-center gap-3 p-2 hover:bg-white rounded-lg cursor-pointer text-[0.85rem] transition-colors border border-transparent hover:border-ink-150 hover:shadow-sm">

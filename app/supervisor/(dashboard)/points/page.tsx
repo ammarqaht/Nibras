@@ -60,6 +60,7 @@ export default function PointsBoardPage() {
   const [activeStage, setActiveStage] = useState<StageName>('ابتدائي');
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [logSearch, setLogSearch] = useState('');
+  const [visibleLogsCount, setVisibleLogsCount] = useState(10);
   const [leaderSearch, setLeaderSearch] = useState('');
   const [pointsHidden, setPointsHidden] = useState(false);
   const [visBusy, setVisBusy] = useState(false);
@@ -110,7 +111,7 @@ export default function PointsBoardPage() {
       const prj = await pr.json().catch(() => ({ points: [] }));
       const allSt: Student[] = srj.students ?? [];
       setStudents(allSt.filter(s =>
-        s.registrationStatus === 'approved' &&
+        (s.registrationStatus === 'approved' || s.paymentStatus === 'exempted') &&
         (s.paymentStatus === 'paid' || s.paymentStatus === 'exempted' || s.paymentStatus === '')
       ));
       setGroups(grj.groups ?? []);
@@ -164,6 +165,10 @@ export default function PointsBoardPage() {
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [points, stageStudentIds, logSearch, studentMap]);
 
+  const visibleLogs = useMemo(() => {
+    return stageLog.slice(0, visibleLogsCount);
+  }, [stageLog, visibleLogsCount]);
+
   const toggleExpand = (id: number) => setExpandedIds(prev => {
     const next = new Set(prev);
     next.has(id) ? next.delete(id) : next.add(id);
@@ -206,7 +211,7 @@ export default function PointsBoardPage() {
           <button
             key={stage}
             type="button"
-            onClick={() => { setActiveStage(stage); setLeaderSearch(''); setLogSearch(''); }}
+            onClick={() => { setActiveStage(stage); setLeaderSearch(''); setLogSearch(''); setVisibleLogsCount(10); }}
             className={`choice py-1.5 px-4 text-sm font-medium ${activeStage === stage ? 'is-active' : ''}`}
           >
             {stage}
@@ -325,7 +330,7 @@ export default function PointsBoardPage() {
                 placeholder="بحث باسم أو رقم عضوية..."
                 className="field py-1.5 px-3 text-xs sm:w-48"
                 value={logSearch}
-                onChange={e => setLogSearch(e.target.value)}
+                onChange={e => { setLogSearch(e.target.value); setVisibleLogsCount(10); }}
               />
             </div>
 
@@ -349,7 +354,7 @@ export default function PointsBoardPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {stageLog.map(p => {
+                      {visibleLogs.map(p => {
                         const st = studentMap.get(p.registrationId);
                         const typeLabel = p.delta < 0 ? (p.pointType === 'deduction' ? 'خصم متجر' : 'خصم نهائي') : (p.pointType === 'collective' ? 'جماعية' : 'فردية');
                         const typeCls = p.delta < 0 ? (p.pointType === 'deduction' ? 'pill-red bg-red-50 text-red-700 border-red-200' : 'pill-red') : (p.pointType === 'collective' ? 'pill-blue' : 'pill-green');
@@ -382,7 +387,7 @@ export default function PointsBoardPage() {
 
                 {/* Mobile */}
                 <ul className="lg:hidden divide-y divide-ink-100">
-                  {stageLog.map(p => {
+                  {visibleLogs.map(p => {
                     const st = studentMap.get(p.registrationId);
                     const isExp = expandedIds.has(p.id);
                     const typeLabel = p.delta < 0 ? (p.pointType === 'deduction' ? 'خصم متجر' : 'خصم نهائي') : (p.pointType === 'collective' ? 'جماعية' : 'فردية');
@@ -431,6 +436,18 @@ export default function PointsBoardPage() {
                     );
                   })}
                 </ul>
+
+                {stageLog.length > visibleLogsCount && (
+                  <div className="p-4 text-center border-t border-ink-100 bg-ink-50/50">
+                    <button
+                      type="button"
+                      onClick={() => setVisibleLogsCount(prev => prev + 10)}
+                      className="btn btn-secondary text-sm px-6 font-bold cursor-pointer"
+                    >
+                      عرض المزيد
+                    </button>
+                  </div>
+                )}
               </>
             )}
           </div>

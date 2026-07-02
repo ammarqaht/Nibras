@@ -85,7 +85,14 @@ export default function KioskPage() {
   useEffect(() => {
     function tick() {
       const n = new Date();
-      setClock(`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}:${String(n.getSeconds()).padStart(2,'0')}`);
+      let hours = n.getHours();
+      const minutes = String(n.getMinutes()).padStart(2, '0');
+      const seconds = String(n.getSeconds()).padStart(2, '0');
+      const ampm = hours >= 12 ? 'م' : 'ص';
+      hours = hours % 12;
+      hours = hours ? hours : 12; // the hour '0' should be '12'
+      const formattedHours = String(hours).padStart(2, '0');
+      setClock(`${formattedHours}:${minutes}:${seconds} ${ampm}`);
       setDateLabel(n.toLocaleDateString('ar-SA', { weekday:'long', year:'numeric', month:'long', day:'numeric' }));
     }
     tick();
@@ -257,7 +264,7 @@ export default function KioskPage() {
                   setInput(val);
                   if (val && !busy && students.find(s => String(s.membershipNo) === val)) doCheckIn(val);
                 }}
-                disabled={busy} autoFocus autoComplete="off" dir="ltr" placeholder="رقم العضوية"
+                disabled={busy} autoFocus autoComplete="off" dir="ltr" placeholder="(0000)"
                 className="w-full text-center rounded-2xl border-2 border-ink-200 focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/15 transition-all bg-white placeholder:text-ink-200 py-5 text-5xl font-bold tracking-[0.2em]"
                 style={{fontFamily:'ui-monospace,monospace'}}
               />

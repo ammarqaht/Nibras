@@ -283,14 +283,16 @@ function AddInvoiceModal({
   }
 
   return (
-    <div className="modal-backdrop flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 overflow-y-auto" onClick={onClose}>
-      <div className="modal-panel w-full sm:max-w-2xl rounded-t-3xl sm:rounded-2xl max-h-[92vh] sm:max-h-[85vh] flex flex-col shadow-elevated" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-ink-200">
-          <h2 className="text-lg sm:text-xl font-bold text-ink-900">إضافة فاتورة</h2>
-          <button onClick={onClose} className="text-ink-400 hover:text-ink-900 text-3xl font-bold leading-none px-2 py-1">×</button>
+    <div className="modal-backdrop flex items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto" onClick={onClose}>
+      <div className="modal-panel w-[92vw] sm:w-full sm:max-w-xl rounded-2xl max-h-[70vh] sm:max-h-[70vh] flex flex-col shadow-elevated" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between p-3.5 sm:p-5 border-b border-ink-200 shrink-0">
+          <div>
+            <h2 className="text-lg sm:text-xl font-bold text-ink-900">إضافة فاتورة</h2>
+          </div>
+          <button onClick={onClose} className="text-ink-400 hover:text-ink-900 text-2xl leading-none px-2">×</button>
         </div>
 
-        <div className="p-5 space-y-5 max-h-[72vh] overflow-y-auto scroll-soft">
+        <div className="p-3.5 sm:p-5 space-y-3.5 sm:space-y-5 flex-1 overflow-y-auto scroll-soft">
           {/* photo / AI */}
           <div className="rounded-xl border border-dashed border-ink-300 p-4 text-center">
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickFile} />
@@ -361,9 +363,9 @@ function AddInvoiceModal({
           </Field>
         </div>
 
-        <div className="p-4 border-t border-ink-200 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-cream-50/20 shrink-0">
-          <button onClick={onClose} className="btn btn-ghost py-2.5 px-4 text-xs sm:text-sm flex-1 sm:flex-none justify-center rounded-lg">إلغاء</button>
-          <button onClick={submit} disabled={busy || reading} className="btn btn-primary py-2.5 px-4 text-xs sm:text-sm flex-1 sm:flex-none justify-center rounded-lg">{busy ? 'جارٍ الحفظ…' : 'حفظ الفاتورة'}</button>
+        <div className="p-3.5 sm:p-5 border-t border-ink-200 flex justify-end gap-2 shrink-0 bg-ink-50/50 rounded-b-2xl">
+          <button onClick={onClose} className="btn btn-secondary px-6">إلغاء</button>
+          <button onClick={submit} disabled={busy || reading} className="btn btn-primary px-6">{busy ? 'جارٍ الحفظ…' : 'حفظ الفاتورة'}</button>
         </div>
       </div>
     </div>
@@ -384,9 +386,9 @@ function ViewInvoiceModal({
   onDelete: () => void;
 }) {
   return (
-    <div className="modal-backdrop flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 overflow-y-auto" onClick={onClose}>
-      <div className="modal-panel w-full sm:max-w-xl rounded-t-3xl sm:rounded-2xl max-h-[92vh] sm:max-h-[85vh] flex flex-col shadow-elevated" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start justify-between p-4 sm:p-5 border-b border-ink-200">
+    <div className="modal-backdrop flex items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto" onClick={onClose}>
+      <div className="modal-panel w-[92vw] sm:w-full sm:max-w-xl rounded-2xl max-h-[70vh] sm:max-h-[70vh] flex flex-col shadow-elevated" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between p-3.5 sm:p-5 border-b border-ink-200 shrink-0">
           <div>
             <h2 className="text-lg sm:text-xl font-bold text-ink-900">{invoice.title}</h2>
             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
@@ -395,10 +397,10 @@ function ViewInvoiceModal({
               {invoice.settlement === 'handed_over' && <span className="pill pill-green">تم تسليم المبلغ</span>}
             </div>
           </div>
-          <button onClick={onClose} className="text-ink-400 hover:text-ink-900 text-3xl font-bold leading-none px-2 py-1">×</button>
+          <button onClick={onClose} className="text-ink-400 hover:text-ink-900 text-2xl leading-none px-2">×</button>
         </div>
 
-        <div className="p-4 sm:p-5 space-y-4 flex-1 overflow-y-auto scroll-soft">
+        <div className="p-3.5 sm:p-5 space-y-3.5 sm:space-y-5 flex-1 overflow-y-auto scroll-soft">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm">
             <Info label="القسم" value={departmentLabel(invoice.department)} />
             <Info label="التصنيف" value={invoice.category ? categoryLabel(invoice.category) : '—'} />
@@ -428,10 +430,10 @@ function ViewInvoiceModal({
           )}
         </div>
 
-        <div className="p-4 border-t border-ink-200 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-cream-50/20 shrink-0">
-          <button onClick={onClose} className="btn btn-ghost py-2.5 px-4 text-xs sm:text-sm flex-1 sm:flex-none justify-center rounded-lg">إغلاق</button>
+        <div className="p-3.5 sm:p-5 border-t border-ink-200 flex justify-end gap-2 shrink-0 bg-ink-50/50 rounded-b-2xl">
+          <button onClick={onClose} className="btn btn-secondary px-6">إغلاق</button>
           {canDelete && (
-            <button onClick={onDelete} className="btn btn-danger py-2.5 px-4 text-xs sm:text-sm flex-1 sm:flex-none justify-center rounded-lg">حذف الفاتورة</button>
+            <button onClick={onDelete} className="btn btn-danger px-6">حذف الفاتورة</button>
           )}
         </div>
       </div>
