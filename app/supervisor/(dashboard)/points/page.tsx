@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useSupervisor } from '@/components/SupervisorShell';
+import { pushToast } from '@/components/Toast';
 
 type Student = {
   id: number; membershipNo: number; studentName: string;
@@ -51,7 +52,7 @@ function RankBadge({ rank }: { rank: number }) {
 export default function PointsBoardPage() {
   const { user } = useSupervisor();
   const roles = user?.role ? user.role.split(',').map(r => r.trim()) : [];
-  const canAddPoints = roles.some(r => ADD_POINTS_ROLES.includes(r));
+  const canAddPoints = roles.length > 0;
   const canToggleVisibility = roles.some(r => ['admin', 'stage_supervisor'].includes(r));
 
   const [students, setStudents] = useState<Student[]>([]);
@@ -69,6 +70,13 @@ export default function PointsBoardPage() {
   const [teaserMsg, setTeaserMsg] = useState('النقاط مخفية مؤقتاً… استمر في التميّز، وسيتم الكشف عنها قريباً! 🌟');
   const [teaserTitle, setTeaserTitle] = useState('النقاط مخفية مؤقتاً');
   const [mounted, setMounted] = useState(false);
+
+  const [catsOpen, setCatsOpen] = useState(false);
+  const [catsSaving, setCatsSaving] = useState(false);
+  const [studentCats, setStudentCats] = useState<{key:string, label:string}[]>([]);
+  const [groupCats, setGroupCats] = useState<{key:string, label:string}[]>([]);
+  const [draftStudentCats, setDraftStudentCats] = useState<{key:string, label:string}[]>([]);
+  const [draftGroupCats, setDraftGroupCats] = useState<{key:string, label:string}[]>([]);
 
   useEffect(() => {
     setMounted(true);
@@ -106,10 +114,14 @@ export default function PointsBoardPage() {
       fetch('/api/supervisor/students?scope=all', { cache: 'no-store' }),
       fetch('/api/supervisor/groups', { cache: 'no-store' }),
       fetch('/api/supervisor/points', { cache: 'no-store' }),
-    ]).then(async ([sr, gr, pr]) => {
+      fetch('/api/supervisor/points-categories', { cache: 'no-store' }),
+    ]).then(async ([sr, gr, pr, cr]) => {
       const srj = await sr.json().catch(() => ({ students: [] }));
       const grj = await gr.json().catch(() => ({ groups: [] }));
       const prj = await pr.json().catch(() => ({ points: [] }));
+      const crj = await cr.json().catch(() => ({}));
+      if (crj.studentCategories) setStudentCats(crj.studentCategories);
+      if (crj.groupCategories) setGroupCats(crj.groupCategories);
       const allSt: Student[] = srj.students ?? [];
       setStudents(allSt.filter(s =>
         (s.registrationStatus === 'approved' || s.paymentStatus === 'exempted') &&
@@ -201,6 +213,16 @@ export default function PointsBoardPage() {
               className="btn btn-ghost text-xs md:text-sm py-1.5 px-2.5 flex items-center gap-1.5 shrink-0 text-ink-700"
               title="إخفاء/إظهار النقاط في حسابات الطلاب">
               <span>{pointsHidden ? '👁️ إظهار النقاط' : '🙈 إخفاء النقاط'}</span>
+            </button>
+          )}
+          {roles.includes('admin') && (
+            <button onClick={() => {
+              setDraftStudentCats([...studentCats]);
+              setDraftGroupCats([...groupCats]);
+              setCatsOpen(true);
+            }} className="btn btn-ghost text-xs md:text-sm py-1.5 px-2.5 flex items-center gap-1.5 shrink-0 text-ink-700"
+              title="تعديل تصنيفات النقاط الفردية والجماعية">
+              <span>⚙️ تعديل التصنيفات</span>
             </button>
           )}
         </div>
@@ -496,6 +518,149 @@ export default function PointsBoardPage() {
                 تفعيل الحجب التشويقي
               </button>
               <button onClick={() => setShowVisModal(false)} className="btn btn-secondary flex-1 text-xs font-semibold">إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {catsOpen && (
+        <div className="modal-backdrop flex items-center justify-center p-4 z-50 animate-fade-in" onClick={() => setCatsOpen(false)}>
+          <div className="modal-panel w-full max-w-2xl p-5 space-y-4 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: 'var(--line)' }}>
+              <h3 className="font-bold text-base text-ink-900">تعديل تصنيفات النقاط</h3>
+              <button onClick={() => setCatsOpen(false)} className="btn btn-ghost p-1" aria-label="إغلاق">✕</button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Individual categories */}
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <h4 className="font-bold text-sm text-ink-800">تصنيفات النقاط الفردية</h4>
+                  <button
+                    type="button"
+                    onClick={() => setDraftStudentCats([...draftStudentCats, { key: `cat_ind_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`, label: '' }])}
+                    className="btn btn-secondary py-1 px-2.5 text-xs flex items-center gap-1"
+                  >
+                    <span>➕ إضافة تصنيف</span>
+                  </button>
+                </div>
+                
+                <div className="space-y-2 border p-3 rounded-xl bg-cream-50/20 max-h-[250px] overflow-y-auto" style={{ borderColor: 'var(--line)' }}>
+                  {draftStudentCats.length === 0 ? (
+                    <p className="text-xs text-ink-400 text-center py-4">لا توجد تصنيفات، أضف تصنيفاً جديداً</p>
+                  ) : (
+                    draftStudentCats.map((cat, idx) => (
+                      <div key={cat.key} className="flex gap-2 items-center">
+                        <input
+                          type="text"
+                          className="field text-xs py-2 px-3 flex-1"
+                          placeholder="اسم التصنيف (مثال: مشاركة)"
+                          value={cat.label}
+                          onChange={e => {
+                            const copy = [...draftStudentCats];
+                            copy[idx].label = e.target.value;
+                            setDraftStudentCats(copy);
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setDraftStudentCats(draftStudentCats.filter((_, i) => i !== idx))}
+                          className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                          title="حذف"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+              
+              {/* Group/Collective categories */}
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <h4 className="font-bold text-sm text-ink-800">تصنيفات النقاط الجماعية</h4>
+                  <button
+                    type="button"
+                    onClick={() => setDraftGroupCats([...draftGroupCats, { key: `cat_grp_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`, label: '' }])}
+                    className="btn btn-secondary py-1 px-2.5 text-xs flex items-center gap-1"
+                  >
+                    <span>➕ إضافة تصنيف</span>
+                  </button>
+                </div>
+                
+                <div className="space-y-2 border p-3 rounded-xl bg-cream-50/20 max-h-[250px] overflow-y-auto" style={{ borderColor: 'var(--line)' }}>
+                  {draftGroupCats.length === 0 ? (
+                    <p className="text-xs text-ink-400 text-center py-4">لا توجد تصنيفات، أضف تصنيفاً جديداً</p>
+                  ) : (
+                    draftGroupCats.map((cat, idx) => (
+                      <div key={cat.key} className="flex gap-2 items-center">
+                        <input
+                          type="text"
+                          className="field text-xs py-2 px-3 flex-1"
+                          placeholder="اسم التصنيف (مثال: مسابقة)"
+                          value={cat.label}
+                          onChange={e => {
+                            const copy = [...draftGroupCats];
+                            copy[idx].label = e.target.value;
+                            setDraftGroupCats(copy);
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setDraftGroupCats(draftGroupCats.filter((_, i) => i !== idx))}
+                          className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                          title="حذف"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex gap-2 pt-3 border-t justify-end" style={{ borderColor: 'var(--line)' }}>
+              <button
+                type="button"
+                onClick={async () => {
+                  setCatsSaving(true);
+                  try {
+                    const r = await fetch('/api/supervisor/points-categories', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        studentCategories: draftStudentCats.filter(c => c.label.trim()),
+                        groupCategories: draftGroupCats.filter(c => c.label.trim())
+                      })
+                    });
+                    if (r.ok) {
+                      setStudentCats(draftStudentCats.filter(c => c.label.trim()));
+                      setGroupCats(draftGroupCats.filter(c => c.label.trim()));
+                      pushToast('success', 'تم حفظ تصنيفات النقاط بنجاح');
+                      setCatsOpen(false);
+                    } else {
+                      pushToast('error', 'فشل حفظ التصنيفات');
+                    }
+                  } catch (e) {
+                    pushToast('error', 'حدث خطأ غير متوقع');
+                  } finally {
+                    setCatsSaving(false);
+                  }
+                }}
+                disabled={catsSaving}
+                className="btn btn-primary text-xs text-white font-bold px-6 py-2"
+              >
+                {catsSaving ? 'جارٍ الحفظ...' : 'حفظ التصنيفات'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setCatsOpen(false)}
+                className="btn btn-secondary text-xs font-semibold px-6 py-2"
+              >
+                إلغاء
+              </button>
             </div>
           </div>
         </div>

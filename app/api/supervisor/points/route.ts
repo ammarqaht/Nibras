@@ -58,12 +58,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { registrationId, registrationIds, groupId, delta, reason, category } = body;
 
-    if (groupId) {
-      const canAddGroupPoints = roles.some(r => GROUP_POINTS_ROLES.includes(r));
-      if (!canAddGroupPoints) {
-        return NextResponse.json({ error: 'غير مصرح لك برصد النقاط الجماعية' }, { status: 403 });
-      }
-    }
+
 
     const dVal = parseInt(delta, 10);
     if (isNaN(dVal) || !reason || !category) {

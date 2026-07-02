@@ -25,8 +25,7 @@ const ROLES = [
   { key: 'attendance_supervisor', label: 'لجنة التحضير', color: 'bg-gray-100 text-gray-800 border-gray-200' },
   { key: 'general_supervisor', label: 'الإدارة', color: 'bg-slate-100 text-slate-800 border-slate-300' },
   { key: 'scientific_supervisor', label: 'اللجنة العلمية', color: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
-  { key: 'sports_supervisor', label: 'اللجنة الرياضية', color: 'bg-orange-100 text-orange-800 border-orange-200' },
-  { key: 'family_supervisor', label: 'اللجنة الأسرية', color: 'bg-rose-100 text-rose-800 border-rose-200' },
+  { key: 'sports_supervisor', label: 'اللجنة الرياضية', color: 'bg-orange-100 text-orange-800 border-orange-200' }
 ];
 
 const DEFAULT_SLOTS = [
@@ -53,7 +52,7 @@ function getProgramSlots(s: ScheduleInfo): number[] {
 }
 
 // Only these committees can add/edit programs
-const COMMITTEE_ROLES = ['social_supervisor','cultural_supervisor','scientific_supervisor','sports_supervisor','groups_supervisor','family_supervisor'];
+const COMMITTEE_ROLES = ['social_supervisor','cultural_supervisor','scientific_supervisor','sports_supervisor','groups_supervisor'];
 
 export default function SchedulePage() {
   const { user } = useSupervisor();

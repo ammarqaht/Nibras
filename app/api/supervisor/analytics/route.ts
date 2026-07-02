@@ -36,7 +36,6 @@ const SCHEDULE_ROLES: Record<string, string> = {
   general_supervisor: 'الإدارة',
   scientific_supervisor: 'العلمية',
   sports_supervisor: 'الرياضية',
-  family_supervisor: 'الأسرية',
 };
 
 export async function GET(req: NextRequest) {

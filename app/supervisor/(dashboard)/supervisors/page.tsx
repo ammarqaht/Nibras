@@ -30,7 +30,6 @@ const ROLE_MAP: Record<string, string> = {
   social_supervisor: 'مشرف اجتماعية',
   cultural_supervisor: 'مشرف ثقافية',
   groups_supervisor: 'مشرف أسر',
-  family_supervisor: 'مشرف أسر',
   families_supervisor: 'مشرف أسر',
   general_supervisor: 'مشرف عام',
   media_officer: 'مسؤول الإعلامية',
@@ -303,8 +302,7 @@ export default function SupervisorsPage() {
                   { key: 'scientific_supervisor', label: 'مشرف العلمية' },
                   { key: 'sports_supervisor', label: 'مشرف الرياضية' },
                   { key: 'stage_supervisor', label: 'مشرف مرحلة' },
-                  { key: 'tasks_supervisor', label: 'مشرف المهام' },
-                  { key: 'family_supervisor', label: 'مشرف الأسرية' }
+                  { key: 'tasks_supervisor', label: 'مشرف المهام' }
                 ].map((r) => {
                   const active = selectedRoles.includes(r.key);
                   return (

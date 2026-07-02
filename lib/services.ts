@@ -131,8 +131,7 @@ export const FINANCE_ANALYTICS_ROLES = [
 /** الأدوار التي تستطيع إضافة نقاط جماعية للمجموعات */
 export const GROUP_POINTS_ROLES = [
   'admin', 'cultural_supervisor', 'sports_supervisor',
-  'scientific_supervisor', 'social_supervisor', 'stage_supervisor',
-  'family_supervisor'
+  'scientific_supervisor', 'social_supervisor', 'stage_supervisor'
 ];
 
 export const GLOBAL_ROLES = [
@@ -141,7 +140,7 @@ export const GLOBAL_ROLES = [
   'general_supervisor', 'attendance_supervisor',
   'cultural_supervisor', 'sports_supervisor',
   'scientific_supervisor', 'social_supervisor',
-  'tasks_supervisor', 'family_supervisor'
+  'tasks_supervisor'
 ];
 
 export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
@@ -155,7 +154,6 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
   media_supervisor: ['announcements', 'schedule', 'students', 'analytics', 'points'],
   stage_supervisor: ['groups', 'students', 'points', 'attendance', 'analytics'],
   tasks_supervisor: ['tasks', 'students', 'analytics'],
-  family_supervisor: ['points', 'students', 'groups', 'schedule', 'analytics'],
 };
 
 /**

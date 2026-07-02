@@ -38,15 +38,17 @@ const GROUP_CATEGORIES = [
 export default function AddPointsPage() {
   const { user } = useSupervisor();
   const roles = user?.role ? user.role.split(',').map(r => r.trim()) : [];
-  const canAdd = roles.some(r => ADD_POINTS_ROLES.includes(r));
-  const canAddGroupPoints = roles.some(r => GROUP_POINTS_ROLES.includes(r));
+  const canAdd = roles.length > 0;
+  const canAddGroupPoints = roles.length > 0;
 
   const [students, setStudents] = useState<Student[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [mode, setMode] = useState<'individual' | 'group'>('individual');
-  const categories = mode === 'group' ? GROUP_CATEGORIES : STUDENT_CATEGORIES;
+  const [studentCategories, setStudentCategories] = useState(STUDENT_CATEGORIES);
+  const [groupCategories, setGroupCategories] = useState(GROUP_CATEGORIES);
+  const categories = mode === 'group' ? groupCategories : studentCategories;
 
   // Multi-student selection
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -63,16 +65,20 @@ export default function AddPointsPage() {
   const [sign, setSign] = useState<1 | -1>(1);
   const [amount, setAmount] = useState('5');
   const [reason, setReason] = useState('');
-  const [category, setCategory] = useState('behavior');
+  const [category, setCategory] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     Promise.all([
       fetch('/api/supervisor/students?scope=all', { cache: 'no-store' }),
       fetch('/api/supervisor/groups', { cache: 'no-store' }),
-    ]).then(async ([sr, gr]) => {
+      fetch('/api/supervisor/points-categories', { cache: 'no-store' }),
+    ]).then(async ([sr, gr, cr]) => {
       const srj = await sr.json().catch(() => ({ students: [] }));
       const grj = await gr.json().catch(() => ({ groups: [] }));
+      const crj = await cr.json().catch(() => ({}));
+      if (crj.studentCategories) setStudentCategories(crj.studentCategories);
+      if (crj.groupCategories) setGroupCategories(crj.groupCategories);
       const allSt: Student[] = srj.students ?? [];
       setStudents(allSt.filter(s =>
         (s.registrationStatus === 'approved' || s.paymentStatus === 'exempted') &&
@@ -82,6 +88,12 @@ export default function AddPointsPage() {
       setLoading(false);
     });
   }, []);
+
+  useEffect(() => {
+    if (categories.length > 0) {
+      setCategory(categories[0].key);
+    }
+  }, [mode, studentCategories, groupCategories]);
 
   // Close student dropdown on outside click
   useEffect(() => {
