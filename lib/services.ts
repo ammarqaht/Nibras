@@ -1371,8 +1371,10 @@ export async function createInvoice(data: CreateInvoiceInput): Promise<InvoiceIn
   const itemsJson = JSON.stringify(data.items || []);
   if (hasDatabase) {
     const prisma = getPrisma()!;
-    const count = await prisma.invoice.count();
-    const invoiceNo = INVOICE_BASE + count + 1;
+    const maxInvoice = await prisma.invoice.findFirst({
+      orderBy: { invoiceNo: 'desc' },
+    });
+    const invoiceNo = maxInvoice ? maxInvoice.invoiceNo + 1 : INVOICE_BASE + 1;
     const created = await prisma.invoice.create({
       data: {
         invoiceNo,
@@ -1399,7 +1401,8 @@ export async function createInvoice(data: CreateInvoiceInput): Promise<InvoiceIn
   } else {
     const list = await readJsonFile<any[]>(FILE_INVOICES, []);
     const id = list.length > 0 ? Math.max(...list.map((i) => i.id || 0)) + 1 : 1;
-    const invoiceNo = INVOICE_BASE + list.length + 1;
+    const maxInvoiceNo = list.length > 0 ? Math.max(...list.map((i) => i.invoiceNo || INVOICE_BASE)) : INVOICE_BASE;
+    const invoiceNo = maxInvoiceNo + 1;
     const row = {
       id,
       invoiceNo,
