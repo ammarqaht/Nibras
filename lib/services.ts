@@ -1521,7 +1521,8 @@ export type TaskInfo = {
   track: string | null;
   stage?: string | null;       // المرحلة المعنية — '' / 'الكل' = all stages
   cost?: number;               // points deducted from the student's balance when claiming
-  durationHours?: number | null; // hours the student has to finish after claiming (null = open)
+  durationHours?: number | null; // hours until task auto-expires after claim (null = open) — "مدة الاستحقاق"
+  lateAfterHours?: number | null; // hours after claim beyond which submissions are marked late — "مدة المهمة"
   isActive: boolean;
   submissionMethod: string | null;
   assignedAdmins: string[];
@@ -1542,6 +1543,7 @@ export type SubmissionInfo = {
   selectedAdminId: string | null;
   claimedAt?: string | null;
   submittedAt: string;
+  wasLate?: boolean;
   studentName?: string;
   taskTitle?: string;
   taskMaxPoints?: number;
@@ -1565,6 +1567,7 @@ export async function getTasks(): Promise<TaskInfo[]> {
       stage: (t as any).stage ?? null,
       cost: (t as any).cost ?? 0,
       durationHours: (t as any).durationHours ?? null,
+      lateAfterHours: (t as any).lateAfterHours ?? null,
       isActive: t.isActive,
       submissionMethod: t.submissionMethod,
       assignedAdmins: t.assignedAdmins,
@@ -1587,6 +1590,7 @@ export async function getTasks(): Promise<TaskInfo[]> {
       stage: t.stage ?? null,
       cost: Number(t.cost ?? 0),
       durationHours: t.durationHours ?? null,
+      lateAfterHours: t.lateAfterHours ?? null,
       isActive: t.isActive !== false,
       submissionMethod: t.submissionMethod || 'file',
       assignedAdmins: Array.isArray(t.assignedAdmins) ? t.assignedAdmins : [],
@@ -1627,6 +1631,7 @@ export async function createTask(data: Omit<TaskInfo, 'id' | 'createdAt'>): Prom
         stage: task.stage ?? null,
         cost: task.cost ?? 0,
         durationHours: task.durationHours ?? null,
+        lateAfterHours: task.lateAfterHours ?? null,
         isActive: task.isActive,
         submissionMethod: task.submissionMethod,
         assignedAdmins: task.assignedAdmins,
@@ -1648,7 +1653,7 @@ export async function createTask(data: Omit<TaskInfo, 'id' | 'createdAt'>): Prom
 export async function updateTask(id: string, patch: Partial<Omit<TaskInfo, 'id' | 'createdAt'>>): Promise<TaskInfo | null> {
   const dbData: any = {};
   const allowedKeys = [
-    'title', 'description', 'maxPoints', 'startDate', 'dueDate', 'track', 'stage', 'cost', 'durationHours', 'isActive',
+    'title', 'description', 'maxPoints', 'startDate', 'dueDate', 'track', 'stage', 'cost', 'durationHours', 'lateAfterHours', 'isActive',
     'submissionMethod', 'assignedAdmins', 'imageUrl', 'resourceLink', 'visibility', 'visibleToIds'
   ] as const;
 
@@ -1677,6 +1682,7 @@ export async function updateTask(id: string, patch: Partial<Omit<TaskInfo, 'id' 
         stage: (updated as any).stage ?? null,
         cost: (updated as any).cost ?? 0,
         durationHours: (updated as any).durationHours ?? null,
+        lateAfterHours: (updated as any).lateAfterHours ?? null,
         isActive: updated.isActive,
         submissionMethod: updated.submissionMethod,
         assignedAdmins: updated.assignedAdmins,
@@ -1749,6 +1755,7 @@ export async function getSubmissions(): Promise<SubmissionInfo[]> {
         selectedAdminId: s.selectedAdminId,
         claimedAt: (s as any).claimedAt ? (s as any).claimedAt.toISOString() : null,
         submittedAt: s.submittedAt.toISOString(),
+        wasLate: Boolean((s as any).wasLate),
         studentName: studentsMap.get(s.registrationId) || `طالب #${s.registrationId}`,
         taskTitle: task?.title || 'مهمة محذوفة',
         taskMaxPoints: task?.maxPoints || 0,
@@ -1771,6 +1778,7 @@ export async function getSubmissions(): Promise<SubmissionInfo[]> {
         selectedAdminId: s.selectedAdminId || null,
         claimedAt: s.claimedAt || null,
         submittedAt: String(s.submittedAt || new Date().toISOString()),
+        wasLate: Boolean(s.wasLate),
         studentName: studentsMap.get(Number(s.registrationId)) || `طالب #${s.registrationId}`,
         taskTitle: task?.title || 'مهمة محذوفة',
         taskMaxPoints: task?.maxPoints || 0,
@@ -2034,13 +2042,26 @@ export async function submitClaim(registrationId: number, taskId: string, fileUr
   }
   const wasClaimed = existing.status === 'claimed'; // deposit still held → release it (full) on first submit
   const now = new Date();
+
+  // Determine if this submission is late (past the late threshold since claim)
+  const tasks = await getTasks();
+  const task = tasks.find(t => t.id === taskId);
+  const lateHours = task?.lateAfterHours ?? null;
+  const claimedAtIso = existing.claimedAt || null;
+  const isLateNow = Boolean(
+    lateHours && lateHours > 0 && claimedAtIso &&
+    new Date(claimedAtIso).getTime() + lateHours * 3600000 < now.getTime()
+  );
+  // Preserve prior late flag on resubmits — once late, always late
+  const wasLate = isLateNow || Boolean(existing.wasLate);
+
   if (hasDatabase) {
     const prisma = getPrisma()!;
-    await prisma.submission.update({ where: { id: existing.id }, data: { fileUrl, status: 'pending', submittedAt: now } });
+    await prisma.submission.update({ where: { id: existing.id }, data: { fileUrl, status: 'pending', submittedAt: now, wasLate } });
   } else {
     const list = await readJsonFile<any[]>(FILE_SUBMISSIONS, []);
     const idx = list.findIndex(s => String(s.id) === existing.id);
-    if (idx !== -1) { list[idx] = { ...list[idx], fileUrl, status: 'pending', submittedAt: now.toISOString() }; await writeJsonFile(FILE_SUBMISSIONS, list); }
+    if (idx !== -1) { list[idx] = { ...list[idx], fileUrl, status: 'pending', submittedAt: now.toISOString(), wasLate }; await writeJsonFile(FILE_SUBMISSIONS, list); }
   }
   // Submitting returns the full deposit (the task cost) to the student's balance
   if (wasClaimed) await refundTaskCost(registrationId, taskId);
@@ -2623,8 +2644,11 @@ export async function getStudentTasksWithSubmissions(registrationId: number, sta
   const tasks = await getTasks();
   const submissions = await getSubmissions();
 
+  const now = Date.now();
   const activeTasks = tasks.filter(t => {
     if (!t.isActive) return false;
+    // Hide tasks that haven't reached their start date yet
+    if (t.startDate && new Date(t.startDate).getTime() > now) return false;
     if (t.visibility === 'specific') {
       return t.visibleToIds.includes(registrationId);
     }

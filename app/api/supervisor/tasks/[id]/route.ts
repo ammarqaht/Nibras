@@ -27,7 +27,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (body.visibleToIds !== undefined) patch.visibleToIds = Array.isArray(body.visibleToIds) ? body.visibleToIds.map(Number) : [];
     if (body.assignedAdmins !== undefined) patch.assignedAdmins = Array.isArray(body.assignedAdmins) ? body.assignedAdmins.map(String) : [];
     if (body.timeLimitHours !== undefined) {
-      patch.timeLimitHours = body.timeLimitHours ? parseInt(body.timeLimitHours, 10) : null;
+      patch.durationHours = body.timeLimitHours ? parseInt(body.timeLimitHours, 10) : null;
+    }
+    if (body.lateAfterHours !== undefined) {
+      patch.lateAfterHours = body.lateAfterHours ? parseInt(body.lateAfterHours, 10) : null;
     }
 
     if (body.maxPoints !== undefined) {
@@ -38,6 +41,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
     if (body.dueDate !== undefined) {
       patch.dueDate = new Date(body.dueDate).toISOString();
+    }
+    if (body.startDate !== undefined) {
+      patch.startDate = body.startDate ? new Date(body.startDate).toISOString() : null;
     }
 
     const updated = await updateTask(id, patch);

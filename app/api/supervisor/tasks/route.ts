@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'غير مصرح لك بإنشاء المهام' }, { status: 403 });
     }
     const body = await req.json();
-    const { title, description, maxPoints, dueDate, track, submissionMethod, timeLimitHours, assignedAdmins, imageUrl, resourceLink, visibility, visibleToIds } = body;
+    const { title, description, maxPoints, dueDate, track, submissionMethod, timeLimitHours, lateAfterHours, assignedAdmins, imageUrl, resourceLink, visibility, visibleToIds } = body;
 
     if (!title || !description || !maxPoints || !dueDate) {
       return NextResponse.json({ error: 'البيانات غير كاملة' }, { status: 400 });
@@ -71,6 +71,7 @@ export async function POST(req: NextRequest) {
       isActive: true,
       submissionMethod: submissionMethod || 'رفع ملف',
       durationHours: timeLimitHours ? parseInt(timeLimitHours, 10) : null,
+      lateAfterHours: lateAfterHours ? parseInt(lateAfterHours, 10) : null,
       assignedAdmins: Array.isArray(assignedAdmins) ? assignedAdmins.map(String) : [],
       imageUrl: imageUrl || null,
       resourceLink: resourceLink || null,

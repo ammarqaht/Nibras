@@ -11,12 +11,14 @@ type Task = {
   title: string;
   description: string;
   maxPoints: number;
+  startDate: string | null;
   dueDate: string;
   createdAt: string;
   track: string | null;
   isActive: boolean;
   submissionMethod: string | null;
-  timeLimitHours: number | null;
+  durationHours: number | null;
+  lateAfterHours: number | null;
   assignedAdmins: string[];
   imageUrl: string | null;
   resourceLink: string | null;
@@ -34,6 +36,7 @@ type Submission = {
   selectedAdminId: string | null;
   startedAt: string | null;
   submittedAt: string;
+  wasLate?: boolean;
   studentName: string;
   taskTitle: string;
   taskMaxPoints: number;
@@ -92,6 +95,7 @@ export default function TasksPage() {
   const { user } = useSupervisor();
   const roles = useMemo(() => (user?.role || '').split(',').map(r => r.trim()), [user]);
   const isScientific = useMemo(() => roles.includes('scientific_supervisor'), [roles]);
+  const canGrade = useMemo(() => roles.some(r => ['scientific_supervisor', 'tasks_supervisor', 'admin'].includes(r)), [roles]);
   const [activeTab, setActiveTab] = useState<'submissions' | 'log' | 'add' | 'manage'>('manage');
   const [loading, setLoading] = useState(true);
 
@@ -147,8 +151,10 @@ export default function TasksPage() {
   const [addTitle, setAddTitle] = useState('');
   const [addDesc, setAddDesc] = useState('');
   const [addPoints, setAddPoints] = useState('10');
+  const [addStartDate, setAddStartDate] = useState('');
   const [addDeadline, setAddDeadline] = useState('');
   const [addMethod, setAddMethod] = useState('رفع ملف');
+  const [addLateAfter, setAddLateAfter] = useState('');
   const [addTimeLimit, setAddTimeLimit] = useState('');
   const [addResourceLink, setAddResourceLink] = useState('');
   const [addImage, setAddImage] = useState<string | null>(null);
@@ -251,8 +257,10 @@ export default function TasksPage() {
           title: addTitle.trim(),
           description: addDesc.trim(),
           maxPoints: parseInt(addPoints, 10),
+          startDate: addStartDate || null,
           dueDate: addDeadline,
           submissionMethod: addMethod,
+          lateAfterHours: addLateAfter ? parseInt(addLateAfter, 10) : null,
           timeLimitHours: addTimeLimit ? parseInt(addTimeLimit, 10) : null,
           assignedAdmins: addAdmins,
           track: addTrack.trim() || 'عام',
@@ -267,7 +275,7 @@ export default function TasksPage() {
       if (!res.ok) throw new Error(data.error || 'فشل إضافة المهمة');
 
       pushToast('success', 'تم نشر المهمة بنجاح ✓');
-      setAddTitle(''); setAddDesc(''); setAddPoints('10'); setAddDeadline(''); setAddMethod('رفع ملف'); setAddTimeLimit(''); setAddResourceLink(''); setAddImage(null); setAddAdmins([]); setAddTrack('عام');
+      setAddTitle(''); setAddDesc(''); setAddPoints('10'); setAddStartDate(''); setAddDeadline(''); setAddMethod('رفع ملف'); setAddLateAfter(''); setAddTimeLimit(''); setAddResourceLink(''); setAddImage(null); setAddAdmins([]); setAddTrack('عام');
       await loadData();
       setActiveTab('manage');
     } catch (err: any) {
@@ -280,8 +288,11 @@ export default function TasksPage() {
   async function handleEvaluate(status: 'approved' | 'rejected') {
     if (!evalSub) return;
     const grade = parseInt(evalPoints, 10);
-    if (status === 'approved' && (isNaN(grade) || grade < 0 || grade > evalSub.taskMaxPoints)) {
-      return pushToast('error', `يجب أن تكون الدرجة بين 0 و ${evalSub.taskMaxPoints}`);
+    const maxAllowed = evalSub.wasLate ? Math.floor(evalSub.taskMaxPoints / 2) : evalSub.taskMaxPoints;
+    if (status === 'approved' && (isNaN(grade) || grade < 0 || grade > maxAllowed)) {
+      return pushToast('error', evalSub.wasLate
+        ? `التسليم متأخر — يجب أن تكون الدرجة بين 0 و ${maxAllowed}`
+        : `يجب أن تكون الدرجة بين 0 و ${maxAllowed}`);
     }
 
     setEvalBusy(true);
@@ -348,10 +359,12 @@ export default function TasksPage() {
           title: editTask.title.trim(),
           description: editTask.description.trim(),
           maxPoints: editTask.maxPoints,
+          startDate: editTask.startDate || null,
           dueDate: editTask.dueDate,
           track: editTask.track?.trim() || 'عام',
           submissionMethod: editTask.submissionMethod,
-          timeLimitHours: editTask.timeLimitHours,
+          timeLimitHours: editTask.durationHours,
+          lateAfterHours: editTask.lateAfterHours,
           assignedAdmins: editTask.assignedAdmins,
           imageUrl: editTask.imageUrl,
           resourceLink: editTask.resourceLink,
@@ -400,8 +413,11 @@ export default function TasksPage() {
 
   async function saveInlinePoints(sub: Submission) {
     const val = parseInt(inlinePoints, 10);
-    if (isNaN(val) || val < 0 || val > sub.taskMaxPoints) {
-      return pushToast('error', `يجب أن تكون الدرجة بين 0 و ${sub.taskMaxPoints}`);
+    const capMax = sub.wasLate ? Math.floor(sub.taskMaxPoints / 2) : sub.taskMaxPoints;
+    if (isNaN(val) || val < 0 || val > capMax) {
+      return pushToast('error', sub.wasLate
+        ? `التسليم متأخر — يجب أن تكون الدرجة بين 0 و ${capMax}`
+        : `يجب أن تكون الدرجة بين 0 و ${capMax}`);
     }
     setInlineBusy(true);
     try {
@@ -632,8 +648,10 @@ export default function TasksPage() {
                                   <span>{task.maxPoints}</span>
                                   <span className="text-brand-500 text-lg">🎯</span>
                                 </div>
-                                {task.timeLimitHours && (
-                                  <span className="text-ink-400 text-[0.75rem] font-bold bg-ink-50 px-2 py-0.5 rounded-md border border-ink-150">⏳ مهلة {task.timeLimitHours}س</span>
+                                {(task.lateAfterHours || task.durationHours) && (
+                                  <span className="text-ink-400 text-[0.7rem] font-bold bg-ink-50 px-2 py-0.5 rounded-md border border-ink-150 whitespace-nowrap">
+                                    ⏳ {task.lateAfterHours ? `${task.lateAfterHours}س` : '—'} / {task.durationHours ? `${task.durationHours}س` : '—'}
+                                  </span>
                                 )}
                               </div>
                             </td>
@@ -747,7 +765,7 @@ export default function TasksPage() {
                     بانتظار المراجعة ({filteredPendingSubmissions.length})
                   </div>
                   {filteredPendingSubmissions.map(sub => (
-                    <SubmissionCard key={sub.id} sub={sub} onEvaluate={setEvalSub} supervisors={supervisors} />
+                    <SubmissionCard key={sub.id} sub={sub} onEvaluate={canGrade ? setEvalSub : undefined} supervisors={supervisors} />
                   ))}
                 </div>
               )}
@@ -811,7 +829,7 @@ export default function TasksPage() {
                 <div className="space-y-5">
                   {filteredLogSubmissions.map(sub => (
                     <SubmissionCard
-                      key={sub.id} sub={sub} supervisors={supervisors} isLog
+                      key={sub.id} sub={sub} supervisors={supervisors} isLog canGrade={canGrade}
                       inlineEditSub={inlineEditSub} inlinePoints={inlinePoints}
                       setInlineEditSub={setInlineEditSub} setInlinePoints={setInlinePoints}
                       saveInlinePoints={saveInlinePoints} inlineBusy={inlineBusy}
@@ -857,7 +875,12 @@ export default function TasksPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="label mb-1.5 font-bold text-ink-800">تاريخ الاستحقاق <span className="req">*</span></label>
+                    <label className="label mb-1.5 font-bold text-ink-800">وقت البداية (ظهور المهمة)</label>
+                    <input type="date" className="field py-3 rounded-xl bg-ink-50/20 font-mono" value={addStartDate} onChange={e => setAddStartDate(e.target.value)} />
+                    <p className="text-[0.7rem] text-ink-400 mt-1">اتركه فارغاً لتظهر المهمة فوراً.</p>
+                  </div>
+                  <div>
+                    <label className="label mb-1.5 font-bold text-ink-800">تاريخ إغلاق المهمة <span className="req">*</span></label>
                     <input type="date" className="field py-3 rounded-xl bg-ink-50/20 font-mono" required value={addDeadline} onChange={e => setAddDeadline(e.target.value)} />
                   </div>
                   <div>
@@ -868,12 +891,19 @@ export default function TasksPage() {
                     <label className="label mb-1.5 font-bold text-ink-800">طريقة التسليم <span className="req">*</span></label>
                     <select className="field py-3 rounded-xl bg-ink-50/20" value={addMethod} onChange={e => setAddMethod(e.target.value)}>
                       <option value="رفع ملف">رفع ملف (صورة / مستند / فيديو)</option>
+                      <option value="نص">إجابة نصية</option>
                       <option value="إقرار بالإنجاز">إقرار بالإنجاز فقط</option>
                     </select>
                   </div>
                   <div>
-                    <label className="label mb-1.5 font-bold text-ink-800">مهلة الإنجاز (اختياري)</label>
-                    <input type="number" min={1} placeholder="مثال: 2 (ساعتين)" className="field py-3 rounded-xl bg-ink-50/20 font-mono" value={addTimeLimit} onChange={e => setAddTimeLimit(e.target.value.replace(/\D/g, ''))} />
+                    <label className="label mb-1.5 font-bold text-ink-800">مدة المهمة (ساعات — بعدها متأخر)</label>
+                    <input type="number" min={1} placeholder="مثال: 24" className="field py-3 rounded-xl bg-ink-50/20 font-mono" value={addLateAfter} onChange={e => setAddLateAfter(e.target.value.replace(/\D/g, ''))} />
+                    <p className="text-[0.7rem] text-ink-400 mt-1">إذا تجاوزها الطالب لا يستحق التقييم الكامل.</p>
+                  </div>
+                  <div>
+                    <label className="label mb-1.5 font-bold text-ink-800">مدة الاستحقاق (ساعات — بعدها تُلغى)</label>
+                    <input type="number" min={1} placeholder="مثال: 48" className="field py-3 rounded-xl bg-ink-50/20 font-mono" value={addTimeLimit} onChange={e => setAddTimeLimit(e.target.value.replace(/\D/g, ''))} />
+                    <p className="text-[0.7rem] text-ink-400 mt-1">إذا تجاوزها الطالب تُلغى عليه ولا يسترد النقاط.</p>
                   </div>
                 </div>
 
@@ -962,17 +992,31 @@ export default function TasksPage() {
                 </div>
               )}
 
-              <div className="bg-white p-5 rounded-2xl border border-ink-200 shadow-sm">
-                <label className="label font-bold text-ink-900 text-[0.95rem] mb-3">النقاط الممنوحة (🎯) (الحد الأقصى: {evalSub.taskMaxPoints})</label>
-                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                  <input type="number" min={0} max={evalSub.taskMaxPoints} className="field w-28 text-center font-extrabold text-2xl py-3 text-brand-600 border-brand-200 bg-brand-50/30 rounded-xl" value={evalPoints === '' ? evalSub.taskMaxPoints : evalPoints} onChange={e => setEvalPoints(e.target.value.replace(/\D/g, ''))} />
-                  <div className="flex-1 flex gap-2">
-                    <button type="button" onClick={() => setEvalPoints(String(evalSub.taskMaxPoints))} className="btn bg-ink-50 hover:bg-ink-100 text-ink-800 border-transparent text-[0.8rem] flex-1 py-3 rounded-xl font-bold">كامل</button>
-                    <button type="button" onClick={() => setEvalPoints(String(Math.round(evalSub.taskMaxPoints * 0.75)))} className="btn bg-ink-50 hover:bg-ink-100 text-ink-800 border-transparent text-[0.8rem] flex-1 py-3 rounded-xl font-bold">75%</button>
-                    <button type="button" onClick={() => setEvalPoints(String(Math.round(evalSub.taskMaxPoints * 0.5)))} className="btn bg-ink-50 hover:bg-ink-100 text-ink-800 border-transparent text-[0.8rem] flex-1 py-3 rounded-xl font-bold">50%</button>
-                    <button type="button" onClick={() => setEvalPoints('0')} className="btn bg-ink-50 hover:bg-ink-100 text-ink-800 border-transparent text-[0.8rem] flex-1 py-3 rounded-xl font-bold">صفر</button>
-                  </div>
+              {evalSub.wasLate && (
+                <div className="bg-yellow-50 border border-yellow-300 text-yellow-800 rounded-xl p-3 text-[0.85rem] font-bold flex items-center gap-2">
+                  <span>⏰</span>
+                  <span>تسليم متأخر — الحد الأقصى للنقاط {Math.floor(evalSub.taskMaxPoints / 2)} من {evalSub.taskMaxPoints}</span>
                 </div>
+              )}
+
+              <div className="bg-white p-5 rounded-2xl border border-ink-200 shadow-sm">
+                {(() => {
+                  const capMax = evalSub.wasLate ? Math.floor(evalSub.taskMaxPoints / 2) : evalSub.taskMaxPoints;
+                  return (
+                    <>
+                      <label className="label font-bold text-ink-900 text-[0.95rem] mb-3">النقاط الممنوحة (🎯) (الحد الأقصى: {capMax})</label>
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                        <input type="number" min={0} max={capMax} className="field w-28 text-center font-extrabold text-2xl py-3 text-brand-600 border-brand-200 bg-brand-50/30 rounded-xl" value={evalPoints === '' ? capMax : evalPoints} onChange={e => setEvalPoints(e.target.value.replace(/\D/g, ''))} />
+                        <div className="flex-1 flex gap-2">
+                          <button type="button" onClick={() => setEvalPoints(String(capMax))} className="btn bg-ink-50 hover:bg-ink-100 text-ink-800 border-transparent text-[0.8rem] flex-1 py-3 rounded-xl font-bold">كامل</button>
+                          <button type="button" onClick={() => setEvalPoints(String(Math.round(capMax * 0.75)))} className="btn bg-ink-50 hover:bg-ink-100 text-ink-800 border-transparent text-[0.8rem] flex-1 py-3 rounded-xl font-bold">75%</button>
+                          <button type="button" onClick={() => setEvalPoints(String(Math.round(capMax * 0.5)))} className="btn bg-ink-50 hover:bg-ink-100 text-ink-800 border-transparent text-[0.8rem] flex-1 py-3 rounded-xl font-bold">50%</button>
+                          <button type="button" onClick={() => setEvalPoints('0')} className="btn bg-ink-50 hover:bg-ink-100 text-ink-800 border-transparent text-[0.8rem] flex-1 py-3 rounded-xl font-bold">صفر</button>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
 
               <div>
@@ -1027,19 +1071,28 @@ export default function TasksPage() {
                     <input type="number" className="field py-3 rounded-xl bg-ink-50/30 text-center font-extrabold text-brand-600 w-full" required min={1} value={editTask.maxPoints} onChange={e => setEditTask({ ...editTask, maxPoints: parseInt(e.target.value.replace(/\D/g, ''), 10) || 1 })} />
                   </div>
                   <div>
-                    <label className="label font-bold text-ink-800 mb-1.5">تاريخ الاستحقاق</label>
+                    <label className="label font-bold text-ink-800 mb-1.5">وقت البداية (اختياري)</label>
+                    <input type="date" className="field py-3 rounded-xl bg-ink-50/30 font-mono" value={editTask.startDate ? editTask.startDate.split('T')[0] : ''} onChange={e => setEditTask({ ...editTask, startDate: e.target.value || null })} />
+                  </div>
+                  <div>
+                    <label className="label font-bold text-ink-800 mb-1.5">تاريخ إغلاق المهمة</label>
                     <input type="date" className="field py-3 rounded-xl bg-ink-50/30 font-mono" required value={editTask.dueDate.split('T')[0]} onChange={e => setEditTask({ ...editTask, dueDate: e.target.value })} />
                   </div>
                   <div>
                     <label className="label font-bold text-ink-800 mb-1.5">طريقة التسليم</label>
                     <select className="field py-3 rounded-xl bg-ink-50/30" value={editTask.submissionMethod || 'رفع ملف'} onChange={e => setEditTask({ ...editTask, submissionMethod: e.target.value })}>
                       <option value="رفع ملف">رفع ملف (صورة / مستند / فيديو)</option>
+                      <option value="نص">إجابة نصية</option>
                       <option value="إقرار بالإنجاز">إقرار بالإنجاز فقط</option>
                     </select>
                   </div>
                   <div>
-                    <label className="label font-bold text-ink-800 mb-1.5">مهلة الإنجاز بالساعات (اختياري)</label>
-                    <input type="number" min={1} placeholder="بدون مهلة" className="field py-3 rounded-xl bg-ink-50/30 font-mono" value={editTask.timeLimitHours || ''} onChange={e => setEditTask({ ...editTask, timeLimitHours: e.target.value ? parseInt(e.target.value, 10) : null })} />
+                    <label className="label font-bold text-ink-800 mb-1.5">مدة المهمة (ساعات — بعدها متأخر)</label>
+                    <input type="number" min={1} placeholder="بدون" className="field py-3 rounded-xl bg-ink-50/30 font-mono" value={editTask.lateAfterHours || ''} onChange={e => setEditTask({ ...editTask, lateAfterHours: e.target.value ? parseInt(e.target.value, 10) : null })} />
+                  </div>
+                  <div>
+                    <label className="label font-bold text-ink-800 mb-1.5">مدة الاستحقاق (ساعات — بعدها تُلغى)</label>
+                    <input type="number" min={1} placeholder="بدون" className="field py-3 rounded-xl bg-ink-50/30 font-mono" value={editTask.durationHours || ''} onChange={e => setEditTask({ ...editTask, durationHours: e.target.value ? parseInt(e.target.value, 10) : null })} />
                   </div>
                 </div>
 
@@ -1263,7 +1316,7 @@ export default function TasksPage() {
 
 /* SUBMISSION CARD COMPONENT */
 function SubmissionCard({
-  sub, onEvaluate, supervisors, isLog = false,
+  sub, onEvaluate, supervisors, isLog = false, canGrade = true,
   inlineEditSub, inlinePoints, setInlineEditSub, setInlinePoints, saveInlinePoints, inlineBusy
 }: any) {
   const isPending = sub.status === 'pending';
@@ -1299,6 +1352,11 @@ function SubmissionCard({
           <span className={`px-2.5 py-0.5 rounded-full text-[0.65rem] font-bold shadow-sm ${isPending ? 'bg-brand-50 text-brand-700 border border-brand-200' : isApproved ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-nred-50 text-nred-700 border border-nred-200'}`}>
             {statusLabel(sub.status)}
           </span>
+          {sub.wasLate && (
+            <span className="px-2.5 py-0.5 rounded-full text-[0.65rem] font-bold shadow-sm bg-yellow-50 text-yellow-800 border border-yellow-300">
+              ⏰ متأخر
+            </span>
+          )}
           
           {/* Display grade or status */}
           {!isPending && isApproved && (
@@ -1320,7 +1378,7 @@ function SubmissionCard({
               <button onClick={() => setInlineEditSub?.(null)} className="bg-white border border-ink-200 text-ink-600 px-2 py-0.5 rounded text-[10px] font-bold shadow-sm cursor-pointer hover:bg-ink-100">إلغاء</button>
             </div>
           )}
-          {!isPending && isApproved && inlineEditSub !== sub.id && (
+          {!isPending && isApproved && canGrade && inlineEditSub !== sub.id && (
             <button onClick={() => { setInlineEditSub?.(sub.id); setInlinePoints?.(String(sub.grade || 0)); }} className="text-brand hover:underline font-bold text-[0.7rem] mr-1 cursor-pointer">
               ✏️ تعديل النقاط
             </button>

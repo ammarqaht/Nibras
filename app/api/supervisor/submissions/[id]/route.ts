@@ -9,6 +9,13 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: 'غير مصرح بالدخول' }, { status: 401 });
     }
 
+    // Only scientific_supervisor, tasks_supervisor, or admin can grade/modify submissions
+    const roles = (session.role || '').split(',').map((r: string) => r.trim());
+    const canGrade = roles.some(r => ['scientific_supervisor', 'tasks_supervisor', 'admin'].includes(r));
+    if (!canGrade) {
+      return NextResponse.json({ error: 'تصحيح المهام مخصص لمشرف العلمية أو مشرف المهام فقط' }, { status: 403 });
+    }
+
     const { id } = await params;
     const body = await req.json();
 
@@ -27,6 +34,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (body.selectedAdminId !== undefined) patch.selectedAdminId = body.selectedAdminId;
     if (body.grade !== undefined) {
       patch.grade = body.grade !== null ? parseInt(body.grade, 10) : null;
+    }
+
+    // Cap grade at 50% for late submissions — supervisor cannot give full marks after the late window
+    if (existing?.wasLate && typeof patch.grade === 'number' && existing.taskMaxPoints) {
+      const cap = Math.floor(existing.taskMaxPoints / 2);
+      if (patch.grade > cap) {
+        return NextResponse.json({ error: `التسليم متأخر — الحد الأقصى للنقاط ${cap} من ${existing.taskMaxPoints}` }, { status: 400 });
+      }
     }
 
     const updated = await updateSubmission(id, patch);

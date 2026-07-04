@@ -136,6 +136,7 @@ model Task {
   stage            String?
   cost             Int          @default(0)
   durationHours    Int?
+  lateAfterHours   Int?
   isActive         Boolean      @default(true)
   submissionMethod String?      @default("file")
   assignedAdmins   String[]     @default([])
@@ -172,6 +173,7 @@ model Submission {
   selectedAdminId String?
   claimedAt       DateTime?
   submittedAt     DateTime     @default(now())
+  wasLate         Boolean      @default(false)
   task            Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
   registration    Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
 

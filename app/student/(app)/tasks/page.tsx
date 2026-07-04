@@ -13,6 +13,7 @@ type TaskItem = {
     track: string | null;
     cost?: number;
     durationHours?: number | null;
+    lateAfterHours?: number | null;
     submissionMethod: string;
     resourceLink: string | null;
     imageUrl: string | null;
@@ -25,6 +26,7 @@ type TaskItem = {
     fileUrl: string;
     claimedAt?: string | null;
     submittedAt: string;
+    wasLate?: boolean;
   } | null;
 };
 
@@ -34,6 +36,13 @@ function claimDeadline(item: TaskItem): number | null {
   const claimedAt = item.submission?.claimedAt;
   if (!dur || dur <= 0 || !claimedAt) return null;
   return new Date(claimedAt).getTime() + dur * 3600000;
+}
+// Late threshold — after this, submission is marked late and grade capped
+function lateThreshold(item: TaskItem): number | null {
+  const lateAfter = item.task.lateAfterHours;
+  const claimedAt = item.submission?.claimedAt;
+  if (!lateAfter || lateAfter <= 0 || !claimedAt) return null;
+  return new Date(claimedAt).getTime() + lateAfter * 3600000;
 }
 function fmtRemaining(ms: number): string {
   if (ms <= 0) return 'انتهى الوقت';
@@ -47,9 +56,8 @@ function fmtRemaining(ms: number): string {
 // Map legacy Arabic values + new keys to a canonical method key
 function methodKey(m: string): string {
   switch (m) {
-    case 'file': case 'رفع ملف': case 'image': case 'video': case 'any': return 'file';
-    case 'audio': return 'audio';
-    case 'text': return 'text';
+    case 'file': case 'رفع ملف': case 'image': case 'video': case 'any': case 'audio': return 'file';
+    case 'text': case 'نص': return 'text';
     case 'ack': case 'إقرار بالإنجاز': return 'ack';
     default: return 'file';
   }
@@ -57,7 +65,6 @@ function methodKey(m: string): string {
 
 const METHOD_LABELS: Record<string, string> = {
   file: 'رفع ملف',
-  audio: 'تسجيل صوتي',
   text: 'إجابة نصية',
   ack: 'إقرار بالإنجاز',
 };
@@ -98,12 +105,9 @@ export default function StudentTasks() {
   const [subFile, setSubFile] = useState<File | null>(null);
   const [subFileDataUrl, setSubFileDataUrl] = useState('');
   const [ackChecked, setAckChecked] = useState(false);
-  const [recording, setRecording] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [subErr, setSubErr] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
 
   // List controls + submitted popup
   const [filterTrack, setFilterTrack] = useState('');
@@ -169,7 +173,6 @@ export default function StudentTasks() {
     setSubFile(null);
     setSubFileDataUrl('');
     setAckChecked(false);
-    setRecording(false);
     setSubErr('');
   }
 
@@ -180,33 +183,6 @@ export default function StudentTasks() {
     const reader = new FileReader();
     reader.onload = ev => setSubFileDataUrl(ev.target?.result as string || '');
     reader.readAsDataURL(f);
-  }
-
-  async function startRecording() {
-    setSubErr('');
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream);
-      audioChunksRef.current = [];
-      mr.ondataavailable = ev => { if (ev.data.size > 0) audioChunksRef.current.push(ev.data); };
-      mr.onstop = () => {
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        const reader = new FileReader();
-        reader.onload = ev => setSubFileDataUrl((ev.target?.result as string) || '');
-        reader.readAsDataURL(blob);
-        stream.getTracks().forEach(t => t.stop());
-      };
-      mr.start();
-      mediaRecorderRef.current = mr;
-      setRecording(true);
-    } catch {
-      setSubErr('تعذّر الوصول إلى الميكروفون — يمكنك رفع ملف صوتي بدلاً من ذلك.');
-    }
-  }
-
-  function stopRecording() {
-    mediaRecorderRef.current?.stop();
-    setRecording(false);
   }
 
   async function submitTask(e: React.FormEvent) {
@@ -225,8 +201,7 @@ export default function StudentTasks() {
       if (!ackChecked) { setSubErr('الرجاء تأكيد الإقرار بالإنجاز'); setSubmitting(false); return; }
       fileUrl = 'ack://confirmed';
     } else {
-      // file or audio — both produce a data URL
-      if (!subFileDataUrl) { setSubErr(method === 'audio' ? 'الرجاء تسجيل أو رفع ملف صوتي' : 'الرجاء اختيار الملف'); setSubmitting(false); return; }
+      if (!subFileDataUrl) { setSubErr('الرجاء اختيار الملف'); setSubmitting(false); return; }
       fileUrl = subFileDataUrl;
     }
 
@@ -458,6 +433,9 @@ export default function StudentTasks() {
                         {s!.grade !== null && (
                           <p className="tabular-nums text-sm" style={{ color: 'var(--ink)' }}>الدرجة: <strong>{s!.grade} / {selected.task.maxPoints}</strong></p>
                         )}
+                        {s!.wasLate && (
+                          <p className="text-xs mt-1" style={{ color: '#854D0E' }}>⏰ تسليم متأخر — النقاط بحد أقصى {Math.floor(selected.task.maxPoints / 2)}.</p>
+                        )}
                         {s!.feedback && <p className="text-sm mt-1" style={{ color: 'var(--ink-soft)' }}>ملاحظة المشرف: {s!.feedback}</p>}
                         {isApproved && cost > 0 && <p className="text-xs mt-2" style={{ color: 'var(--ink-soft)' }}>أُعيد مبلغ المهمة ({cost}) إلى رصيدك.</p>}
                       </div>
@@ -482,7 +460,8 @@ export default function StudentTasks() {
                           <p className="text-sm font-bold mb-1" style={{ color: 'var(--ink)' }}>اطلب المهمة للبدء</p>
                           <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-soft)' }}>
                             {cost > 0 ? `سيُخصم ${cost} نقطة من رصيدك عند الطلب، وتُعاد كاملةً عند قبول تسليمك.` : 'لا تُخصم نقاط لطلب هذه المهمة.'}
-                            {selected.task.durationHours ? ` لديك ${selected.task.durationHours} ساعة لإنهائها بعد الطلب.` : ''}
+                            {selected.task.lateAfterHours ? ` سلّم خلال ${selected.task.lateAfterHours} ساعة للحصول على النقاط الكاملة.` : ''}
+                            {selected.task.durationHours ? ` ولديك ${selected.task.durationHours} ساعة قبل أن تُلغى وتفقد المبلغ.` : ''}
                           </p>
                           <p className="text-[11px] mt-2" style={{ color: 'var(--ink-soft)' }}>لديك {activeClaimCount} من ٣ مهام نشطة — ومهمة واحدة فقط لكل قسم.</p>
                         </div>
@@ -510,6 +489,23 @@ export default function StudentTasks() {
                         {expiredNow ? 'انتهى وقت التسليم — لا يمكن التسليم' : `⏳ المتبقّي لإنهاء المهمة: ${fmtRemaining(dl - now)}`}
                       </div>
                     )}
+                    {isClaimed && !expiredNow && (() => {
+                      const lt = lateThreshold(selected);
+                      if (lt == null) return null;
+                      const beforeLate = lt - now;
+                      if (beforeLate <= 0) {
+                        return (
+                          <div className="rounded-xl p-3 text-xs font-bold text-center border" style={{ background: '#FEF3C7', borderColor: 'rgba(180,83,9,0.3)', color: '#854D0E' }}>
+                            ⏰ تجاوزت مدة المهمة — التسليم الآن يُحسب متأخراً (الحد الأقصى للنقاط النصف).
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="rounded-xl p-3 text-xs font-bold text-center border" style={{ background: '#EEF3FC', borderColor: 'rgba(29,78,216,0.3)', color: '#1D4ED8' }}>
+                          🎯 للحصول على النقاط الكاملة، سلّم خلال {fmtRemaining(beforeLate)}.
+                        </div>
+                      );
+                    })()}
 
                     {canSubmit && (
                       <form onSubmit={submitTask} className="space-y-3 border-t pt-4" style={{ borderColor: 'var(--line)' }}>
@@ -533,26 +529,6 @@ export default function StudentTasks() {
                           <input type="checkbox" checked={ackChecked} onChange={e => setAckChecked(e.target.checked)} className="mt-0.5 w-5 h-5 accent-[var(--accent-deep)]" />
                           <span className="text-sm" style={{ color: 'var(--ink)' }}>أُقرّ بأنني أنجزت هذه المهمة على الوجه المطلوب.</span>
                         </label>
-                      );
-                    }
-                    if (method === 'audio') {
-                      return (
-                        <div className="space-y-3">
-                          <label className="label">سجّل إجابتك الصوتية</label>
-                          <div className="flex items-center gap-3 flex-wrap">
-                            {recording ? (
-                              <button type="button" onClick={stopRecording} className="btn btn-danger flex items-center gap-2">
-                                <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" /> إيقاف التسجيل
-                              </button>
-                            ) : (
-                              <button type="button" onClick={startRecording} className="btn btn-primary flex items-center gap-2">🎙️ {subFileDataUrl ? 'إعادة التسجيل' : 'بدء التسجيل'}</button>
-                            )}
-                            <span className="text-xs" style={{ color: 'var(--ink-soft)' }}>أو</span>
-                            <button type="button" onClick={() => fileRef.current?.click()} className="btn btn-secondary">رفع ملف صوتي</button>
-                          </div>
-                          {subFileDataUrl && !recording && <audio controls src={subFileDataUrl} className="w-full" />}
-                          <input ref={fileRef} type="file" className="hidden" accept="audio/*" onChange={handleFileChange} />
-                        </div>
                       );
                     }
                     // file
