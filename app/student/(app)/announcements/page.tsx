@@ -36,6 +36,12 @@ function formatRelative(dateStr: string): string {
   return date.toLocaleDateString('ar-SA', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
+// A stable per-calendar-day key (local time) used to draw a separator between days
+function dayKey(dateStr: string): string {
+  const d = new Date(dateStr);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
 export default function StudentAnnouncements() {
   const [items, setItems] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,10 +74,22 @@ export default function StudentAnnouncements() {
         </div>
       ) : (
         <div className="space-y-4">
-          {items.map(a => {
+          {items.map((a, i) => {
             const imgs = a.imageUrl ? [a.imageUrl, ...parseImages(a.images)] : parseImages(a.images);
+            // Insert a divider whenever the calendar day changes from the previous announcement
+            const showDaySep = i > 0 && dayKey(items[i - 1].createdAt) !== dayKey(a.createdAt);
             return (
-              <article key={a.id} className="card p-5">
+              <div key={a.id} className="space-y-4">
+              {showDaySep && (
+                <div className="flex items-center gap-3 pt-1" aria-hidden>
+                  <span className="h-px flex-1" style={{ background: 'var(--line)' }} />
+                  <span className="text-[11px] font-bold px-2" style={{ color: 'var(--ink-soft)' }}>
+                    {new Date(a.createdAt).toLocaleDateString('ar-SA', { day: 'numeric', month: 'long' })}
+                  </span>
+                  <span className="h-px flex-1" style={{ background: 'var(--line)' }} />
+                </div>
+              )}
+              <article className="card p-5">
                 <header className="mb-2">
                   <h2 className="font-display text-lg font-bold" style={{ color: 'var(--ink)' }}>{a.title}</h2>
                   <p className="text-[11px] mt-0.5" style={{ color: 'var(--ink-soft)', opacity: 0.8 }}>
@@ -95,6 +113,7 @@ export default function StudentAnnouncements() {
                   </div>
                 )}
               </article>
+              </div>
             );
           })}
         </div>

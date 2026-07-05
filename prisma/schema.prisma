@@ -84,6 +84,7 @@ model Announcement {
   audience  String // 'students' | 'guardians' | 'all' or comma-separated stages/groups
   imageUrl  String? // Optional base64 or url for image
   images    String? // Optional JSON string of multiple base64 content images
+  expiresAt DateTime? // Optional: after this date the announcement is hidden from students (null = permanent)
   createdAt DateTime @default(now())
 }
 

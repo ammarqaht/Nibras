@@ -82,6 +82,22 @@ function statusBadgeClass(status: string) {
   return 'bg-brand-50 text-brand-700 border border-brand-200';
 }
 
+// Colored status dot (used in the stats popup where the status is expressed by color only)
+function statusDotClass(status: string) {
+  if (status === 'approved') return 'bg-emerald-500';
+  if (status === 'rejected') return 'bg-nred-500';
+  if (status === 'pending') return 'bg-brand-500';
+  if (status === 'missing') return 'bg-ink-300';
+  return 'bg-ink-300';
+}
+function statusText(status: string) {
+  if (status === 'approved') return 'مقبولة';
+  if (status === 'rejected') return 'مردودة';
+  if (status === 'pending') return 'بانتظار المراجعة';
+  if (status === 'missing') return 'لم يسلّم بعد';
+  return status;
+}
+
 function getTrackPillClass(track: string | null) {
   if (track === 'الثقافي' || track === 'ثقافي') return 'bg-yellow-50 text-yellow-700 border border-yellow-200/60';
   if (track === 'مسار تقني' || track === 'تقني') return 'bg-ncyan-50 text-ncyan-700 border border-ncyan-200/60';
@@ -614,97 +630,87 @@ export default function TasksPage() {
                 </div>
               </div>
 
-              {/* Tasks List */}
-              <div className="card p-0 overflow-hidden border border-ink-150 shadow-soft">
-                {filteredTasks.length === 0 ? (
-                  <div className="p-16 text-center text-ink-400">لا توجد مهام مطابقة للبحث.</div>
-                ) : (
-                  <div className="overflow-x-auto scroll-soft">
-                    <table className="w-full text-right">
-                      <thead className="bg-ink-50/60 border-b border-ink-150 text-ink-500 text-[0.85rem]">
-                        <tr>
-                          <th className="font-bold py-4 px-5">المهمة</th>
-                          <th className="font-bold py-4 px-5">المسار</th>
-                          <th className="font-bold py-4 px-5 text-center">النقاط</th>
-                          <th className="font-bold py-4 px-5">الموعد</th>
-                          <th className="font-bold py-4 px-5 text-center">الإجراءات</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredTasks.map(task => (
-                          <tr key={task.id} className={`border-b border-ink-150 last:border-0 hover:bg-cream-100/50 transition-colors ${!task.isActive ? 'opacity-60 bg-ink-50/20' : ''}`}>
-                            <td className="py-4 px-5 max-w-[280px]">
-                              <div className="font-bold text-ink-900 mb-1.5 text-[0.95rem]">{task.title}</div>
-                              <div className="text-[0.8rem] text-ink-400 line-clamp-1 leading-relaxed">{task.description}</div>
-                            </td>
-                            <td className="py-4 px-5">
-                              <span className={`px-3 py-1 rounded-full text-[0.75rem] font-bold ${getTrackPillClass(task.track)}`}>
-                                {task.track || 'عام'}
-                              </span>
-                            </td>
-                            <td className="py-4 px-5">
-                              <div className="flex flex-col items-center justify-center gap-1">
-                                <div className="flex items-center gap-1.5 font-extrabold text-ink-900 text-[0.95rem]">
-                                  <span>{task.maxPoints}</span>
-                                  <span className="text-brand-500 text-lg">🎯</span>
-                                </div>
-                                {(task.lateAfterHours || task.durationHours) && (
-                                  <span className="text-ink-400 text-[0.7rem] font-bold bg-ink-50 px-2 py-0.5 rounded-md border border-ink-150 whitespace-nowrap">
-                                    ⏳ {task.lateAfterHours ? `${task.lateAfterHours}س` : '—'} / {task.durationHours ? `${task.durationHours}س` : '—'}
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="py-4 px-5 font-mono text-[0.8rem] font-bold text-ink-500">
-                              {task.dueDate.split('T')[0]}
-                            </td>
-                            <td className="py-4 px-5">
-                              <div className="flex gap-2 justify-center flex-wrap">
-                                {isScientific && (
-                                  <>
-                                    <button
-                                      className="border border-ncyan-600/30 text-ncyan-700 bg-ncyan-50/60 hover:bg-ncyan-100/60 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors"
-                                      onClick={() => setEditTask(task)}
-                                    >
-                                      تعديل
-                                    </button>
-                                    <button
-                                      className={`border px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${task.isActive ? 'border-brand/40 text-brand-700 bg-brand-50/60 hover:bg-brand-100/60' : 'border-emerald-600/30 text-emerald-700 bg-emerald-50/60 hover:bg-emerald-100/60'}`}
-                                      onClick={() => toggleTaskActive(task)}
-                                    >
-                                      {task.isActive ? 'تعطيل' : 'تفعيل'}
-                                    </button>
-                                    <button
-                                      className="border border-purple-500/30 text-purple-700 bg-purple-50/60 hover:bg-purple-100/60 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors"
-                                      onClick={() => { setScopeTask(task); setScopeSelected(task.visibleToIds || []); setScopeSearch(''); }}
-                                    >
-                                      النطاق
-                                    </button>
-                                  </>
-                                )}
-                                <button
-                                  className="border border-nblue-400/30 text-nblue-700 bg-nblue-50/60 hover:bg-nblue-100/60 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors"
-                                  onClick={() => { setStatsTask(task); setStatsSearch(''); setStatsFilter('all'); }}
-                                >
-                                  تسليمات
-                                </button>
-                                {isScientific && (
-                                  <button
-                                    className="border border-nred-400/30 text-nred-700 bg-nred-50/60 hover:bg-nred-100/60 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors"
-                                    onClick={() => handleTaskDelete(task.id, task.title)}
-                                  >
-                                    حذف
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
+              {/* Tasks List — cards */}
+              {filteredTasks.length === 0 ? (
+                <div className="card p-16 text-center text-ink-400 border border-ink-150 shadow-soft">لا توجد مهام مطابقة للبحث.</div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {filteredTasks.map(task => (
+                    <div
+                      key={task.id}
+                      className={`card p-0 overflow-hidden border border-ink-150 shadow-soft flex flex-col transition-all hover:shadow-md ${!task.isActive ? 'opacity-70' : ''}`}
+                      style={{ borderTop: `3px solid ${task.isActive ? 'var(--accent, #FF9F1C)' : '#CBD5E1'}` }}
+                    >
+                      {/* Header: title + description */}
+                      <div className="p-4 pb-3 flex-1">
+                        <div className="flex items-start justify-between gap-2 mb-1.5">
+                          <h3 className="font-bold text-ink-900 text-[0.95rem] leading-snug truncate flex-1">{task.title}</h3>
+                          {!task.isActive && <span className="shrink-0 text-[0.65rem] font-bold text-ink-500 bg-ink-100 px-2 py-0.5 rounded-full">معطّلة</span>}
+                        </div>
+                        <p className="text-[0.8rem] text-ink-400 line-clamp-2 leading-relaxed">{task.description}</p>
+
+                        {/* Meta pills */}
+                        <div className="flex flex-wrap items-center gap-1.5 mt-3">
+                          <span className={`px-2.5 py-1 rounded-full text-[0.72rem] font-bold ${getTrackPillClass(task.track)}`}>
+                            {task.track || 'عام'}
+                          </span>
+                          <span className="px-2.5 py-1 rounded-full text-[0.72rem] font-bold bg-brand-50 text-brand-700 border border-brand-200/60 inline-flex items-center gap-1">
+                            🎯 {task.maxPoints}
+                          </span>
+                          <span className="px-2.5 py-1 rounded-full text-[0.72rem] font-bold bg-nblue-50 text-nblue-700 border border-nblue-200/50 inline-flex items-center gap-1 font-mono">
+                            📅 {task.dueDate.split('T')[0]}
+                          </span>
+                          {(task.lateAfterHours || task.durationHours) && (
+                            <span className="px-2.5 py-1 rounded-full text-[0.72rem] font-bold bg-ink-50 text-ink-500 border border-ink-150 inline-flex items-center gap-1 whitespace-nowrap">
+                              ⏳ {task.lateAfterHours ? `${task.lateAfterHours}س` : '—'} / {task.durationHours ? `${task.durationHours}س` : '—'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Actions row */}
+                      <div className="flex flex-wrap gap-2 p-3 border-t border-ink-100 bg-cream-50/40">
+                        {isScientific && (
+                          <>
+                            <button
+                              className="border border-ncyan-600/30 text-ncyan-700 bg-ncyan-50/60 hover:bg-ncyan-100/60 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+                              onClick={() => setEditTask(task)}
+                            >
+                              تعديل
+                            </button>
+                            <button
+                              className={`border px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${task.isActive ? 'border-brand/40 text-brand-700 bg-brand-50/60 hover:bg-brand-100/60' : 'border-emerald-600/30 text-emerald-700 bg-emerald-50/60 hover:bg-emerald-100/60'}`}
+                              onClick={() => toggleTaskActive(task)}
+                            >
+                              {task.isActive ? 'تعطيل' : 'تفعيل'}
+                            </button>
+                            <button
+                              className="border border-purple-500/30 text-purple-700 bg-purple-50/60 hover:bg-purple-100/60 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+                              onClick={() => { setScopeTask(task); setScopeSelected(task.visibleToIds || []); setScopeSearch(''); }}
+                            >
+                              النطاق
+                            </button>
+                          </>
+                        )}
+                        <button
+                          className="border border-nblue-400/30 text-nblue-700 bg-nblue-50/60 hover:bg-nblue-100/60 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+                          onClick={() => { setStatsTask(task); setStatsSearch(''); setStatsFilter('all'); }}
+                        >
+                          تسليمات
+                        </button>
+                        {isScientific && (
+                          <button
+                            className="border border-nred-400/30 text-nred-700 bg-nred-50/60 hover:bg-nred-100/60 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors mr-auto"
+                            onClick={() => handleTaskDelete(task.id, task.title)}
+                          >
+                            حذف
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -959,13 +965,13 @@ export default function TasksPage() {
 
       {/* MODAL 1: EVALUATE SUBMISSION */}
       {evalSub && (
-        <div className="modal-backdrop flex items-center justify-center p-4 z-50" onClick={() => setEvalSub(null)}>
-          <div className="modal-panel w-full max-w-lg shadow-elevated" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-6 border-b border-ink-150 bg-ink-50/50 rounded-t-2xl">
-              <h3 className="text-xl font-extrabold text-ink-900">مراجعة وتقييم المهمة</h3>
-              <button className="text-3xl text-ink-400 hover:text-ink-900 transition-colors" onClick={() => setEvalSub(null)}>×</button>
+        <div className="modal-backdrop flex items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto" onClick={() => setEvalSub(null)}>
+          <div className="modal-panel w-[92vw] sm:w-full sm:max-w-xl rounded-2xl max-h-[85vh] flex flex-col shadow-elevated" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-ink-150 bg-ink-50/50 rounded-t-2xl shrink-0">
+              <h3 className="text-lg sm:text-xl font-extrabold text-ink-900">مراجعة وتقييم المهمة</h3>
+              <button className="text-3xl text-ink-400 hover:text-ink-900 transition-colors leading-none" onClick={() => setEvalSub(null)}>×</button>
             </div>
-            <div className="p-6 space-y-6">
+            <div className="p-4 sm:p-5 space-y-4 flex-1 overflow-y-auto scroll-soft">
               <div className="flex items-start gap-4">
                 <div className="w-14 h-14 rounded-full bg-emerald-50 text-emerald-600 font-extrabold flex items-center justify-center text-2xl shrink-0 border border-emerald-100 shadow-sm">
                   {evalSub.studentName?.charAt(0) || 'ط'}
@@ -1024,7 +1030,7 @@ export default function TasksPage() {
                 <textarea className="field py-3 rounded-xl bg-ink-50/30" rows={2} placeholder="مثال: ممتاز، استمر في هذا التميز!" value={evalComment} onChange={e => setEvalComment(e.target.value)} />
               </div>
             </div>
-            <div className="flex flex-col sm:flex-row justify-end gap-3 p-6 border-t border-ink-150 bg-ink-50/50 rounded-b-2xl">
+            <div className="flex flex-col sm:flex-row justify-end gap-3 p-4 sm:p-5 border-t border-ink-150 bg-ink-50/50 rounded-b-2xl shrink-0">
               <button onClick={() => handleEvaluate('rejected')} disabled={evalBusy} className="btn bg-white text-nred-600 border border-nred-200 hover:bg-nred-50 transition-colors text-[0.95rem] font-bold rounded-xl py-3 px-6">
                 رد المهمة للطلب (رفض)
               </button>
@@ -1038,14 +1044,14 @@ export default function TasksPage() {
 
       {/* MODAL 2: EDIT TASK */}
       {editTask && isScientific && (
-        <div className="modal-backdrop flex items-center justify-center p-4 z-50" onClick={() => setEditTask(null)}>
-          <div className="modal-panel w-full max-w-2xl shadow-elevated" onClick={e => e.stopPropagation()}>
-            <form onSubmit={handleUpdateTask} autoComplete="off">
-              <div className="flex items-center justify-between p-6 border-b border-ink-150 bg-ink-50/50 rounded-t-2xl">
-                <h3 className="text-xl font-extrabold text-ink-900">تعديل بيانات المهمة</h3>
-                <button type="button" className="text-3xl text-ink-400 hover:text-ink-900" onClick={() => setEditTask(null)}>×</button>
+        <div className="modal-backdrop flex items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto" onClick={() => setEditTask(null)}>
+          <div className="modal-panel w-[92vw] sm:w-full sm:max-w-xl rounded-2xl max-h-[85vh] flex flex-col shadow-elevated" onClick={e => e.stopPropagation()}>
+            <form onSubmit={handleUpdateTask} autoComplete="off" className="flex flex-col min-h-0 flex-1">
+              <div className="flex items-center justify-between p-4 sm:p-5 border-b border-ink-150 bg-ink-50/50 rounded-t-2xl shrink-0">
+                <h3 className="text-lg sm:text-xl font-extrabold text-ink-900">تعديل بيانات المهمة</h3>
+                <button type="button" className="text-3xl text-ink-400 hover:text-ink-900 leading-none" onClick={() => setEditTask(null)}>×</button>
               </div>
-              <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto scroll-soft">
+              <div className="p-4 sm:p-5 space-y-4 flex-1 overflow-y-auto scroll-soft">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="md:col-span-2">
                     <label className="label font-bold text-ink-800 mb-1.5">عنوان المهمة</label>
@@ -1124,7 +1130,7 @@ export default function TasksPage() {
                   </div>
                 </div>
               </div>
-              <div className="flex justify-end gap-3 p-6 border-t border-ink-150 bg-ink-50/50 rounded-b-2xl">
+              <div className="flex justify-end gap-3 p-4 sm:p-5 border-t border-ink-150 bg-ink-50/50 rounded-b-2xl shrink-0">
                 <button type="button" onClick={() => setEditTask(null)} className="btn bg-white border border-ink-200 text-ink-600 text-[0.95rem] font-bold rounded-xl py-3 px-6">إلغاء</button>
                 <button type="submit" disabled={editBusy} className="btn bg-brand-500 hover:bg-brand-600 text-white text-[0.95rem] font-bold rounded-xl py-3 px-8 shadow-brand transition-all">
                   {editBusy ? 'جاري الحفظ…' : 'حفظ التعديلات'}
@@ -1137,16 +1143,16 @@ export default function TasksPage() {
 
       {/* MODAL 3: VISIBILITY SCOPE */}
       {scopeTask && (
-        <div className="modal-backdrop flex items-center justify-center p-4 z-50" onClick={() => setScopeTask(null)}>
-          <div className="modal-panel w-full max-w-lg shadow-elevated" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-6 border-b border-ink-150 bg-ink-50/50 rounded-t-2xl">
+        <div className="modal-backdrop flex items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto" onClick={() => setScopeTask(null)}>
+          <div className="modal-panel w-[92vw] sm:w-full sm:max-w-xl rounded-2xl max-h-[85vh] flex flex-col shadow-elevated" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-ink-150 bg-ink-50/50 rounded-t-2xl shrink-0">
               <div>
-                <h3 className="text-xl font-extrabold text-ink-900">تعديل النطاق:</h3>
+                <h3 className="text-lg sm:text-xl font-extrabold text-ink-900">تعديل النطاق:</h3>
                 <div className="text-[0.9rem] font-bold text-ink-500 mt-1">{scopeTask.title}</div>
               </div>
-              <button className="text-3xl text-ink-400 hover:text-ink-900 transition-colors" onClick={() => setScopeTask(null)}>×</button>
+              <button className="text-3xl text-ink-400 hover:text-ink-900 transition-colors leading-none" onClick={() => setScopeTask(null)}>×</button>
             </div>
-            <div className="p-6 space-y-5">
+            <div className="p-4 sm:p-5 space-y-5 flex-1 overflow-y-auto scroll-soft">
               <div className="flex gap-3">
                 <button
                   type="button"
@@ -1202,7 +1208,7 @@ export default function TasksPage() {
                 </div>
               )}
             </div>
-            <div className="flex justify-end gap-3 p-6 border-t border-ink-150 bg-ink-50/50 rounded-b-2xl">
+            <div className="flex justify-end gap-3 p-4 sm:p-5 border-t border-ink-150 bg-ink-50/50 rounded-b-2xl shrink-0">
               <button onClick={() => setScopeTask(null)} className="btn bg-white border border-ink-200 text-ink-600 text-[0.95rem] font-bold rounded-xl py-3 px-6">إلغاء</button>
               <button onClick={handleScopeConfirm} disabled={scopeBusy || (scopeTask.visibility === 'restricted' && scopeSelected.length === 0)} className="btn bg-brand-500 hover:bg-brand-600 text-white text-[0.95rem] font-bold rounded-xl py-3 px-8 shadow-brand transition-all">
                 {scopeBusy ? 'جارٍ الحفظ…' : 'تحديث النطاق'}
@@ -1214,16 +1220,16 @@ export default function TasksPage() {
 
       {/* MODAL 4: STATISTICS */}
       {statsTask && (
-        <div className="modal-backdrop flex items-center justify-center p-4 z-50" onClick={() => setStatsTask(null)}>
-          <div className="modal-panel w-full max-w-3xl shadow-elevated" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-6 border-b border-ink-150 bg-ink-50/50 rounded-t-2xl">
+        <div className="modal-backdrop flex items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto" onClick={() => setStatsTask(null)}>
+          <div className="modal-panel w-[92vw] sm:w-full sm:max-w-xl rounded-2xl max-h-[85vh] flex flex-col shadow-elevated" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-ink-150 bg-ink-50/50 rounded-t-2xl shrink-0">
               <div>
-                <h3 className="text-xl font-extrabold text-ink-900">إحصائيات تسليمات الطلاب</h3>
+                <h3 className="text-lg sm:text-xl font-extrabold text-ink-900">إحصائيات تسليمات الطلاب</h3>
                 <div className="text-[0.9rem] font-bold text-ink-500 mt-1">{statsTask.title}</div>
               </div>
-              <button className="text-3xl text-ink-400 hover:text-ink-900 transition-colors" onClick={() => setStatsTask(null)}>×</button>
+              <button className="text-3xl text-ink-400 hover:text-ink-900 transition-colors leading-none" onClick={() => setStatsTask(null)}>×</button>
             </div>
-            <div className="p-6 space-y-6">
+            <div className="p-4 sm:p-5 space-y-5 flex-1 overflow-y-auto scroll-soft">
               {/* Stats Strip */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
                 <div className="bg-ink-50 p-4 rounded-xl border border-ink-150 shadow-sm">
@@ -1257,54 +1263,45 @@ export default function TasksPage() {
                 </select>
               </div>
 
-              {/* Table */}
-              <div className="max-h-64 overflow-y-auto border border-ink-150 rounded-xl bg-white shadow-sm scroll-soft">
+              {/* Student rows */}
+              <div className="border border-ink-150 rounded-xl bg-white shadow-sm overflow-hidden">
                 {statsStudentList.length === 0 ? (
                   <div className="text-center py-12 text-ink-400 font-medium text-[0.9rem]">لا يوجد طلاب يطابقون الفلاتر المحددة.</div>
                 ) : (
-                  <table className="w-full text-right text-[0.85rem]">
-                    <thead className="bg-ink-50/80 sticky top-0 border-b border-ink-150 text-ink-500">
-                      <tr>
-                        <th className="py-3 px-4 font-bold">الطالب</th>
-                        <th className="py-3 px-4 font-bold">الحالة</th>
-                        <th className="py-3 px-4 font-bold text-center">الدرجة</th>
-                        <th className="py-3 px-4 font-bold">التاريخ</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {statsStudentList.map((item, i) => (
-                        <tr key={item.id} className={`border-b border-ink-100 last:border-0 hover:bg-cream-100/50 ${i % 2 === 0 ? 'bg-white' : 'bg-ink-50/10'}`}>
-                          <td className="py-3 px-4">
-                            <span className="font-extrabold text-ink-900">{item.studentName}</span>
-                            <span className="text-ink-400 mr-2">({item.stage} - {item.grade})</span>
-                          </td>
-                          <td className="py-3 px-4">
-                            {item.submitted ? (
-                              <span className={`px-2.5 py-1 rounded-full text-[0.7rem] font-bold ${statusBadgeClass(item.submission!.status)}`}>
-                                {statusLabel(item.submission!.status)}
-                              </span>
+                  <ul className="divide-y divide-ink-100">
+                    {statsStudentList.map((item) => {
+                      const status = item.submitted ? item.submission!.status : 'missing';
+                      const isApproved = item.submission?.status === 'approved';
+                      return (
+                        <li key={item.id} className="flex items-center gap-3 p-3 hover:bg-cream-100/50 transition-colors">
+                          {/* status dot (color only) */}
+                          <span className={`w-3 h-3 rounded-full shrink-0 ${statusDotClass(status)}`} title={statusText(status)} />
+
+                          {/* name + meta + date */}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-ink-900 text-[0.85rem] truncate">{item.studentName}</p>
+                            <p className="text-[0.7rem] text-ink-400 truncate">{item.stage} - {item.grade}</p>
+                            <p className="text-[0.65rem] text-ink-400 font-mono mt-0.5">
+                              {item.submission ? item.submission.submittedAt.split('T')[0] : '—'}
+                            </p>
+                          </div>
+
+                          {/* grade */}
+                          <div className="shrink-0 text-left">
+                            {isApproved ? (
+                              <span className="font-extrabold text-emerald-600 text-[0.95rem] whitespace-nowrap">{item.submission!.grade} 🎯</span>
                             ) : (
-                              <span className="px-2.5 py-1 rounded-full text-[0.7rem] font-bold bg-nred-50 text-nred-600 border border-nred-200">لم يسلّم بعد</span>
+                              <span className="text-ink-300 text-sm">—</span>
                             )}
-                          </td>
-                          <td className="py-3 px-4 font-extrabold text-center text-[0.95rem]">
-                            {item.submission?.status === 'approved' ? (
-                              <span className="text-emerald-600">{item.submission.grade} 🎯</span>
-                            ) : (
-                              <span className="text-ink-300">—</span>
-                            )}
-                          </td>
-                          <td className="py-3 px-4 font-mono text-[0.75rem] text-ink-500 font-medium">
-                            {item.submission ? item.submission.submittedAt.split('T')[0] : '—'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 )}
               </div>
             </div>
-            <div className="flex justify-end p-6 border-t border-ink-150 bg-ink-50/50 rounded-b-2xl">
+            <div className="flex justify-end p-4 sm:p-5 border-t border-ink-150 bg-ink-50/50 rounded-b-2xl shrink-0">
               <button onClick={() => setStatsTask(null)} className="btn bg-brand-500 hover:bg-brand-600 text-white text-[0.95rem] font-bold rounded-xl py-3 px-8 shadow-brand">إغلاق</button>
             </div>
           </div>

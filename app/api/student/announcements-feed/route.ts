@@ -14,10 +14,14 @@ export async function GET(req: NextRequest) {
   const group = student.groupId ? groups.find(g => g.id === student.groupId) : null;
 
   const all = await getAnnouncements();
+  const nowMs = Date.now();
   const visible = all.filter(a => {
+    // Hide announcements whose expiry date has passed
+    if (a.expiresAt && new Date(a.expiresAt).getTime() < nowMs) return false;
+
     const aud = (a.audience || '').trim().toLowerCase();
     if (!aud) return true;
-    
+
     if (aud === 'all' || aud === 'students' || aud === 'الكل' || aud === 'الطلاب' || aud.includes('student') || aud.includes('طالب')) {
       return true;
     }

@@ -108,6 +108,7 @@ export type AnnouncementInfo = {
   audience: string;
   imageUrl?: string | null;
   images?: string | null;
+  expiresAt?: string | null;
   createdAt: string;
 };
 
@@ -999,6 +1000,7 @@ export async function getAnnouncements(): Promise<AnnouncementInfo[]> {
       audience: a.audience,
       imageUrl: a.imageUrl,
       images: a.images,
+      expiresAt: (a as any).expiresAt ? (a as any).expiresAt.toISOString() : null,
       createdAt: a.createdAt.toISOString()
     }));
   } else {
@@ -1006,11 +1008,11 @@ export async function getAnnouncements(): Promise<AnnouncementInfo[]> {
   }
 }
 
-export async function createAnnouncement(title: string, body: string, audience: string, imageUrl?: string | null, images?: string | null): Promise<AnnouncementInfo> {
+export async function createAnnouncement(title: string, body: string, audience: string, imageUrl?: string | null, images?: string | null, expiresAt?: string | null): Promise<AnnouncementInfo> {
   if (hasDatabase) {
     const prisma = getPrisma()!;
     const a = await prisma.announcement.create({
-      data: { title, body, audience, imageUrl, images }
+      data: { title, body, audience, imageUrl, images, expiresAt: expiresAt ? new Date(expiresAt) : null }
     });
     return {
       id: a.id,
@@ -1019,6 +1021,7 @@ export async function createAnnouncement(title: string, body: string, audience: 
       audience: a.audience,
       imageUrl: a.imageUrl,
       images: a.images,
+      expiresAt: (a as any).expiresAt ? (a as any).expiresAt.toISOString() : null,
       createdAt: a.createdAt.toISOString()
     };
   } else {
@@ -1030,6 +1033,7 @@ export async function createAnnouncement(title: string, body: string, audience: 
       audience,
       imageUrl: imageUrl || null,
       images: images || null,
+      expiresAt: expiresAt || null,
       createdAt: new Date().toISOString()
     };
     list.push(newAnnounce);
@@ -1038,7 +1042,7 @@ export async function createAnnouncement(title: string, body: string, audience: 
   }
 }
 
-export async function updateAnnouncement(id: number, patch: { title?: string; body?: string; audience?: string; imageUrl?: string | null; images?: string | null }): Promise<AnnouncementInfo | null> {
+export async function updateAnnouncement(id: number, patch: { title?: string; body?: string; audience?: string; imageUrl?: string | null; images?: string | null; expiresAt?: string | null }): Promise<AnnouncementInfo | null> {
   if (hasDatabase) {
     const prisma = getPrisma()!;
     const a = await prisma.announcement.update({
@@ -1048,7 +1052,8 @@ export async function updateAnnouncement(id: number, patch: { title?: string; bo
         body: patch.body,
         audience: patch.audience,
         imageUrl: patch.imageUrl,
-        images: patch.images
+        images: patch.images,
+        ...(patch.expiresAt !== undefined ? { expiresAt: patch.expiresAt ? new Date(patch.expiresAt) : null } : {})
       }
     });
     return {
@@ -1058,6 +1063,7 @@ export async function updateAnnouncement(id: number, patch: { title?: string; bo
       audience: a.audience,
       imageUrl: a.imageUrl,
       images: a.images,
+      expiresAt: (a as any).expiresAt ? (a as any).expiresAt.toISOString() : null,
       createdAt: a.createdAt.toISOString()
     };
   } else {

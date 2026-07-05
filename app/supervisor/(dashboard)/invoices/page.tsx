@@ -47,6 +47,7 @@ export default function InvoicesPage() {
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [viewing, setViewing] = useState<Invoice | null>(null);
+  const [editing, setEditing] = useState<Invoice | null>(null);
 
   const roles = (user?.role ?? '').split(',').map(r => r.trim());
   const canDeleteAny = roles.some(r => ['admin', 'finance'].includes(r));
@@ -170,11 +171,22 @@ export default function InvoicesPage() {
         />
       )}
 
+      {editing && (
+        <AddInvoiceModal
+          deptOptions={deptOptions}
+          editInvoice={editing}
+          onClose={() => setEditing(null)}
+          onCreated={(inv) => { setInvoices((p) => p.map((x) => (x.id === inv.id ? inv : x))); setEditing(null); }}
+        />
+      )}
+
       {viewing && (
         <ViewInvoiceModal
           invoice={viewing}
           canDelete={canDeleteAny || viewing.status === 'pending'}
+          canEdit={viewing.status === 'pending'}
           onClose={() => setViewing(null)}
+          onEdit={() => { setEditing(viewing); setViewing(null); }}
           onDelete={() => del(viewing)}
         />
       )}
@@ -186,28 +198,31 @@ export default function InvoicesPage() {
 
 function AddInvoiceModal({
   deptOptions,
+  editInvoice,
   onClose,
   onCreated
 }: {
   deptOptions: { key: string; label: string }[];
+  editInvoice?: Invoice | null;
   onClose: () => void;
   onCreated: (inv: Invoice) => void;
 }) {
+  const isEdit = !!editInvoice;
   const fileRef = useRef<HTMLInputElement>(null);
   const [reading, setReading] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const [image, setImage] = useState<string | null>(null);
+  const [image, setImage] = useState<string | null>(editInvoice?.imageData ?? null);
   const [aiExtracted, setAiExtracted] = useState(false);
   const [aiConfidence, setAiConfidence] = useState<number | null>(null);
-  const [entryMode, setEntryMode] = useState<'photo' | 'manual'>('manual');
+  const [entryMode, setEntryMode] = useState<'photo' | 'manual'>(editInvoice?.entryMode === 'photo' ? 'photo' : 'manual');
 
-  const [title, setTitle] = useState('');
-  const [vendor, setVendor] = useState('');
-  const [invoiceDate, setInvoiceDate] = useState('');
-  const [category, setCategory] = useState('');
-  const [department, setDepartment] = useState(deptOptions.length === 1 ? deptOptions[0].key : '');
-  const [total, setTotal] = useState('');
+  const [title, setTitle] = useState(editInvoice?.title ?? '');
+  const [vendor, setVendor] = useState(editInvoice?.vendor ?? '');
+  const [invoiceDate, setInvoiceDate] = useState(editInvoice?.invoiceDate ?? '');
+  const [category, setCategory] = useState(editInvoice?.category ?? '');
+  const [department, setDepartment] = useState(editInvoice?.department ?? (deptOptions.length === 1 ? deptOptions[0].key : ''));
+  const [total, setTotal] = useState(editInvoice ? String(editInvoice.total) : '');
 
   async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -256,29 +271,30 @@ function AddInvoiceModal({
     if (isNaN(finalTotal) || finalTotal <= 0) return pushToast('error', 'أدخل قيمة الإجمالي بشكل صحيح');
 
     setBusy(true);
+    const commonBody = {
+      title: title.trim(),
+      vendor: vendor.trim() || null,
+      invoiceDate: invoiceDate.trim() || null,
+      category: category || null,
+      department,
+      items: [{ name: title.trim(), qty: 1, price: finalTotal }],
+      subtotal: finalTotal,
+      tax: null,
+      total: finalTotal,
+      imageData: image,
+      entryMode,
+      aiExtracted,
+      aiConfidence
+    };
     const r = await fetch('/api/supervisor/invoices', {
-      method: 'POST',
+      method: isEdit ? 'PUT' : 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: title.trim(),
-        vendor: vendor.trim() || null,
-        invoiceDate: invoiceDate.trim() || null,
-        category: category || null,
-        department,
-        items: [{ name: title.trim(), qty: 1, price: finalTotal }],
-        subtotal: finalTotal,
-        tax: null,
-        total: finalTotal,
-        imageData: image,
-        entryMode,
-        aiExtracted,
-        aiConfidence
-      })
+      body: JSON.stringify(isEdit ? { id: editInvoice!.id, ...commonBody } : commonBody)
     });
     setBusy(false);
     const j = await r.json().catch(() => ({}));
     if (!r.ok) return pushToast('error', j.error ?? 'فشل حفظ الفاتورة');
-    pushToast('success', 'تم حفظ الفاتورة');
+    pushToast('success', isEdit ? 'تم تعديل الفاتورة' : 'تم حفظ الفاتورة');
     onCreated(j.invoice);
   }
 
@@ -287,7 +303,7 @@ function AddInvoiceModal({
       <div className="modal-panel w-[92vw] sm:w-full sm:max-w-xl rounded-2xl max-h-[70vh] sm:max-h-[70vh] flex flex-col shadow-elevated" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between p-3.5 sm:p-5 border-b border-ink-200 shrink-0">
           <div>
-            <h2 className="text-lg sm:text-xl font-bold text-ink-900">إضافة فاتورة</h2>
+            <h2 className="text-lg sm:text-xl font-bold text-ink-900">{isEdit ? `تعديل فاتورة #${editInvoice!.invoiceNo}` : 'إضافة فاتورة'}</h2>
           </div>
           <button onClick={onClose} className="text-ink-400 hover:text-ink-900 text-2xl leading-none px-2">×</button>
         </div>
@@ -365,7 +381,7 @@ function AddInvoiceModal({
 
         <div className="p-3.5 sm:p-5 border-t border-ink-200 flex justify-end gap-2 shrink-0 bg-ink-50/50 rounded-b-2xl">
           <button onClick={onClose} className="btn btn-secondary px-6">إلغاء</button>
-          <button onClick={submit} disabled={busy || reading} className="btn btn-primary px-6">{busy ? 'جارٍ الحفظ…' : 'حفظ الفاتورة'}</button>
+          <button onClick={submit} disabled={busy || reading} className="btn btn-primary px-6">{busy ? 'جارٍ الحفظ…' : isEdit ? 'حفظ التعديلات' : 'حفظ الفاتورة'}</button>
         </div>
       </div>
     </div>
@@ -377,12 +393,16 @@ function AddInvoiceModal({
 function ViewInvoiceModal({
   invoice,
   canDelete,
+  canEdit,
   onClose,
+  onEdit,
   onDelete
 }: {
   invoice: Invoice;
   canDelete: boolean;
+  canEdit?: boolean;
   onClose: () => void;
+  onEdit?: () => void;
   onDelete: () => void;
 }) {
   return (
@@ -432,6 +452,9 @@ function ViewInvoiceModal({
 
         <div className="p-3.5 sm:p-5 border-t border-ink-200 flex justify-end gap-2 shrink-0 bg-ink-50/50 rounded-b-2xl">
           <button onClick={onClose} className="btn btn-secondary px-6">إغلاق</button>
+          {canEdit && onEdit && (
+            <button onClick={onEdit} className="btn btn-primary px-6">تعديل الفاتورة</button>
+          )}
           {canDelete && (
             <button onClick={onDelete} className="btn btn-danger px-6">حذف الفاتورة</button>
           )}

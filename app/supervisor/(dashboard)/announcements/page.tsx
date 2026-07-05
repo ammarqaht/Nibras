@@ -12,6 +12,7 @@ type Announcement = {
   audience: string;
   imageUrl?: string | null;
   images?: string | null;
+  expiresAt?: string | null;
   createdAt: string;
 };
 
@@ -42,6 +43,7 @@ export default function AnnouncementsPage() {
   const [selectedAudience, setSelectedAudience] = useState<string[]>([]);
   const [coverImage, setCoverImage] = useState<string | null>(null);
   const [contentImages, setContentImages] = useState<string[]>([]);
+  const [expiresAt, setExpiresAt] = useState('');
 
   // Detailed Modal View state
   const [activeDetails, setActiveDetails] = useState<Announcement | null>(null);
@@ -107,7 +109,8 @@ export default function AnnouncementsPage() {
       body: body.trim(),
       audience: audienceStr,
       imageUrl: coverImage,
-      images: contentImages.length > 0 ? JSON.stringify(contentImages) : null
+      images: contentImages.length > 0 ? JSON.stringify(contentImages) : null,
+      expiresAt: expiresAt ? new Date(expiresAt + 'T23:59:59').toISOString() : null
     };
 
     const r = await fetch('/api/supervisor/announcements', {
@@ -141,6 +144,7 @@ export default function AnnouncementsPage() {
       }
     }
     setContentImages(contentImgs);
+    setExpiresAt(a.expiresAt ? a.expiresAt.split('T')[0] : '');
 
     // Filter out legacy values like 'all', 'students', 'guardians' so they do not stack with stage/group values
     const filteredAudience = a.audience
@@ -158,6 +162,7 @@ export default function AnnouncementsPage() {
     setCoverImage(null);
     setContentImages([]);
     setSelectedAudience([]);
+    setExpiresAt('');
     setShowFormModal(false);
   };
 
@@ -294,6 +299,18 @@ export default function AnnouncementsPage() {
                   onChange={(e) => setBody(e.target.value)}
                   placeholder="اكتب تفاصيل الإعلان هنا…"
                 />
+              </div>
+
+              {/* Expiry Date */}
+              <div>
+                <label className="label">تاريخ انتهاء الإعلان (اختياري)</label>
+                <input
+                  type="date"
+                  className="field font-mono"
+                  value={expiresAt}
+                  onChange={(e) => setExpiresAt(e.target.value)}
+                />
+                <p className="hint mt-1 text-ink-400">اتركه فارغاً ليبقى الإعلان ظاهراً بشكل دائم. بعد هذا التاريخ يختفي عن الطلاب تلقائياً.</p>
               </div>
 
               {/* Multiple Content Images Upload */}
@@ -442,8 +459,18 @@ export default function AnnouncementsPage() {
                     {a.title}
                   </h3>
                   <p className="text-xs text-ink-500 line-clamp-2 leading-relaxed flex-1">{a.body}</p>
-                  <div className="text-[10px] text-ink-400 mt-auto" dir="ltr">
-                    {new Date(a.createdAt).toLocaleDateString('ar', { year: 'numeric', month: 'short', day: 'numeric' })}
+                  <div className="flex items-center justify-between gap-2 mt-auto">
+                    <span className="text-[10px] text-ink-400" dir="ltr">
+                      {new Date(a.createdAt).toLocaleDateString('ar', { year: 'numeric', month: 'short', day: 'numeric' })}
+                    </span>
+                    {a.expiresAt && (() => {
+                      const expired = new Date(a.expiresAt).getTime() < Date.now();
+                      return (
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${expired ? 'bg-nred-50 text-nred-600 border border-nred-200' : 'bg-cream-100 text-brand-600 border border-brand-200/50'}`}>
+                          {expired ? '⛔ منتهٍ' : `⏳ ينتهي ${new Date(a.expiresAt).toLocaleDateString('ar', { month: 'short', day: 'numeric' })}`}
+                        </span>
+                      );
+                    })()}
                   </div>
                 </div>
 

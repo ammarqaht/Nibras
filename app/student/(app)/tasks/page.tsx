@@ -278,22 +278,22 @@ export default function StudentTasks() {
         </div>
 
         {/* Filters / sort / submitted */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <select className="field py-1.5 px-3 text-sm flex-1 min-w-[110px]" value={filterTrack} onChange={e => setFilterTrack(e.target.value)}>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <select className="field py-2 px-2.5 text-xs" value={filterTrack} onChange={e => setFilterTrack(e.target.value)}>
             <option value="">كل التصنيفات</option>
             {tracks.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
-          <select className="field py-1.5 px-3 text-sm flex-1 min-w-[110px]" value={filterMethod} onChange={e => setFilterMethod(e.target.value)}>
+          <select className="field py-2 px-2.5 text-xs" value={filterMethod} onChange={e => setFilterMethod(e.target.value)}>
             <option value="">كل طرق التسليم</option>
             {methodsAvail.map(m => <option key={m} value={m}>{METHOD_LABELS[m]}</option>)}
           </select>
-          <select className="field py-1.5 px-3 text-sm flex-1 min-w-[110px]" value={sortBy} onChange={e => setSortBy(e.target.value as 'due' | 'points-desc' | 'points-asc')}>
+          <select className="field py-2 px-2.5 text-xs" value={sortBy} onChange={e => setSortBy(e.target.value as 'due' | 'points-desc' | 'points-asc')}>
             <option value="due">الأقرب موعداً</option>
             <option value="points-desc">النقاط: الأعلى</option>
             <option value="points-asc">النقاط: الأقل</option>
           </select>
           <button onClick={() => { setShowSubmitted(true); setExpandedSubId(null); }}
-            className="btn text-white text-sm px-4 py-2 shrink-0 flex items-center gap-1.5 font-bold hover:opacity-90 transition-opacity"
+            className="btn text-white text-xs px-3 py-2 flex items-center justify-center gap-1.5 font-bold hover:opacity-90 transition-opacity"
             style={{ background: 'radial-gradient(circle at 80% 10%, rgba(255,159,28,0.12) 0%, transparent 50%), radial-gradient(circle at 20% 90%, rgba(18,179,213,0.15) 0%, transparent 60%), linear-gradient(135deg, #103F91 0%, #071F4A 100%)' }}>
             📋 المهام المسلَّمة
             {submittedItems.length > 0 && <span className="bg-white/25 rounded-full text-[11px] px-1.5 py-0.5 tabular-nums">{submittedItems.length}</span>}
