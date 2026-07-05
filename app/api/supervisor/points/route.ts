@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { getPoints, addPointsRecord, getSupervisorByEmail, GROUP_POINTS_ROLES } from '@/lib/services';
+import { randomUUID } from 'crypto';
+import { getPoints, addPointsRecord, deletePointRecord, deletePointBatch, getSupervisorByEmail, GROUP_POINTS_ROLES } from '@/lib/services';
 
 export async function GET(req: NextRequest) {
   try {
@@ -143,6 +144,9 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // One batchId ties together all per-student records from this single
+      // group registration so the log can show them as one row (by group name).
+      const batchId = randomUUID();
       const records = [];
       for (const s of studentsInGroup) {
         const rec = await addPointsRecord({
@@ -151,6 +155,7 @@ export async function POST(req: NextRequest) {
           reason: `${reason} (رصد جماعي للأسرة)`,
           category,
           pointType: isDeduction ? 'deduction' : 'collective',
+          batchId,
           recordedBy: session.name
         });
         records.push(rec);
@@ -187,5 +192,55 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('points POST error', error);
     return NextResponse.json({ error: 'حدث خطأ في تسجيل النقاط' }, { status: 500 });
+  }
+}
+
+// Cancel an erroneous entry by permanently removing the point record.
+// Unlike a deduction (which only lowers the balance), deleting the record
+// removes the points from both the total (الاجمالي) and the balance (الرصيد).
+export async function DELETE(req: NextRequest) {
+  try {
+    const session = getSession(req);
+    if (!session) {
+      return NextResponse.json({ error: 'غير مصرح بالدخول' }, { status: 401 });
+    }
+
+    const supervisor = await getSupervisorByEmail(session.email);
+    if (!supervisor) {
+      return NextResponse.json({ error: 'حساب غير موجود' }, { status: 401 });
+    }
+
+    // Cancelling/deleting point records is restricted to the admin only.
+    const roles = supervisor.role.split(',').map(r => r.trim());
+    if (!roles.includes('admin')) {
+      return NextResponse.json({ error: 'هذه الصلاحية متاحة للمدير فقط' }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const batchId = searchParams.get('batchId');
+
+    // Delete a whole group registration (all per-student records) by batchId.
+    if (batchId) {
+      const count = await deletePointBatch(batchId);
+      if (count === 0) {
+        return NextResponse.json({ error: 'السجل غير موجود' }, { status: 404 });
+      }
+      return NextResponse.json({ success: true, deletedCount: count });
+    }
+
+    const id = parseInt(searchParams.get('id') ?? '', 10);
+    if (isNaN(id)) {
+      return NextResponse.json({ error: 'رقم السجل غير صحيح' }, { status: 400 });
+    }
+
+    const deleted = await deletePointRecord(id);
+    if (!deleted) {
+      return NextResponse.json({ error: 'السجل غير موجود' }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, deleted });
+  } catch (error) {
+    console.error('points DELETE error', error);
+    return NextResponse.json({ error: 'حدث خطأ أثناء حذف السجل' }, { status: 500 });
   }
 }

@@ -21,18 +21,29 @@ const GROUP_POINTS_ROLES = [
   'scientific_supervisor', 'social_supervisor', 'stage_supervisor',
 ];
 
-const STUDENT_CATEGORIES = [
-  { key: 'participation', label: 'مشاركة' },
-  { key: 'behavior',     label: 'سلوك'   },
-  { key: 'store',        label: 'متجر'   },
-  { key: 'other',        label: 'أخرى'   },
-];
+type Cat = { key: string; label: string };
 
-const GROUP_CATEGORIES = [
+// Fallbacks used only until the saved categories load (or if the fetch fails).
+const DEFAULT_STUDENT_ADD: Cat[] = [
+  { key: 'participation', label: 'مشاركة' },
+  { key: 'behavior',      label: 'سلوك'   },
+  { key: 'excellence',    label: 'تميّز'  },
+  { key: 'other',         label: 'أخرى'   },
+];
+const DEFAULT_STUDENT_DEDUCT: Cat[] = [
+  { key: 'store',     label: 'متجر'   },
+  { key: 'violation', label: 'مخالفة' },
+  { key: 'other',     label: 'أخرى'   },
+];
+const DEFAULT_GROUP_ADD: Cat[] = [
   { key: 'competition', label: 'مسابقة'  },
   { key: 'sports',      label: 'رياضي'   },
   { key: 'social',      label: 'اجتماعي' },
   { key: 'scientific',  label: 'علمي'    },
+];
+const DEFAULT_GROUP_DEDUCT: Cat[] = [
+  { key: 'violation', label: 'مخالفة' },
+  { key: 'other',     label: 'أخرى'   },
 ];
 
 export default function AddPointsPage() {
@@ -46,9 +57,10 @@ export default function AddPointsPage() {
   const [loading, setLoading] = useState(true);
 
   const [mode, setMode] = useState<'individual' | 'group'>('individual');
-  const [studentCategories, setStudentCategories] = useState(STUDENT_CATEGORIES);
-  const [groupCategories, setGroupCategories] = useState(GROUP_CATEGORIES);
-  const categories = mode === 'group' ? groupCategories : studentCategories;
+  const [studentAddCats, setStudentAddCats] = useState<Cat[]>(DEFAULT_STUDENT_ADD);
+  const [studentDeductCats, setStudentDeductCats] = useState<Cat[]>(DEFAULT_STUDENT_DEDUCT);
+  const [groupAddCats, setGroupAddCats] = useState<Cat[]>(DEFAULT_GROUP_ADD);
+  const [groupDeductCats, setGroupDeductCats] = useState<Cat[]>(DEFAULT_GROUP_DEDUCT);
 
   // Multi-student selection
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -68,6 +80,15 @@ export default function AddPointsPage() {
   const [category, setCategory] = useState('');
   const [busy, setBusy] = useState(false);
 
+  // The category list depends on both the scope (individual/group) and the
+  // operation (add/deduct), so the four saved buckets map to the dropdown.
+  const categories = useMemo<Cat[]>(() => {
+    const list = mode === 'group'
+      ? (sign === 1 ? groupAddCats : groupDeductCats)
+      : (sign === 1 ? studentAddCats : studentDeductCats);
+    return list.length ? list : [{ key: 'other', label: 'أخرى' }];
+  }, [mode, sign, studentAddCats, studentDeductCats, groupAddCats, groupDeductCats]);
+
   useEffect(() => {
     Promise.all([
       fetch('/api/supervisor/students?scope=all', { cache: 'no-store' }),
@@ -77,8 +98,10 @@ export default function AddPointsPage() {
       const srj = await sr.json().catch(() => ({ students: [] }));
       const grj = await gr.json().catch(() => ({ groups: [] }));
       const crj = await cr.json().catch(() => ({}));
-      if (crj.studentCategories) setStudentCategories(crj.studentCategories);
-      if (crj.groupCategories) setGroupCategories(crj.groupCategories);
+      if (Array.isArray(crj.studentAddCategories)) setStudentAddCats(crj.studentAddCategories);
+      if (Array.isArray(crj.studentDeductCategories)) setStudentDeductCats(crj.studentDeductCategories);
+      if (Array.isArray(crj.groupAddCategories)) setGroupAddCats(crj.groupAddCategories);
+      if (Array.isArray(crj.groupDeductCategories)) setGroupDeductCats(crj.groupDeductCategories);
       const allSt: Student[] = srj.students ?? [];
       setStudents(allSt.filter(s =>
         (s.registrationStatus === 'approved' || s.paymentStatus === 'exempted') &&
@@ -89,11 +112,13 @@ export default function AddPointsPage() {
     });
   }, []);
 
+  // Keep the selected category valid whenever the available list changes
+  // (switching scope or add/deduct, or after categories load).
   useEffect(() => {
-    if (categories.length > 0) {
-      setCategory(categories[0].key);
+    if (!categories.some(c => c.key === category)) {
+      setCategory(categories[0]?.key ?? '');
     }
-  }, [mode, studentCategories, groupCategories]);
+  }, [categories, category]);
 
   // Close student dropdown on outside click
   useEffect(() => {
@@ -220,14 +245,14 @@ export default function AddPointsPage() {
               <button
                 type="button"
                 className={`choice flex-1 ${mode === 'individual' ? 'is-active' : ''}`}
-                onClick={() => { setMode('individual'); setCategory(STUDENT_CATEGORIES[0].key); }}
+                onClick={() => setMode('individual')}
               >
                 طلاب
               </button>
               <button
                 type="button"
                 className={`choice flex-1 ${mode === 'group' ? 'is-active' : ''}`}
-                onClick={() => { setMode('group'); setCategory(GROUP_CATEGORIES[0].key); }}
+                onClick={() => setMode('group')}
               >
                 مجموعة
               </button>

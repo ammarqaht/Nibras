@@ -73,6 +73,7 @@ model Point {
   reason         String
   category       String // 'attendance' | 'tasks' | 'behavior' | 'other'
   pointType      String   @default("individual") // 'individual' | 'collective' | 'deduction'
+  batchId        String? // groups records created in one collective/group registration
   recordedBy     String?
   createdAt      DateTime @default(now())
 }

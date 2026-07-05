@@ -90,6 +90,7 @@ export type PointInfo = {
   reason: string;
   category: string;
   pointType: 'individual' | 'collective' | 'deduction'; // individual=حضور+مهام, collective=لجان, deduction=خصم من الرصيد
+  batchId?: string | null; // groups records created in one collective/group registration
   recordedBy: string | null;
   createdAt: string;
 };
@@ -830,6 +831,7 @@ export async function getPoints(): Promise<PointInfo[]> {
       pointType: ((p as any).pointType as PointInfo['pointType']) ?? (
         p.reason.endsWith('(رصد جماعي للأسرة)') ? 'collective' : p.delta < 0 ? 'deduction' : 'individual'
       ),
+      batchId: (p as any).batchId ?? null,
       recordedBy: p.recordedBy,
       createdAt: p.createdAt.toISOString()
     }));
@@ -853,6 +855,7 @@ export async function addPointsRecord(data: Omit<PointInfo, 'id' | 'createdAt'>)
         reason: data.reason,
         category: data.category,
         pointType: data.pointType,
+        batchId: data.batchId ?? null,
         recordedBy: data.recordedBy
       } as any
     });
@@ -863,6 +866,7 @@ export async function addPointsRecord(data: Omit<PointInfo, 'id' | 'createdAt'>)
       reason: p.reason,
       category: p.category,
       pointType: data.pointType,
+      batchId: (p as any).batchId ?? null,
       recordedBy: p.recordedBy,
       createdAt: p.createdAt.toISOString()
     };
@@ -876,6 +880,48 @@ export async function addPointsRecord(data: Omit<PointInfo, 'id' | 'createdAt'>)
     list.push(newRecord);
     await writeJsonFile(FILE_POINTS, list);
     return newRecord;
+  }
+}
+
+// Permanently remove a single point record (used to cancel an erroneous entry).
+// Deleting the record removes it from both the total (الاجمالي) and the balance (الرصيد).
+export async function deletePointRecord(id: number): Promise<PointInfo | null> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    const existing = await prisma.point.findUnique({ where: { id } });
+    if (!existing) return null;
+    await prisma.point.delete({ where: { id } });
+    return {
+      id: existing.id,
+      registrationId: existing.registrationId,
+      delta: existing.delta,
+      reason: existing.reason,
+      category: existing.category,
+      pointType: (existing as any).pointType,
+      recordedBy: existing.recordedBy,
+      createdAt: existing.createdAt.toISOString(),
+    };
+  } else {
+    const list = await readJsonFile<PointInfo[]>(FILE_POINTS, []);
+    const record = list.find(p => p.id === id) ?? null;
+    if (!record) return null;
+    await writeJsonFile(FILE_POINTS, list.filter(p => p.id !== id));
+    return record;
+  }
+}
+
+// Cancel a whole group/collective registration by removing every record that
+// shares the same batchId. Returns the number of records removed.
+export async function deletePointBatch(batchId: string): Promise<number> {
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    const res = await (prisma as any).point.deleteMany({ where: { batchId } });
+    return res.count ?? 0;
+  } else {
+    const list = await readJsonFile<PointInfo[]>(FILE_POINTS, []);
+    const remaining = list.filter(p => p.batchId !== batchId);
+    await writeJsonFile(FILE_POINTS, remaining);
+    return list.length - remaining.length;
   }
 }
 

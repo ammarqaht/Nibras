@@ -14,8 +14,68 @@ type Group = { id: number; name: string; stage: string };
 type Point = {
   id: number; registrationId: number; delta: number;
   reason: string; category: string; pointType: string;
+  batchId?: string | null;
   recordedBy: string | null; createdAt: string;
 };
+type LogRow = {
+  key: string; rec: Point; isGroup: boolean; count: number;
+  groupName?: string; batchId?: string | null; createdAt: string;
+};
+type Cat = { key: string; label: string };
+
+// Editable list of categories (add row / edit label / delete row) used inside
+// the categories-management modal for each of the four buckets.
+function CategoryListEditor({
+  title, tone, items, onChange, placeholder, keyPrefix,
+}: {
+  title: string; tone: 'add' | 'deduct'; items: Cat[];
+  onChange: (next: Cat[]) => void; placeholder: string; keyPrefix: string;
+}) {
+  const toneCls = tone === 'add' ? 'text-green-700' : 'text-red-700';
+  return (
+    <div className="space-y-2">
+      <div className="flex justify-between items-center">
+        <h5 className={`font-semibold text-xs ${toneCls}`}>{title}</h5>
+        <button
+          type="button"
+          onClick={() => onChange([...items, { key: `${keyPrefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, label: '' }])}
+          className="btn btn-secondary py-1 px-2 text-[11px] flex items-center gap-1"
+        >
+          <span>➕ إضافة</span>
+        </button>
+      </div>
+      <div className="space-y-2 border p-2.5 rounded-xl bg-cream-50/20 min-h-[70px] max-h-[200px] overflow-y-auto" style={{ borderColor: 'var(--line)' }}>
+        {items.length === 0 ? (
+          <p className="text-[11px] text-ink-400 text-center py-3">لا توجد تصنيفات، أضف تصنيفاً جديداً</p>
+        ) : (
+          items.map((cat, idx) => (
+            <div key={cat.key} className="flex gap-2 items-center">
+              <input
+                type="text"
+                className="field text-xs py-2 px-3 flex-1"
+                placeholder={placeholder}
+                value={cat.label}
+                onChange={e => {
+                  const copy = items.slice();
+                  copy[idx] = { ...copy[idx], label: e.target.value };
+                  onChange(copy);
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => onChange(items.filter((_, i) => i !== idx))}
+                className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                title="حذف"
+              >
+                🗑️
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
 
 const STAGES = ['ابتدائي', 'متوسط', 'ثانوي'] as const;
 type StageName = typeof STAGES[number];
@@ -53,6 +113,7 @@ export default function PointsBoardPage() {
   const { user } = useSupervisor();
   const roles = user?.role ? user.role.split(',').map(r => r.trim()) : [];
   const canAddPoints = roles.length > 0;
+  const canDeletePoints = roles.includes('admin');
   const canToggleVisibility = roles.some(r => ['admin', 'stage_supervisor'].includes(r));
 
   const [students, setStudents] = useState<Student[]>([]);
@@ -73,10 +134,16 @@ export default function PointsBoardPage() {
 
   const [catsOpen, setCatsOpen] = useState(false);
   const [catsSaving, setCatsSaving] = useState(false);
-  const [studentCats, setStudentCats] = useState<{key:string, label:string}[]>([]);
-  const [groupCats, setGroupCats] = useState<{key:string, label:string}[]>([]);
-  const [draftStudentCats, setDraftStudentCats] = useState<{key:string, label:string}[]>([]);
-  const [draftGroupCats, setDraftGroupCats] = useState<{key:string, label:string}[]>([]);
+  // Current saved categories, split by scope (student/group) and operation (add/deduct).
+  const [studentAddCats, setStudentAddCats] = useState<Cat[]>([]);
+  const [studentDeductCats, setStudentDeductCats] = useState<Cat[]>([]);
+  const [groupAddCats, setGroupAddCats] = useState<Cat[]>([]);
+  const [groupDeductCats, setGroupDeductCats] = useState<Cat[]>([]);
+  // Draft copies edited inside the modal before saving.
+  const [draftStudentAdd, setDraftStudentAdd] = useState<Cat[]>([]);
+  const [draftStudentDeduct, setDraftStudentDeduct] = useState<Cat[]>([]);
+  const [draftGroupAdd, setDraftGroupAdd] = useState<Cat[]>([]);
+  const [draftGroupDeduct, setDraftGroupDeduct] = useState<Cat[]>([]);
 
   useEffect(() => {
     setMounted(true);
@@ -109,6 +176,44 @@ export default function PointsBoardPage() {
     } finally { setVisBusy(false); }
   }
 
+  const [deletingKey, setDeletingKey] = useState<string | null>(null);
+
+  async function handleDeleteRow(row: LogRow) {
+    const p = row.rec;
+    const sign = p.delta >= 0 ? `+${p.delta}` : `${p.delta}`;
+    const reasonText = p.reason.replace(' (رصد جماعي للأسرة)', '');
+    const who = row.isGroup
+      ? `المجموعة: ${row.groupName} (${row.count} طالب)`
+      : `الطالب: ${students.find(s => s.id === p.registrationId)?.studentName ?? `#${p.registrationId}`}`;
+    if (!confirm(
+      `إلغاء هذه العملية نهائياً؟\n\n${who}\nالنقاط: ${sign}${row.isGroup ? ' لكل طالب' : ''}\nالسبب: ${reasonText}\n\nسيُحذف السجل ويُخصم من الاجمالي والرصيد معاً.`
+    )) return;
+
+    const url = row.isGroup && row.batchId
+      ? `/api/supervisor/points?batchId=${encodeURIComponent(row.batchId)}`
+      : `/api/supervisor/points?id=${p.id}`;
+
+    setDeletingKey(row.key);
+    try {
+      const r = await fetch(url, { method: 'DELETE' });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) {
+        setPoints(prev =>
+          row.isGroup && row.batchId
+            ? prev.filter(x => x.batchId !== row.batchId)
+            : prev.filter(x => x.id !== p.id)
+        );
+        pushToast('success', 'تم إلغاء العملية وحذف النقاط');
+      } else {
+        pushToast('error', d.error || 'تعذّر حذف السجل');
+      }
+    } catch {
+      pushToast('error', 'حدث خطأ أثناء حذف السجل');
+    } finally {
+      setDeletingKey(null);
+    }
+  }
+
   useEffect(() => {
     Promise.all([
       fetch('/api/supervisor/students?scope=all', { cache: 'no-store' }),
@@ -120,8 +225,10 @@ export default function PointsBoardPage() {
       const grj = await gr.json().catch(() => ({ groups: [] }));
       const prj = await pr.json().catch(() => ({ points: [] }));
       const crj = await cr.json().catch(() => ({}));
-      if (crj.studentCategories) setStudentCats(crj.studentCategories);
-      if (crj.groupCategories) setGroupCats(crj.groupCategories);
+      if (Array.isArray(crj.studentAddCategories)) setStudentAddCats(crj.studentAddCategories);
+      if (Array.isArray(crj.studentDeductCategories)) setStudentDeductCats(crj.studentDeductCategories);
+      if (Array.isArray(crj.groupAddCategories)) setGroupAddCats(crj.groupAddCategories);
+      if (Array.isArray(crj.groupDeductCategories)) setGroupDeductCats(crj.groupDeductCategories);
       const allSt: Student[] = srj.students ?? [];
       setStudents(allSt.filter(s =>
         (s.registrationStatus === 'approved' || s.paymentStatus === 'exempted') &&
@@ -166,17 +273,47 @@ export default function PointsBoardPage() {
     [students, activeStage]
   );
 
-  const stageLog = useMemo(() => {
+  // A single displayed log line. Group/collective registrations that share a
+  // batchId are collapsed into one row shown by the group name.
+  const stageLog = useMemo<LogRow[]>(() => {
+    const inStage = points.filter(p => stageStudentIds.has(p.registrationId));
+
+    // Collapse records that share a batchId into one group row.
+    const batches = new Map<string, Point[]>();
+    const singles: Point[] = [];
+    for (const p of inStage) {
+      if (p.batchId) {
+        if (!batches.has(p.batchId)) batches.set(p.batchId, []);
+        batches.get(p.batchId)!.push(p);
+      } else {
+        singles.push(p);
+      }
+    }
+
+    const rows: LogRow[] = [];
+    for (const p of singles) {
+      rows.push({ key: `p${p.id}`, rec: p, isGroup: false, count: 1, createdAt: p.createdAt });
+    }
+    for (const [batchId, recs] of batches) {
+      const rep = recs[0];
+      const st = studentMap.get(rep.registrationId);
+      const groupName = st?.groupId ? (groupMap.get(st.groupId) ?? 'مجموعة') : 'مجموعة';
+      rows.push({
+        key: `b${batchId}`, rec: rep, isGroup: true, count: recs.length,
+        groupName, batchId, createdAt: rep.createdAt,
+      });
+    }
+
     const q = logSearch.trim().toLowerCase();
-    return [...points]
-      .filter(p => {
-        if (!stageStudentIds.has(p.registrationId)) return false;
+    return rows
+      .filter(r => {
         if (!q) return true;
-        const st = studentMap.get(p.registrationId);
+        if (r.isGroup) return (r.groupName ?? '').toLowerCase().includes(q);
+        const st = studentMap.get(r.rec.registrationId);
         return st?.studentName.toLowerCase().includes(q) || String(st?.membershipNo).includes(q);
       })
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [points, stageStudentIds, logSearch, studentMap]);
+  }, [points, stageStudentIds, logSearch, studentMap, groupMap]);
 
   const visibleLogs = useMemo(() => {
     return stageLog.slice(0, visibleLogsCount);
@@ -217,8 +354,10 @@ export default function PointsBoardPage() {
           )}
           {roles.includes('admin') && (
             <button onClick={() => {
-              setDraftStudentCats([...studentCats]);
-              setDraftGroupCats([...groupCats]);
+              setDraftStudentAdd([...studentAddCats]);
+              setDraftStudentDeduct([...studentDeductCats]);
+              setDraftGroupAdd([...groupAddCats]);
+              setDraftGroupDeduct([...groupDeductCats]);
               setCatsOpen(true);
             }} className="btn btn-ghost text-xs md:text-sm py-1.5 px-2.5 flex items-center gap-1.5 shrink-0 text-ink-700"
               title="تعديل تصنيفات النقاط الفردية والجماعية">
@@ -374,18 +513,24 @@ export default function PointsBoardPage() {
                         <th>السبب</th>
                         <th>بواسطة</th>
                         <th>التاريخ</th>
+                        {canDeletePoints && <th className="text-center">إجراء</th>}
                       </tr>
                     </thead>
                     <tbody>
-                      {visibleLogs.map(p => {
+                      {visibleLogs.map(row => {
+                        const p = row.rec;
                         const st = studentMap.get(p.registrationId);
                         const typeLabel = p.delta < 0 ? (p.pointType === 'deduction' ? 'خصم متجر' : 'خصم نهائي') : (p.pointType === 'collective' ? 'جماعية' : 'فردية');
                         const typeCls = p.delta < 0 ? (p.pointType === 'deduction' ? 'pill-red bg-red-50 text-red-700 border-red-200' : 'pill-red') : (p.pointType === 'collective' ? 'pill-blue' : 'pill-green');
                         return (
-                          <tr key={p.id}>
-                            <td className="font-medium">{st?.studentName ?? `#${p.registrationId}`}</td>
-                            <td className="font-mono text-xs text-ink-400">{st?.membershipNo ? `#${st.membershipNo}` : '—'}</td>
-                            <td className="text-ink-500 text-sm">{st?.groupId ? (groupMap.get(st.groupId) ?? '—') : '—'}</td>
+                          <tr key={row.key}>
+                            <td className="font-medium">
+                              {row.isGroup
+                                ? <span>{row.groupName} <span className="text-[10px] text-ink-400">({row.count} طالب)</span></span>
+                                : (st?.studentName ?? `#${p.registrationId}`)}
+                            </td>
+                            <td className="font-mono text-xs text-ink-400">{row.isGroup ? '—' : (st?.membershipNo ? `#${st.membershipNo}` : '—')}</td>
+                            <td className="text-ink-500 text-sm">{row.isGroup ? row.groupName : (st?.groupId ? (groupMap.get(st.groupId) ?? '—') : '—')}</td>
                             <td>
                               <span className={`pill text-xs ${p.delta >= 0 ? 'pill-green' : 'pill-red'}`} dir="ltr">
                                 {p.delta >= 0 ? `+${p.delta}` : p.delta}
@@ -401,6 +546,19 @@ export default function PointsBoardPage() {
                                 ? new Date(p.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
                                 : p.createdAt.split('T')[0]}
                             </td>
+                            {canDeletePoints && (
+                              <td className="text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteRow(row)}
+                                  disabled={deletingKey === row.key}
+                                  title="إلغاء العملية وحذف النقاط"
+                                  className="text-red-600 hover:text-red-700 disabled:opacity-40 text-xs font-semibold cursor-pointer"
+                                >
+                                  {deletingKey === row.key ? '...' : 'إلغاء'}
+                                </button>
+                              </td>
+                            )}
                           </tr>
                         );
                       })}
@@ -410,12 +568,13 @@ export default function PointsBoardPage() {
 
                 {/* Mobile */}
                 <ul className="lg:hidden divide-y divide-ink-100">
-                  {visibleLogs.map(p => {
+                  {visibleLogs.map(row => {
+                    const p = row.rec;
                     const st = studentMap.get(p.registrationId);
                     const isExp = expandedIds.has(p.id);
                     const typeLabel = p.delta < 0 ? (p.pointType === 'deduction' ? 'خصم متجر' : 'خصم نهائي') : (p.pointType === 'collective' ? 'جماعية' : 'فردية');
                     return (
-                      <li key={p.id} className="py-3 px-4">
+                      <li key={row.key} className="py-3 px-4">
                         <button
                           type="button"
                           className="w-full flex items-center gap-3 text-right"
@@ -423,10 +582,10 @@ export default function PointsBoardPage() {
                         >
                           <div className="flex-1 min-w-0">
                             <div className="text-sm font-bold text-ink-900 truncate">
-                              {st?.studentName ?? `#${p.registrationId}`}
+                              {row.isGroup ? row.groupName : (st?.studentName ?? `#${p.registrationId}`)}
                             </div>
                             <div className="text-[11px] text-ink-400 mt-0.5">
-                              #{st?.membershipNo} · {typeLabel}
+                              {row.isGroup ? `${row.count} طالب` : `#${st?.membershipNo}`} · {typeLabel}
                             </div>
                           </div>
                           <span
@@ -445,7 +604,8 @@ export default function PointsBoardPage() {
                         </button>
                         {isExp && (
                           <div className="mt-2 text-[11px] text-ink-500 space-y-0.5 pr-1 border-r-2 border-ink-100">
-                            <div>الأسرة: {st?.groupId ? (groupMap.get(st.groupId) ?? '—') : '—'}</div>
+                            <div>الأسرة: {row.isGroup ? row.groupName : (st?.groupId ? (groupMap.get(st.groupId) ?? '—') : '—')}</div>
+                            {row.isGroup && <div>النقاط: {p.delta >= 0 ? `+${p.delta}` : p.delta} لكل طالب</div>}
                             <div>السبب: {p.reason.replace(' (رصد جماعي للأسرة)', '')}</div>
                             <div>
                               بواسطة: {p.recordedBy || '—'} ·{' '}
@@ -453,6 +613,18 @@ export default function PointsBoardPage() {
                                 ? new Date(p.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
                                 : p.createdAt.split('T')[0]}
                             </div>
+                            {canDeletePoints && (
+                              <div className="pt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteRow(row)}
+                                  disabled={deletingKey === row.key}
+                                  className="text-red-600 hover:text-red-700 disabled:opacity-40 text-[11px] font-semibold cursor-pointer"
+                                >
+                                  {deletingKey === row.key ? 'جارٍ الحذف…' : 'إلغاء العملية وحذف النقاط'}
+                                </button>
+                              </div>
+                            )}
                           </div>
                         )}
                       </li>
@@ -531,93 +703,55 @@ export default function PointsBoardPage() {
               <button onClick={() => setCatsOpen(false)} className="btn btn-ghost p-1" aria-label="إغلاق">✕</button>
             </div>
             
+            <p className="text-xs text-ink-500 -mt-1">
+              تُستخدم هذه التصنيفات في صفحة رصد النقاط حسب اختيار المشرف: نوع النقاط (فردية / جماعية) وطبيعة العملية (إضافة / خصم).
+            </p>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Individual categories */}
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <h4 className="font-bold text-sm text-ink-800">تصنيفات النقاط الفردية</h4>
-                  <button
-                    type="button"
-                    onClick={() => setDraftStudentCats([...draftStudentCats, { key: `cat_ind_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`, label: '' }])}
-                    className="btn btn-secondary py-1 px-2.5 text-xs flex items-center gap-1"
-                  >
-                    <span>➕ إضافة تصنيف</span>
-                  </button>
-                </div>
-                
-                <div className="space-y-2 border p-3 rounded-xl bg-cream-50/20 max-h-[250px] overflow-y-auto" style={{ borderColor: 'var(--line)' }}>
-                  {draftStudentCats.length === 0 ? (
-                    <p className="text-xs text-ink-400 text-center py-4">لا توجد تصنيفات، أضف تصنيفاً جديداً</p>
-                  ) : (
-                    draftStudentCats.map((cat, idx) => (
-                      <div key={cat.key} className="flex gap-2 items-center">
-                        <input
-                          type="text"
-                          className="field text-xs py-2 px-3 flex-1"
-                          placeholder="اسم التصنيف (مثال: مشاركة)"
-                          value={cat.label}
-                          onChange={e => {
-                            const copy = [...draftStudentCats];
-                            copy[idx].label = e.target.value;
-                            setDraftStudentCats(copy);
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setDraftStudentCats(draftStudentCats.filter((_, i) => i !== idx))}
-                          className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                          title="حذف"
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    ))
-                  )}
-                </div>
+              {/* Individual point categories */}
+              <div className="space-y-3 border rounded-xl p-3.5" style={{ borderColor: 'var(--line)' }}>
+                <h4 className="font-bold text-sm text-ink-800 flex items-center gap-1.5">
+                  <span className="pill pill-green text-[10px]">فردية</span> تصنيفات النقاط الفردية
+                </h4>
+                <CategoryListEditor
+                  title="تصنيفات الإضافة"
+                  tone="add"
+                  items={draftStudentAdd}
+                  onChange={setDraftStudentAdd}
+                  placeholder="اسم التصنيف (مثال: مشاركة)"
+                  keyPrefix="cat_ind_add"
+                />
+                <CategoryListEditor
+                  title="تصنيفات الخصم"
+                  tone="deduct"
+                  items={draftStudentDeduct}
+                  onChange={setDraftStudentDeduct}
+                  placeholder="اسم التصنيف (مثال: متجر)"
+                  keyPrefix="cat_ind_ded"
+                />
               </div>
-              
-              {/* Group/Collective categories */}
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <h4 className="font-bold text-sm text-ink-800">تصنيفات النقاط الجماعية</h4>
-                  <button
-                    type="button"
-                    onClick={() => setDraftGroupCats([...draftGroupCats, { key: `cat_grp_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`, label: '' }])}
-                    className="btn btn-secondary py-1 px-2.5 text-xs flex items-center gap-1"
-                  >
-                    <span>➕ إضافة تصنيف</span>
-                  </button>
-                </div>
-                
-                <div className="space-y-2 border p-3 rounded-xl bg-cream-50/20 max-h-[250px] overflow-y-auto" style={{ borderColor: 'var(--line)' }}>
-                  {draftGroupCats.length === 0 ? (
-                    <p className="text-xs text-ink-400 text-center py-4">لا توجد تصنيفات، أضف تصنيفاً جديداً</p>
-                  ) : (
-                    draftGroupCats.map((cat, idx) => (
-                      <div key={cat.key} className="flex gap-2 items-center">
-                        <input
-                          type="text"
-                          className="field text-xs py-2 px-3 flex-1"
-                          placeholder="اسم التصنيف (مثال: مسابقة)"
-                          value={cat.label}
-                          onChange={e => {
-                            const copy = [...draftGroupCats];
-                            copy[idx].label = e.target.value;
-                            setDraftGroupCats(copy);
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setDraftGroupCats(draftGroupCats.filter((_, i) => i !== idx))}
-                          className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                          title="حذف"
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    ))
-                  )}
-                </div>
+
+              {/* Collective point categories */}
+              <div className="space-y-3 border rounded-xl p-3.5" style={{ borderColor: 'var(--line)' }}>
+                <h4 className="font-bold text-sm text-ink-800 flex items-center gap-1.5">
+                  <span className="pill pill-blue text-[10px]">جماعية</span> تصنيفات النقاط الجماعية
+                </h4>
+                <CategoryListEditor
+                  title="تصنيفات الإضافة"
+                  tone="add"
+                  items={draftGroupAdd}
+                  onChange={setDraftGroupAdd}
+                  placeholder="اسم التصنيف (مثال: مسابقة)"
+                  keyPrefix="cat_grp_add"
+                />
+                <CategoryListEditor
+                  title="تصنيفات الخصم"
+                  tone="deduct"
+                  items={draftGroupDeduct}
+                  onChange={setDraftGroupDeduct}
+                  placeholder="اسم التصنيف (مثال: مخالفة)"
+                  keyPrefix="cat_grp_ded"
+                />
               </div>
             </div>
             
@@ -626,18 +760,25 @@ export default function PointsBoardPage() {
                 type="button"
                 onClick={async () => {
                   setCatsSaving(true);
+                  const clean = (arr: Cat[]) => arr.filter(c => c.label.trim());
+                  const sAdd = clean(draftStudentAdd), sDed = clean(draftStudentDeduct);
+                  const gAdd = clean(draftGroupAdd), gDed = clean(draftGroupDeduct);
                   try {
                     const r = await fetch('/api/supervisor/points-categories', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({
-                        studentCategories: draftStudentCats.filter(c => c.label.trim()),
-                        groupCategories: draftGroupCats.filter(c => c.label.trim())
+                        studentAddCategories: sAdd,
+                        studentDeductCategories: sDed,
+                        groupAddCategories: gAdd,
+                        groupDeductCategories: gDed,
                       })
                     });
                     if (r.ok) {
-                      setStudentCats(draftStudentCats.filter(c => c.label.trim()));
-                      setGroupCats(draftGroupCats.filter(c => c.label.trim()));
+                      setStudentAddCats(sAdd);
+                      setStudentDeductCats(sDed);
+                      setGroupAddCats(gAdd);
+                      setGroupDeductCats(gDed);
                       pushToast('success', 'تم حفظ تصنيفات النقاط بنجاح');
                       setCatsOpen(false);
                     } else {
