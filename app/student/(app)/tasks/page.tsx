@@ -391,10 +391,30 @@ export default function StudentTasks() {
                   value={`${selected.submission?.status === 'approved' ? (selected.submission.grade ?? 0) : selected.task.maxPoints}`} />
               </div>
 
-              {selected.task.imageUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={selected.task.imageUrl} alt="صورة المهمة" className="w-full rounded-xl object-cover max-h-48" />
-              )}
+              {(() => {
+                const parseTaskImages = (urlStr: string | null): string[] => {
+                  if (!urlStr) return [];
+                  if (urlStr.startsWith('[')) {
+                    try { return JSON.parse(urlStr); } catch { return [urlStr]; }
+                  }
+                  if (urlStr.includes('|||')) {
+                    return urlStr.split('|||').filter(Boolean);
+                  }
+                  return [urlStr];
+                };
+                const imgs = parseTaskImages(selected.task.imageUrl);
+                if (imgs.length === 0) return null;
+                return (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {imgs.map((img, idx) => (
+                      <a href={img} target="_blank" rel="noopener noreferrer" key={idx} className="relative aspect-video rounded-xl overflow-hidden border border-ink-150 block hover:scale-[1.02] transition-transform">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={img} alt={`صورة المهمة ${idx + 1}`} className="w-full h-full object-cover" />
+                      </a>
+                    ))}
+                  </div>
+                );
+              })()}
 
               {selected.task.resourceLink && (
                 <a

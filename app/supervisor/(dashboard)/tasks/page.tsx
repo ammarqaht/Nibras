@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import { pushToast } from '@/components/Toast';
 import { useSupervisor } from '@/components/SupervisorShell';
 
-type Student = { id: number; membershipNo: number; studentName: string; stage: string; grade: string; registrationStatus: string; paymentStatus?: string };
+type Student = { id: number; membershipNo: number; studentName: string; stage: string; grade: string; registrationStatus: string; paymentStatus?: string; groupId: number | null };
 type SupervisorUser = { id: number; name: string; email: string };
 type Task = {
   id: string;
@@ -70,6 +70,18 @@ function compressImage(file: File, maxDim = 1200, quality = 0.7): Promise<string
     reader.readAsDataURL(file);
   });
 }
+
+const parseTaskImages = (urlStr: string | null): string[] => {
+  if (!urlStr) return [];
+  if (urlStr.startsWith('[')) {
+    try { return JSON.parse(urlStr); } catch { return [urlStr]; }
+  }
+  if (urlStr.includes('|||')) {
+    return urlStr.split('|||').filter(Boolean);
+  }
+  return [urlStr];
+};
+
 
 function statusLabel(status: string) {
   if (status === 'approved') return 'مقبولة ✓';
@@ -175,6 +187,8 @@ export default function TasksPage() {
   const [scopeSearch, setScopeSearch] = useState('');
   const [scopeSelected, setScopeSelected] = useState<number[]>([]);
   const [scopeBusy, setScopeBusy] = useState(false);
+  const [scopeTab, setScopeTab] = useState<'groups' | 'students'>('groups');
+  const [groups, setGroups] = useState<any[]>([]);
 
   const [statsTask, setStatsTask] = useState<Task | null>(null);
   const [statsSearch, setStatsSearch] = useState('');
@@ -191,33 +205,33 @@ export default function TasksPage() {
   const [addLateAfter, setAddLateAfter] = useState('');
   const [addTimeLimit, setAddTimeLimit] = useState('');
   const [addResourceLink, setAddResourceLink] = useState('');
-  const [addImage, setAddImage] = useState<string | null>(null);
+  const [addImages, setAddImages] = useState<string[]>([]);
   const [addAdmins, setAddAdmins] = useState<string[]>([]);
   const [addTrack, setAddTrack] = useState('عام');
   const [addBusy, setAddBusy] = useState(false);
 
   const [addStages, setAddStages] = useState<string[]>(['ابتدائي', 'متوسط', 'ثانوي']);
   const [editStages, setEditStages] = useState<string[]>([]);
+  const [editTaskImages, setEditTaskImages] = useState<string[]>([]);
 
   // Tracks management states
-  const [tracks, setTracks] = useState<{ name: string; images: string[] }[]>([]);
+  const [tracks, setTracks] = useState<{ name: string }[]>([]);
   const [manageTracksOpen, setManageTracksOpen] = useState(false);
   const [editingTrackIndex, setEditingTrackIndex] = useState<number | null>(null); // null = list, -1 = adding, >=0 = editing index
   const [trackFormName, setTrackFormName] = useState('');
-  const [trackFormImages, setTrackFormImages] = useState<string[]>([]);
   const [saveTracksBusy, setSaveTracksBusy] = useState(false);
 
   const editFileRef = useRef<HTMLInputElement>(null);
-  const trackFileRef = useRef<HTMLInputElement>(null);
 
   async function loadData() {
     try {
-      const [studentsRes, supervisorsRes, tasksRes, submissionsRes, tracksRes] = await Promise.all([
+      const [studentsRes, supervisorsRes, tasksRes, submissionsRes, tracksRes, groupsRes] = await Promise.all([
         fetch('/api/supervisor/students', { cache: 'no-store' }),
         fetch('/api/supervisor/tasks/supervisors', { cache: 'no-store' }),
         fetch('/api/supervisor/tasks', { cache: 'no-store' }),
         fetch('/api/supervisor/submissions', { cache: 'no-store' }),
-        fetch('/api/supervisor/tracks', { cache: 'no-store' })
+        fetch('/api/supervisor/tracks', { cache: 'no-store' }),
+        fetch('/api/supervisor/groups', { cache: 'no-store' })
       ]);
 
       const studentsData = await studentsRes.json().catch(() => ({ students: [] }));
@@ -225,12 +239,14 @@ export default function TasksPage() {
       const tasksData = await tasksRes.json().catch(() => ({ tasks: [] }));
       const submissionsData = await submissionsRes.json().catch(() => ({ submissions: [] }));
       const tracksData = await tracksRes.json().catch(() => ({ tracks: [] }));
+      const groupsData = await groupsRes.json().catch(() => ({ groups: [] }));
 
       setStudents(studentsData.students ?? []);
       setSupervisors(supervisorsData.supervisors ?? []);
       setTasks(tasksData.tasks ?? []);
       setSubmissions(submissionsData.submissions ?? []);
       setTracks(tracksData.tracks ?? []);
+      setGroups(groupsData.groups ?? []);
     } catch (err) {
       console.error('Failed to load data', err);
       pushToast('error', 'فشل تحميل البيانات');
@@ -250,6 +266,7 @@ export default function TasksPage() {
       } else {
         setEditStages(editTask.stage.split(',').map(s => s.trim()));
       }
+      setEditTaskImages(parseTaskImages(editTask.imageUrl));
     }
   }, [editTask]);
 
@@ -320,12 +337,12 @@ export default function TasksPage() {
           startDate: addStartDate || null,
           dueDate: addDeadline,
           submissionMethod: addMethod,
-          lateAfterHours: addLateAfter ? parseInt(addLateAfter, 10) : null,
-          timeLimitHours: addTimeLimit ? parseInt(addTimeLimit, 10) : null,
+          lateAfterHours: addLateAfter ? parseInt(addLateAfter, 10) * 24 : null,
+          timeLimitHours: addTimeLimit ? parseInt(addTimeLimit, 10) * 24 : null,
           assignedAdmins: addAdmins,
           track: addTrack.trim() || 'عام',
           stage: addStages.join(', '),
-          imageUrl: addImage,
+          imageUrl: addImages.length > 0 ? JSON.stringify(addImages) : null,
           resourceLink: addResourceLink.trim() || null,
           visibility: 'all',
           visibleToIds: [],
@@ -336,7 +353,7 @@ export default function TasksPage() {
       if (!res.ok) throw new Error(data.error || 'فشل إضافة المهمة');
 
       pushToast('success', 'تم نشر المهمة بنجاح ✓');
-      setAddTitle(''); setAddDesc(''); setAddPoints('10'); setAddStartDate(''); setAddDeadline(''); setAddMethod('رفع ملف'); setAddLateAfter(''); setAddTimeLimit(''); setAddResourceLink(''); setAddImage(null); setAddAdmins([]); setAddTrack('عام'); setAddStages(['ابتدائي', 'متوسط', 'ثانوي']);
+      setAddTitle(''); setAddDesc(''); setAddPoints('10'); setAddStartDate(''); setAddDeadline(''); setAddMethod('رفع ملف'); setAddLateAfter(''); setAddTimeLimit(''); setAddResourceLink(''); setAddImages([]); setAddAdmins([]); setAddTrack('عام'); setAddStages(['ابتدائي', 'متوسط', 'ثانوي']);
       await loadData();
       setActiveTab('manage');
     } catch (err: any) {
@@ -429,7 +446,7 @@ export default function TasksPage() {
           timeLimitHours: editTask.durationHours,
           lateAfterHours: editTask.lateAfterHours,
           assignedAdmins: editTask.assignedAdmins,
-          imageUrl: editTask.imageUrl,
+          imageUrl: editTaskImages.length > 0 ? JSON.stringify(editTaskImages) : null,
           resourceLink: editTask.resourceLink,
         })
       });
@@ -533,15 +550,22 @@ export default function TasksPage() {
   }, [statsTask, students, submissions]);
 
   async function handleImagePick(e: React.ChangeEvent<HTMLInputElement>, isEdit = false) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
     try {
-      const base64 = await compressImage(file);
-      if (isEdit && editTask) setEditTask({ ...editTask, imageUrl: base64 });
-      else setAddImage(base64);
-      pushToast('info', 'تم تجهيز الصورة بنجاح ✓');
+      const base64s: string[] = [];
+      for (const file of Array.from(files)) {
+        const base64 = await compressImage(file, 1200, 0.7);
+        base64s.push(base64);
+      }
+      if (isEdit) {
+        setEditTaskImages(prev => [...prev, ...base64s]);
+      } else {
+        setAddImages(prev => [...prev, ...base64s]);
+      }
+      pushToast('success', `تم تجهيز ${files.length} صور بنجاح ✓`);
     } catch {
-      pushToast('error', 'تعذر معالجة الصورة');
+      pushToast('error', 'تعذر معالجة بعض الصور');
     }
   }
 
@@ -720,7 +744,7 @@ export default function TasksPage() {
                           </span>
                           {(task.lateAfterHours || task.durationHours) && (
                             <span className="px-2.5 py-1 rounded-full text-[0.72rem] font-bold bg-ink-50 text-ink-500 border border-ink-150 inline-flex items-center gap-1 whitespace-nowrap">
-                              ⏳ {task.lateAfterHours ? `${task.lateAfterHours}س` : '—'} / {task.durationHours ? `${task.durationHours}س` : '—'}
+                              ⏳ {task.lateAfterHours ? `${Math.round(task.lateAfterHours / 24)}ي` : '—'} / {task.durationHours ? `${Math.round(task.durationHours / 24)}ي` : '—'}
                             </span>
                           )}
                         </div>
@@ -983,33 +1007,46 @@ export default function TasksPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="label mb-1.5 font-bold text-ink-800">مدة المهمة (ساعات — بعدها متأخر)</label>
-                    <input type="number" min={1} placeholder="مثال: 24" className="field py-3 rounded-xl bg-ink-50/20 font-mono" value={addLateAfter} onChange={e => setAddLateAfter(e.target.value.replace(/\D/g, ''))} />
+                    <label className="label mb-1.5 font-bold text-ink-800">مدة المهمة (أيام — بعدها متأخر)</label>
+                    <input type="number" min={1} placeholder="مثال: 1" className="field py-3 rounded-xl bg-ink-50/20 font-mono" value={addLateAfter} onChange={e => setAddLateAfter(e.target.value.replace(/\D/g, ''))} />
                     <p className="text-[0.7rem] text-ink-400 mt-1">إذا تجاوزها الطالب لا يستحق التقييم الكامل.</p>
                   </div>
                   <div>
-                    <label className="label mb-1.5 font-bold text-ink-800">مدة الاستحقاق (ساعات — بعدها تُلغى)</label>
-                    <input type="number" min={1} placeholder="مثال: 48" className="field py-3 rounded-xl bg-ink-50/20 font-mono" value={addTimeLimit} onChange={e => setAddTimeLimit(e.target.value.replace(/\D/g, ''))} />
+                    <label className="label mb-1.5 font-bold text-ink-800">مدة الاستحقاق (أيام — بعدها تُلغى)</label>
+                    <input type="number" min={1} placeholder="مثال: 2" className="field py-3 rounded-xl bg-ink-50/20 font-mono" value={addTimeLimit} onChange={e => setAddTimeLimit(e.target.value.replace(/\D/g, ''))} />
                     <p className="text-[0.7rem] text-ink-400 mt-1">إذا تجاوزها الطالب تُلغى عليه ولا يسترد النقاط.</p>
                   </div>
                 </div>
 
                 <div className="pt-6 border-t border-ink-150">
-                  <label className="label mb-3 font-bold text-ink-800">صورة توضيحية للمهمة (اختياري)</label>
+                  <label className="label mb-3 font-bold text-ink-800">صور توضيحية للمهمة (اختياري)</label>
                   <div onClick={() => addFileRef.current?.click()} className="border-2 border-dashed border-ink-200 bg-ink-50/30 hover:bg-cream-100 rounded-2xl p-8 text-center cursor-pointer transition-colors">
-                    <input ref={addFileRef} type="file" accept="image/*" className="hidden" onChange={e => handleImagePick(e, false)} />
-                    {addImage ? (
-                      <div className="space-y-4">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={addImage} alt="Preview" className="max-h-48 mx-auto rounded-xl shadow-sm border border-ink-150" />
-                        <button type="button" className="btn btn-secondary text-sm font-bold bg-white" onClick={(e) => { e.stopPropagation(); setAddImage(null); }}>إزالة الصورة</button>
+                    <input ref={addFileRef} type="file" accept="image/*" multiple className="hidden" onChange={e => handleImagePick(e, false)} />
+                    {addImages.length > 0 ? (
+                      <div className="space-y-4" onClick={e => e.stopPropagation()}>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                          {addImages.map((img, idx) => (
+                            <div key={idx} className="relative aspect-video rounded-xl overflow-hidden border border-ink-150 group shadow-sm bg-white">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={img} alt={`Preview ${idx + 1}`} className="w-full h-full object-cover" />
+                              <button
+                                type="button"
+                                className="absolute top-1.5 right-1.5 bg-red-500 hover:bg-red-700 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-md transition-colors"
+                                onClick={() => setAddImages(prev => prev.filter((_, i) => i !== idx))}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                        <button type="button" className="btn btn-secondary text-sm font-bold bg-white border border-ink-200 px-4 py-2 rounded-xl" onClick={() => addFileRef.current?.click()}>إضافة المزيد من الصور</button>
                       </div>
                     ) : (
                       <div className="text-ink-500 text-[0.95rem] flex flex-col items-center gap-3">
                         <div className="w-12 h-12 bg-white rounded-full shadow-sm flex items-center justify-center text-ink-300 border border-ink-150">
                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
                         </div>
-                        <span className="font-medium">اضغط لاختيار صورة من جهازك للمهمة</span>
+                        <span className="font-medium">اضغط لاختيار صورة أو صور متعددة للمهمة</span>
                       </div>
                     )}
                   </div>
@@ -1197,27 +1234,40 @@ export default function TasksPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="label font-bold text-ink-800 mb-1.5">مدة المهمة (ساعات — بعدها متأخر)</label>
-                    <input type="number" min={1} placeholder="بدون" className="field py-3 rounded-xl bg-ink-50/30 font-mono" value={editTask.lateAfterHours || ''} onChange={e => setEditTask({ ...editTask, lateAfterHours: e.target.value ? parseInt(e.target.value, 10) : null })} />
+                    <label className="label font-bold text-ink-800 mb-1.5">مدة المهمة (أيام — بعدها متأخر)</label>
+                    <input type="number" min={1} placeholder="بدون" className="field py-3 rounded-xl bg-ink-50/30 font-mono" value={editTask.lateAfterHours ? Math.round(editTask.lateAfterHours / 24) : ''} onChange={e => setEditTask({ ...editTask, lateAfterHours: e.target.value ? parseInt(e.target.value, 10) * 24 : null })} />
                   </div>
                   <div>
-                    <label className="label font-bold text-ink-800 mb-1.5">مدة الاستحقاق (ساعات — بعدها تُلغى)</label>
-                    <input type="number" min={1} placeholder="بدون" className="field py-3 rounded-xl bg-ink-50/30 font-mono" value={editTask.durationHours || ''} onChange={e => setEditTask({ ...editTask, durationHours: e.target.value ? parseInt(e.target.value, 10) : null })} />
+                    <label className="label font-bold text-ink-800 mb-1.5">مدة الاستحقاق (أيام — بعدها تُلغى)</label>
+                    <input type="number" min={1} placeholder="بدون" className="field py-3 rounded-xl bg-ink-50/30 font-mono" value={editTask.durationHours ? Math.round(editTask.durationHours / 24) : ''} onChange={e => setEditTask({ ...editTask, durationHours: e.target.value ? parseInt(e.target.value, 10) * 24 : null })} />
                   </div>
                 </div>
 
                 <div className="pt-4 border-t border-ink-150">
-                  <label className="label font-bold text-ink-800 mb-3">تغيير الصورة التوضيحية (اختياري)</label>
+                  <label className="label font-bold text-ink-800 mb-3">الصور التوضيحية للمهمة (اختياري)</label>
                   <div onClick={() => editFileRef.current?.click()} className="border-2 border-dashed border-ink-200 rounded-2xl p-6 text-center cursor-pointer hover:bg-ink-50/50 transition-colors">
-                    <input ref={editFileRef} type="file" accept="image/*" className="hidden" onChange={e => handleImagePick(e, true)} />
-                    {editTask.imageUrl ? (
-                      <div className="space-y-4">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={editTask.imageUrl} alt="Preview" className="max-h-40 mx-auto rounded-xl shadow-sm" />
-                        <button type="button" className="btn bg-white border-ink-200 text-sm font-bold shadow-sm" onClick={(e) => { e.stopPropagation(); setEditTask({ ...editTask, imageUrl: null }); }}>إزالة الصورة</button>
+                    <input ref={editFileRef} type="file" accept="image/*" multiple className="hidden" onChange={e => handleImagePick(e, true)} />
+                    {editTaskImages.length > 0 ? (
+                      <div className="space-y-4" onClick={e => e.stopPropagation()}>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                          {editTaskImages.map((img, idx) => (
+                            <div key={idx} className="relative aspect-video rounded-xl overflow-hidden border border-ink-150 group shadow-sm bg-white">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={img} alt={`Preview ${idx + 1}`} className="w-full h-full object-cover" />
+                              <button
+                                type="button"
+                                className="absolute top-1.5 right-1.5 bg-red-500 hover:bg-red-700 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-md transition-colors"
+                                onClick={() => setEditTaskImages(prev => prev.filter((_, i) => i !== idx))}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                        <button type="button" className="btn btn-secondary text-sm font-bold bg-white border border-ink-200 px-4 py-2 rounded-xl" onClick={() => editFileRef.current?.click()}>إضافة المزيد من الصور</button>
                       </div>
                     ) : (
-                      <div className="text-ink-400 text-sm font-medium">🖼️ اضغط لرفع صورة جديدة للمهمة</div>
+                      <div className="text-ink-400 text-sm font-medium">🖼️ اضغط لرفع صور توضيحية للمهمة</div>
                     )}
                   </div>
                 </div>
@@ -1276,36 +1326,101 @@ export default function TasksPage() {
 
               {scopeTask.visibility === 'restricted' && (
                 <div className="space-y-4 pt-2">
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <div className="relative flex-1 w-full">
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400">🔍</span>
-                      <input type="text" className="field pl-3 pr-9 py-2 text-[0.85rem] rounded-lg w-full" placeholder="ابحث باسم الطالب..." value={scopeSearch} onChange={e => setScopeSearch(e.target.value)} />
-                    </div>
-                    <div className="flex gap-2 w-full sm:w-auto">
-                      <button type="button" className="btn bg-ink-100 hover:bg-ink-200 text-ink-800 py-2 px-3 text-[0.75rem] font-bold rounded-lg flex-1 sm:flex-none" onClick={() => {
-                        const query = scopeSearch.trim().toLowerCase();
-                        const toSelect = students.filter(s => (s.registrationStatus === 'approved' || s.paymentStatus === 'exempted') && (!query || s.studentName.toLowerCase().includes(query))).map(s => s.id);
-                        setScopeSelected(Array.from(new Set([...scopeSelected, ...toSelect])));
-                      }}>
-                        تحديد النتائج
-                      </button>
-                      <button type="button" className="btn bg-white border border-ink-200 text-ink-600 hover:bg-ink-50 py-2 px-3 text-[0.75rem] font-bold rounded-lg flex-1 sm:flex-none" onClick={() => setScopeSelected([])}>
-                        إلغاء التحديد
-                      </button>
-                    </div>
+                  {/* Scope Tabs */}
+                  <div className="flex border-b border-ink-150">
+                    <button
+                      type="button"
+                      onClick={() => setScopeTab('groups')}
+                      className={`flex-1 pb-2.5 text-sm font-bold text-center border-b-2 transition-colors ${scopeTab === 'groups' ? 'border-brand text-brand' : 'border-transparent text-ink-500 hover:text-ink-900'}`}
+                    >
+                      الأسر والمجموعات ({groups.filter(g => {
+                        const gStudents = students.filter(s => s.groupId === g.id && (s.registrationStatus === 'approved' || s.paymentStatus === 'exempted'));
+                        return gStudents.length > 0 && gStudents.every(s => scopeSelected.includes(s.id));
+                      }).length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setScopeTab('students')}
+                      className={`flex-1 pb-2.5 text-sm font-bold text-center border-b-2 transition-colors ${scopeTab === 'students' ? 'border-brand text-brand' : 'border-transparent text-ink-500 hover:text-ink-900'}`}
+                    >
+                      الطلاب الفرديون ({scopeSelected.length})
+                    </button>
                   </div>
 
-                  <div className="max-h-60 overflow-y-auto border border-ink-200 rounded-xl p-3 space-y-2 scroll-soft bg-ink-50/30">
-                    {students.filter(s => (s.registrationStatus === 'approved' || s.paymentStatus === 'exempted') && (!scopeSearch.trim() || s.studentName.toLowerCase().includes(scopeSearch.trim().toLowerCase()))).map(student => {
-                      const checked = scopeSelected.includes(student.id);
-                      return (
-                        <label key={student.id} className="flex items-center gap-3 p-2 hover:bg-white rounded-lg cursor-pointer text-[0.85rem] transition-colors border border-transparent hover:border-ink-150 hover:shadow-sm">
-                          <input type="checkbox" checked={checked} className="accent-brand w-4 h-4" onChange={() => setScopeSelected(checked ? scopeSelected.filter(id => id !== student.id) : [...scopeSelected, student.id])} />
-                          <span className="font-bold text-ink-800">{student.studentName} <span className="text-ink-400 font-normal">({student.stage} - {student.grade})</span></span>
-                        </label>
-                      );
-                    })}
-                  </div>
+                  {scopeTab === 'groups' ? (
+                    <div className="space-y-3">
+                      <div className="text-xs text-ink-400 font-semibold">تحديد أسرة أو عدة أسر لاستهداف جميع طلابها دفعة واحدة:</div>
+                      <div className="max-h-60 overflow-y-auto border border-ink-200 rounded-xl p-3 space-y-2 scroll-soft bg-ink-50/30">
+                        {groups.map(group => {
+                          const gStudents = students.filter(s => s.groupId === group.id && (s.registrationStatus === 'approved' || s.paymentStatus === 'exempted'));
+                          if (gStudents.length === 0) return null;
+                          const allChecked = gStudents.every(s => scopeSelected.includes(s.id));
+                          const someChecked = gStudents.some(s => scopeSelected.includes(s.id)) && !allChecked;
+
+                          return (
+                            <label key={group.id} className="flex items-center gap-3 p-2 hover:bg-white rounded-lg cursor-pointer text-[0.85rem] transition-colors border border-transparent hover:border-ink-150 hover:shadow-sm">
+                              <input
+                                type="checkbox"
+                                checked={allChecked}
+                                ref={el => {
+                                  if (el) el.indeterminate = someChecked;
+                                }}
+                                className="accent-brand w-4 h-4 cursor-pointer"
+                                onChange={() => {
+                                  const gStudentIds = gStudents.map(s => s.id);
+                                  if (allChecked) {
+                                    // Remove all
+                                    setScopeSelected(prev => prev.filter(id => !gStudentIds.includes(id)));
+                                  } else {
+                                    // Add all
+                                    setScopeSelected(prev => Array.from(new Set([...prev, ...gStudentIds])));
+                                  }
+                                }}
+                              />
+                              <span className="font-bold text-ink-800">
+                                {group.name} 
+                                <span className="text-ink-400 font-normal"> ({group.stage} - {gStudents.length} طلاب)</span>
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                        <div className="relative flex-1 w-full">
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400">🔍</span>
+                          <input type="text" className="field pl-3 pr-9 py-2 text-[0.85rem] rounded-lg w-full" placeholder="ابحث باسم الطالب..." value={scopeSearch} onChange={e => setScopeSearch(e.target.value)} />
+                        </div>
+                        <div className="flex gap-2 w-full sm:w-auto">
+                          <button type="button" className="btn bg-ink-100 hover:bg-ink-200 text-ink-800 py-2 px-3 text-[0.75rem] font-bold rounded-lg flex-1 sm:flex-none" onClick={() => {
+                            const query = scopeSearch.trim().toLowerCase();
+                            const toSelect = students.filter(s => (s.registrationStatus === 'approved' || s.paymentStatus === 'exempted') && (!query || s.studentName.toLowerCase().includes(query))).map(s => s.id);
+                            setScopeSelected(Array.from(new Set([...scopeSelected, ...toSelect])));
+                          }}>
+                            تحديد النتائج
+                          </button>
+                          <button type="button" className="btn bg-white border border-ink-200 text-ink-600 hover:bg-ink-50 py-2 px-3 text-[0.75rem] font-bold rounded-lg flex-1 sm:flex-none" onClick={() => setScopeSelected([])}>
+                            إلغاء التحديد
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="max-h-60 overflow-y-auto border border-ink-200 rounded-xl p-3 space-y-2 scroll-soft bg-ink-50/30">
+                        {students.filter(s => (s.registrationStatus === 'approved' || s.paymentStatus === 'exempted') && (!scopeSearch.trim() || s.studentName.toLowerCase().includes(scopeSearch.trim().toLowerCase()))).map(student => {
+                          const checked = scopeSelected.includes(student.id);
+                          return (
+                            <label key={student.id} className="flex items-center gap-3 p-2 hover:bg-white rounded-lg cursor-pointer text-[0.85rem] transition-colors border border-transparent hover:border-ink-150 hover:shadow-sm">
+                              <input type="checkbox" checked={checked} className="accent-brand w-4 h-4" onChange={() => setScopeSelected(checked ? scopeSelected.filter(id => id !== student.id) : [...scopeSelected, student.id])} />
+                              <span className="font-bold text-ink-800">{student.studentName} <span className="text-ink-400 font-normal">({student.stage} - {student.grade})</span></span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                  
                   <div className="text-[0.85rem] text-brand-600 font-extrabold bg-brand-50 border border-brand-100 rounded-lg py-2 px-4 inline-block">
                     تم تحديد: {scopeSelected.length} طالب
                   </div>
@@ -1415,7 +1530,7 @@ export default function TasksPage() {
       {/* MODAL 5: MANAGE TRACKS */}
       {manageTracksOpen && isScientific && (
         <div className="modal-backdrop flex items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto" onClick={() => setManageTracksOpen(false)}>
-          <div className="modal-panel w-[92vw] sm:w-full sm:max-w-2xl rounded-2xl max-h-[85vh] flex flex-col shadow-elevated" onClick={e => e.stopPropagation()}>
+          <div className="modal-panel w-[92vw] sm:w-full sm:max-w-md rounded-2xl max-h-[85vh] flex flex-col shadow-elevated" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 sm:p-5 border-b border-ink-150 bg-ink-50/50 rounded-t-2xl shrink-0">
               <h3 className="text-lg sm:text-xl font-extrabold text-ink-900">⚙️ إدارة وتعديل المسارات</h3>
               <button type="button" className="text-3xl text-ink-400 hover:text-ink-900 leading-none" onClick={() => setManageTracksOpen(false)}>×</button>
@@ -1432,7 +1547,6 @@ export default function TasksPage() {
                       onClick={() => {
                         setEditingTrackIndex(-1);
                         setTrackFormName('');
-                        setTrackFormImages([]);
                       }}
                       className="btn text-white bg-emerald-600 hover:bg-emerald-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm"
                     >
@@ -1447,7 +1561,6 @@ export default function TasksPage() {
                           <span className={`px-2.5 py-1 rounded-full text-[0.72rem] font-bold ${getTrackPillClass(tr.name)}`}>
                             {tr.name}
                           </span>
-                          <span className="text-xs text-ink-400 font-bold">({tr.images?.length || 0} صور)</span>
                         </div>
                         <div className="flex gap-2">
                           <button
@@ -1455,7 +1568,6 @@ export default function TasksPage() {
                             onClick={() => {
                               setEditingTrackIndex(idx);
                               setTrackFormName(tr.name);
-                              setTrackFormImages(tr.images || []);
                             }}
                             className="text-brand hover:bg-brand-50/50 border border-brand-200/50 px-2.5 py-1 rounded-lg text-xs font-bold transition-all"
                           >
@@ -1507,59 +1619,6 @@ export default function TasksPage() {
                     />
                   </div>
 
-                  <div>
-                    <label className="label font-bold text-ink-800 mb-1.5">صور المسار (يمكن إضافة أكثر من صورة)</label>
-                    
-                    {/* Image thumbnails list */}
-                    {trackFormImages.length > 0 && (
-                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 mb-3">
-                        {trackFormImages.map((img, imgIdx) => (
-                          <div key={imgIdx} className="relative aspect-video rounded-xl overflow-hidden border border-ink-200 group">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={img} alt="Track thumbnail" className="w-full h-full object-cover" />
-                            <button
-                              type="button"
-                              onClick={() => setTrackFormImages(prev => prev.filter((_, i) => i !== imgIdx))}
-                              className="absolute top-1 right-1 w-6 h-6 rounded-full bg-nred-600/80 text-white flex items-center justify-center text-xs font-bold opacity-90 hover:bg-nred-700 hover:scale-105 shadow-sm transition-all"
-                              title="حذف الصورة"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Click-to-upload area */}
-                    <div
-                      onClick={() => trackFileRef.current?.click()}
-                      className="border-2 border-dashed border-ink-200 rounded-2xl p-6 text-center cursor-pointer hover:bg-ink-50/50 transition-colors"
-                    >
-                      <input
-                        ref={trackFileRef}
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                        onChange={async (e) => {
-                          const files = e.target.files;
-                          if (!files) return;
-                          for (const file of Array.from(files)) {
-                            try {
-                              const base64 = await compressImage(file, 1200, 0.7); // compress following site's size rules
-                              setTrackFormImages(prev => [...prev, base64]);
-                            } catch {
-                              pushToast('error', 'تعذر معالجة إحدى الصور');
-                            }
-                          }
-                          pushToast('info', 'تمت إضافة ومعالجة الصور بنجاح ✓');
-                        }}
-                      />
-                      <div className="text-ink-400 text-sm font-medium">🖼️ اضغط لرفع صورة أو عدة صور للمسار</div>
-                      <p className="text-[0.7rem] text-ink-400 mt-1">يتم ضغط الصور تلقائياً للامتثال لقواعد الحجم.</p>
-                    </div>
-                  </div>
-
                   <div className="flex justify-end gap-2 pt-2">
                     <button
                       type="button"
@@ -1580,10 +1639,10 @@ export default function TasksPage() {
 
                         if (editingTrackIndex === -1) {
                           // Add
-                          setTracks(prev => [...prev, { name, images: trackFormImages }]);
+                          setTracks(prev => [...prev, { name }]);
                         } else {
                           // Edit
-                          setTracks(prev => prev.map((t, i) => i === editingTrackIndex ? { name, images: trackFormImages } : t));
+                          setTracks(prev => prev.map((t, i) => i === editingTrackIndex ? { name } : t));
                         }
                         setEditingTrackIndex(null);
                       }}
