@@ -921,6 +921,33 @@ export async function createGroup(name: string, stage: string): Promise<GroupInf
   }
 }
 
+export async function updateGroup(id: number, name: string): Promise<GroupInfo | null> {
+  if (hasDatabase) {
+    try {
+      const prisma = getPrisma()!;
+      const updated = await prisma.group.update({
+        where: { id },
+        data: { name }
+      });
+      return {
+        id: updated.id,
+        name: updated.name,
+        stage: updated.stage,
+        createdAt: updated.createdAt.toISOString()
+      };
+    } catch {
+      return null;
+    }
+  } else {
+    const list = await readJsonFile<GroupInfo[]>(FILE_GROUPS, []);
+    const idx = list.findIndex(g => g.id === id);
+    if (idx === -1) return null;
+    list[idx].name = name;
+    await writeJsonFile(FILE_GROUPS, list);
+    return list[idx];
+  }
+}
+
 export async function deleteGroup(id: number): Promise<boolean> {
   if (hasDatabase) {
     try {
@@ -2658,8 +2685,13 @@ export async function getStudentTasksWithSubmissions(registrationId: number, sta
     if (t.visibility === 'specific') {
       return t.visibleToIds.includes(registrationId);
     }
-    // Stage targeting (المرحلة المعنية): empty / 'الكل' means all stages
-    if (t.stage && t.stage !== 'الكل' && stage && t.stage !== stage) return false;
+    // Stage targeting (المرحلة المعنية): empty / 'الكل' means all stages. Supports comma-separated multiple stages.
+    if (t.stage && t.stage !== 'الكل') {
+      const allowedStages = t.stage.split(',').map(s => s.trim());
+      if (stage && !allowedStages.includes(stage) && !allowedStages.includes('الكل')) {
+        return false;
+      }
+    }
     return true;
   });
 

@@ -19,6 +19,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (body.title !== undefined) patch.title = body.title;
     if (body.description !== undefined) patch.description = body.description;
     if (body.track !== undefined) patch.track = body.track;
+    if (body.stage !== undefined) patch.stage = body.stage ? String(body.stage).trim() : null;
     if (body.isActive !== undefined) patch.isActive = Boolean(body.isActive);
     if (body.submissionMethod !== undefined) patch.submissionMethod = body.submissionMethod;
     if (body.imageUrl !== undefined) patch.imageUrl = body.imageUrl;

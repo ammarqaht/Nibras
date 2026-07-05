@@ -15,6 +15,7 @@ type Task = {
   dueDate: string;
   createdAt: string;
   track: string | null;
+  stage: string | null;
   isActive: boolean;
   submissionMethod: string | null;
   durationHours: number | null;
@@ -93,26 +94,42 @@ function statusDotClass(status: string) {
 function statusText(status: string) {
   if (status === 'approved') return 'مقبولة';
   if (status === 'rejected') return 'مردودة';
-  if (status === 'pending') return 'بانتظار المراجعة';
-  if (status === 'missing') return 'لم يسلّم بعد';
-  return status;
+  if (status === 'pending') return 'بانتظار التقييم';
+  return 'لم تسلم';
 }
 
 function getTrackPillClass(track: string | null) {
-  if (track === 'الثقافي' || track === 'ثقافي') return 'bg-yellow-50 text-yellow-700 border border-yellow-200/60';
-  if (track === 'مسار تقني' || track === 'تقني') return 'bg-ncyan-50 text-ncyan-700 border border-ncyan-200/60';
-  if (track === 'الذاكرة الحديدية') return 'bg-purple-50 text-purple-700 border border-purple-200/60';
-  if (track === 'الاجتماعي' || track === 'اجتماعي') return 'bg-emerald-50 text-emerald-700 border border-emerald-200/60';
-  if (track === 'مسار إعلامي' || track === 'إعلامي') return 'bg-ink-100 text-ink-700 border border-ink-200';
-  return 'bg-ink-50 text-ink-600 border border-ink-200';
+  const t = track || 'عام';
+  if (t === 'الثقافي' || t === 'ثقافي') return 'bg-yellow-50 text-yellow-700 border border-yellow-200/60';
+  if (t === 'مسار تقني' || t === 'تقني') return 'bg-ncyan-50 text-ncyan-700 border border-ncyan-200/60';
+  if (t === 'الذاكرة الحديدية') return 'bg-purple-50 text-purple-700 border border-purple-200/60';
+  if (t === 'الاجتماعي' || t === 'اجتماعي') return 'bg-emerald-50 text-emerald-700 border border-emerald-200/60';
+  if (t === 'مسار إعلامي' || t === 'إعلامي') return 'bg-ink-100 text-ink-700 border border-ink-200';
+
+  const TRACK_PALETTE = [
+    'bg-yellow-50 text-yellow-700 border border-yellow-200/60',
+    'bg-ncyan-50 text-ncyan-700 border border-ncyan-200/60',
+    'bg-purple-50 text-purple-700 border border-purple-200/60',
+    'bg-emerald-50 text-emerald-700 border border-emerald-200/60',
+    'bg-pink-50 text-pink-700 border border-pink-200/60',
+    'bg-rose-50 text-rose-700 border border-rose-200/60',
+    'bg-blue-50 text-blue-700 border border-blue-200/60',
+    'bg-indigo-50 text-indigo-700 border border-indigo-200/60',
+    'bg-orange-50 text-orange-700 border border-orange-200/60',
+    'bg-teal-50 text-teal-700 border border-teal-200/60',
+  ];
+  let h = 0;
+  for (let i = 0; i < t.length; i++) h = t.charCodeAt(i) + ((h << 5) - h);
+  return TRACK_PALETTE[Math.abs(h) % TRACK_PALETTE.length];
 }
 
 export default function TasksPage() {
   const { user } = useSupervisor();
   const roles = useMemo(() => (user?.role || '').split(',').map(r => r.trim()), [user]);
-  const isScientific = useMemo(() => roles.includes('scientific_supervisor'), [roles]);
+  const isScientific = useMemo(() => roles.includes('scientific_supervisor') || roles.includes('admin'), [roles]);
   const canGrade = useMemo(() => roles.some(r => ['scientific_supervisor', 'tasks_supervisor', 'admin'].includes(r)), [roles]);
-  const [activeTab, setActiveTab] = useState<'submissions' | 'log' | 'add' | 'manage'>('manage');
+
+  const [activeTab, setActiveTab] = useState<'manage' | 'submissions' | 'log' | 'add'>('manage');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -120,7 +137,7 @@ export default function TasksPage() {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get('tab');
       if (tabParam === 'submissions' || tabParam === 'log' || tabParam === 'add' || tabParam === 'manage') {
-        setActiveTab(tabParam);
+        setActiveTab(tabParam as any);
       }
     }
   }, []);
@@ -130,11 +147,12 @@ export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
 
-  // Search/Filters states
+  // Submissions search/filter states
   const [subSearch, setSubSearch] = useState('');
   const [subTaskFilter, setSubTaskFilter] = useState('');
   const [subAdminFilter, setSubAdminFilter] = useState('');
 
+  // Log filter/sorting states
   const [logSearch, setLogSearch] = useState('');
   const [logTaskFilter, setLogTaskFilter] = useState('');
   const [logAdminFilter, setLogAdminFilter] = useState('');
@@ -178,26 +196,41 @@ export default function TasksPage() {
   const [addTrack, setAddTrack] = useState('عام');
   const [addBusy, setAddBusy] = useState(false);
 
+  const [addStages, setAddStages] = useState<string[]>(['ابتدائي', 'متوسط', 'ثانوي']);
+  const [editStages, setEditStages] = useState<string[]>([]);
+
+  // Tracks management states
+  const [tracks, setTracks] = useState<{ name: string; images: string[] }[]>([]);
+  const [manageTracksOpen, setManageTracksOpen] = useState(false);
+  const [editingTrackIndex, setEditingTrackIndex] = useState<number | null>(null); // null = list, -1 = adding, >=0 = editing index
+  const [trackFormName, setTrackFormName] = useState('');
+  const [trackFormImages, setTrackFormImages] = useState<string[]>([]);
+  const [saveTracksBusy, setSaveTracksBusy] = useState(false);
+
   const editFileRef = useRef<HTMLInputElement>(null);
+  const trackFileRef = useRef<HTMLInputElement>(null);
 
   async function loadData() {
     try {
-      const [studentsRes, supervisorsRes, tasksRes, submissionsRes] = await Promise.all([
+      const [studentsRes, supervisorsRes, tasksRes, submissionsRes, tracksRes] = await Promise.all([
         fetch('/api/supervisor/students', { cache: 'no-store' }),
         fetch('/api/supervisor/tasks/supervisors', { cache: 'no-store' }),
         fetch('/api/supervisor/tasks', { cache: 'no-store' }),
-        fetch('/api/supervisor/submissions', { cache: 'no-store' })
+        fetch('/api/supervisor/submissions', { cache: 'no-store' }),
+        fetch('/api/supervisor/tracks', { cache: 'no-store' })
       ]);
 
       const studentsData = await studentsRes.json().catch(() => ({ students: [] }));
       const supervisorsData = await supervisorsRes.json().catch(() => ({ supervisors: [] }));
       const tasksData = await tasksRes.json().catch(() => ({ tasks: [] }));
       const submissionsData = await submissionsRes.json().catch(() => ({ submissions: [] }));
+      const tracksData = await tracksRes.json().catch(() => ({ tracks: [] }));
 
       setStudents(studentsData.students ?? []);
       setSupervisors(supervisorsData.supervisors ?? []);
       setTasks(tasksData.tasks ?? []);
       setSubmissions(submissionsData.submissions ?? []);
+      setTracks(tracksData.tracks ?? []);
     } catch (err) {
       console.error('Failed to load data', err);
       pushToast('error', 'فشل تحميل البيانات');
@@ -209,6 +242,16 @@ export default function TasksPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (editTask) {
+      if (!editTask.stage || editTask.stage === 'الكل') {
+        setEditStages(['ابتدائي', 'متوسط', 'ثانوي']);
+      } else {
+        setEditStages(editTask.stage.split(',').map(s => s.trim()));
+      }
+    }
+  }, [editTask]);
 
   const pendingSubmissions = useMemo(() => submissions.filter(s => s.status === 'pending'), [submissions]);
   const logSubmissions = useMemo(() => submissions.filter(s => s.status !== 'pending'), [submissions]);
@@ -263,6 +306,7 @@ export default function TasksPage() {
   async function handleAddTask(e: React.FormEvent) {
     e.preventDefault();
     if (!addTitle.trim() || !addDesc.trim() || !addDeadline) return pushToast('error', 'يرجى إدخال جميع الحقول الإلزامية');
+    if (addStages.length === 0) return pushToast('error', 'يرجى اختيار مرحلة مستهدفة واحدة على الأقل');
 
     setAddBusy(true);
     try {
@@ -280,6 +324,7 @@ export default function TasksPage() {
           timeLimitHours: addTimeLimit ? parseInt(addTimeLimit, 10) : null,
           assignedAdmins: addAdmins,
           track: addTrack.trim() || 'عام',
+          stage: addStages.join(', '),
           imageUrl: addImage,
           resourceLink: addResourceLink.trim() || null,
           visibility: 'all',
@@ -291,7 +336,7 @@ export default function TasksPage() {
       if (!res.ok) throw new Error(data.error || 'فشل إضافة المهمة');
 
       pushToast('success', 'تم نشر المهمة بنجاح ✓');
-      setAddTitle(''); setAddDesc(''); setAddPoints('10'); setAddStartDate(''); setAddDeadline(''); setAddMethod('رفع ملف'); setAddLateAfter(''); setAddTimeLimit(''); setAddResourceLink(''); setAddImage(null); setAddAdmins([]); setAddTrack('عام');
+      setAddTitle(''); setAddDesc(''); setAddPoints('10'); setAddStartDate(''); setAddDeadline(''); setAddMethod('رفع ملف'); setAddLateAfter(''); setAddTimeLimit(''); setAddResourceLink(''); setAddImage(null); setAddAdmins([]); setAddTrack('عام'); setAddStages(['ابتدائي', 'متوسط', 'ثانوي']);
       await loadData();
       setActiveTab('manage');
     } catch (err: any) {
@@ -366,6 +411,7 @@ export default function TasksPage() {
   async function handleUpdateTask(e: React.FormEvent) {
     e.preventDefault();
     if (!editTask) return;
+    if (editStages.length === 0) return pushToast('error', 'يرجى اختيار مرحلة مستهدفة واحدة على الأقل');
     setEditBusy(true);
     try {
       const res = await fetch(`/api/supervisor/tasks/${editTask.id}`, {
@@ -378,6 +424,7 @@ export default function TasksPage() {
           startDate: editTask.startDate || null,
           dueDate: editTask.dueDate,
           track: editTask.track?.trim() || 'عام',
+          stage: editStages.join(', '),
           submissionMethod: editTask.submissionMethod,
           timeLimitHours: editTask.durationHours,
           lateAfterHours: editTask.lateAfterHours,
@@ -571,9 +618,20 @@ export default function TasksPage() {
                   </div>
                 </div>
                 {isScientific && (
-                  <button onClick={() => setActiveTab('add')} className="btn bg-ink-900 text-white hover:bg-ink-800 rounded-xl px-5 py-3 font-bold shadow-soft">
-                    + إضافة مهمة جديدة
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        setManageTracksOpen(true);
+                        setEditingTrackIndex(null);
+                      }}
+                      className="btn border border-ink-200 text-ink-700 bg-white hover:bg-ink-50 rounded-xl px-5 py-3 font-bold shadow-soft flex items-center gap-1.5"
+                    >
+                      ⚙️ تعديل وإضافة المسارات
+                    </button>
+                    <button onClick={() => setActiveTab('add')} className="btn bg-ink-900 text-white hover:bg-ink-800 rounded-xl px-5 py-3 font-bold shadow-soft">
+                      + إضافة مهمة جديدة
+                    </button>
+                  </div>
                 )}
               </div>
 
@@ -614,12 +672,9 @@ export default function TasksPage() {
                 <div className="flex gap-3 w-full md:w-auto">
                   <select className="field py-2.5 px-3 text-[0.9rem] flex-1 md:w-48 rounded-xl bg-ink-50/30 border-transparent focus:bg-white" value={manageTrackFilter} onChange={e => setManageTrackFilter(e.target.value)}>
                     <option value="">كل المسارات</option>
-                    <option value="عام">العامة</option>
-                    <option value="الثقافي">الثقافي</option>
-                    <option value="مسار تقني">مسار تقني</option>
-                    <option value="الذاكرة الحديدية">الذاكرة الحديدية</option>
-                    <option value="الاجتماعي">الاجتماعي</option>
-                    <option value="مسار إعلامي">مسار إعلامي</option>
+                    {tracks.map(t => (
+                      <option key={t.name} value={t.name}>{t.name}</option>
+                    ))}
                   </select>
                   <select className="field py-2.5 px-3 text-[0.9rem] flex-1 md:w-48 rounded-xl bg-ink-50/30 border-transparent focus:bg-white" value={manageSortFilter} onChange={e => setManageSortFilter(e.target.value)}>
                     <option value="default">الترتيب الافتراضي</option>
@@ -653,6 +708,9 @@ export default function TasksPage() {
                         <div className="flex flex-wrap items-center gap-1.5 mt-3">
                           <span className={`px-2.5 py-1 rounded-full text-[0.72rem] font-bold ${getTrackPillClass(task.track)}`}>
                             {task.track || 'عام'}
+                          </span>
+                          <span className="px-2.5 py-1 rounded-full text-[0.72rem] font-bold bg-amber-50 text-amber-700 border border-amber-200/60 inline-flex items-center gap-1">
+                            🏷️ {task.stage || 'الكل'}
                           </span>
                           <span className="px-2.5 py-1 rounded-full text-[0.72rem] font-bold bg-brand-50 text-brand-700 border border-brand-200/60 inline-flex items-center gap-1">
                             🎯 {task.maxPoints}
@@ -872,13 +930,36 @@ export default function TasksPage() {
                   <div>
                     <label className="label mb-1.5 font-bold text-ink-800">المسار التدريبي <span className="req">*</span></label>
                     <select className="field py-3 rounded-xl bg-ink-50/20" required value={addTrack} onChange={e => setAddTrack(e.target.value)}>
-                      <option value="عام">عام</option>
-                      <option value="الثقافي">الثقافي</option>
-                      <option value="مسار تقني">مسار تقني</option>
-                      <option value="الذاكرة الحديدية">الذاكرة الحديدية</option>
-                      <option value="الاجتماعي">الاجتماعي</option>
-                      <option value="مسار إعلامي">مسار إعلامي</option>
+                      {tracks.map(t => (
+                        <option key={t.name} value={t.name}>{t.name}</option>
+                      ))}
                     </select>
+                  </div>
+                  <div>
+                    <label className="label mb-1.5 font-bold text-ink-800">المراحل المستهدفة <span className="req">*</span></label>
+                    <div className="flex gap-2">
+                      {['ابتدائي', 'متوسط', 'ثانوي'].map(st => {
+                        const active = addStages.includes(st);
+                        return (
+                          <button
+                            key={st}
+                            type="button"
+                            onClick={() => {
+                              setAddStages(prev =>
+                                prev.includes(st) ? prev.filter(x => x !== st) : [...prev, st]
+                              );
+                            }}
+                            className={`choice flex-1 text-xs font-bold py-2.5 px-3 rounded-xl border text-center transition-all ${
+                              active
+                                ? 'bg-brand text-white border-brand shadow-soft'
+                                : 'bg-ink-50/10 text-ink-600 border-ink-200/60 hover:bg-cream-100'
+                            }`}
+                          >
+                            {st}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                   <div>
                     <label className="label mb-1.5 font-bold text-ink-800">وقت البداية (ظهور المهمة)</label>
@@ -1064,13 +1145,36 @@ export default function TasksPage() {
                   <div>
                     <label className="label font-bold text-ink-800 mb-1.5">المسار التدريبي</label>
                     <select className="field py-3 rounded-xl bg-ink-50/30" required value={editTask.track || 'عام'} onChange={e => setEditTask({ ...editTask, track: e.target.value })}>
-                      <option value="عام">عام</option>
-                      <option value="الثقافي">الثقافي</option>
-                      <option value="مسار تقني">مسار تقني</option>
-                      <option value="الذاكرة الحديدية">الذاكرة الحديدية</option>
-                      <option value="الاجتماعي">الاجتماعي</option>
-                      <option value="مسار إعلامي">مسار إعلامي</option>
+                      {tracks.map(t => (
+                        <option key={t.name} value={t.name}>{t.name}</option>
+                      ))}
                     </select>
+                  </div>
+                  <div>
+                    <label className="label font-bold text-ink-800 mb-1.5">المراحل المستهدفة <span className="req">*</span></label>
+                    <div className="flex gap-2">
+                      {['ابتدائي', 'متوسط', 'ثانوي'].map(st => {
+                        const active = editStages.includes(st);
+                        return (
+                          <button
+                            key={st}
+                            type="button"
+                            onClick={() => {
+                              setEditStages(prev =>
+                                prev.includes(st) ? prev.filter(x => x !== st) : [...prev, st]
+                              );
+                            }}
+                            className={`choice flex-1 text-xs font-bold py-2.5 px-3 rounded-xl border text-center transition-all ${
+                              active
+                                ? 'bg-brand text-white border-brand shadow-soft'
+                                : 'bg-ink-50/10 text-ink-600 border-ink-200/60 hover:bg-cream-100'
+                            }`}
+                          >
+                            {st}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                   <div>
                     <label className="label font-bold text-ink-800 mb-1.5">النقاط (🎯)</label>
@@ -1303,6 +1407,231 @@ export default function TasksPage() {
             </div>
             <div className="flex justify-end p-4 sm:p-5 border-t border-ink-150 bg-ink-50/50 rounded-b-2xl shrink-0">
               <button onClick={() => setStatsTask(null)} className="btn bg-brand-500 hover:bg-brand-600 text-white text-[0.95rem] font-bold rounded-xl py-3 px-8 shadow-brand">إغلاق</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 5: MANAGE TRACKS */}
+      {manageTracksOpen && isScientific && (
+        <div className="modal-backdrop flex items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto" onClick={() => setManageTracksOpen(false)}>
+          <div className="modal-panel w-[92vw] sm:w-full sm:max-w-2xl rounded-2xl max-h-[85vh] flex flex-col shadow-elevated" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-ink-150 bg-ink-50/50 rounded-t-2xl shrink-0">
+              <h3 className="text-lg sm:text-xl font-extrabold text-ink-900">⚙️ إدارة وتعديل المسارات</h3>
+              <button type="button" className="text-3xl text-ink-400 hover:text-ink-900 leading-none" onClick={() => setManageTracksOpen(false)}>×</button>
+            </div>
+            
+            <div className="p-4 sm:p-5 flex-1 overflow-y-auto scroll-soft space-y-4">
+              {editingTrackIndex === null ? (
+                // Track List View
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-ink-500 font-bold">المسارات الحالية ({tracks.length})</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingTrackIndex(-1);
+                        setTrackFormName('');
+                        setTrackFormImages([]);
+                      }}
+                      className="btn text-white bg-emerald-600 hover:bg-emerald-700 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm"
+                    >
+                      + إضافة مسار جديد
+                    </button>
+                  </div>
+
+                  <div className="divide-y divide-ink-150 border border-ink-150 rounded-xl bg-white overflow-hidden shadow-soft">
+                    {tracks.map((tr, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-3.5 hover:bg-ink-50/20">
+                        <div className="flex items-center gap-3">
+                          <span className={`px-2.5 py-1 rounded-full text-[0.72rem] font-bold ${getTrackPillClass(tr.name)}`}>
+                            {tr.name}
+                          </span>
+                          <span className="text-xs text-ink-400 font-bold">({tr.images?.length || 0} صور)</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingTrackIndex(idx);
+                              setTrackFormName(tr.name);
+                              setTrackFormImages(tr.images || []);
+                            }}
+                            className="text-brand hover:bg-brand-50/50 border border-brand-200/50 px-2.5 py-1 rounded-lg text-xs font-bold transition-all"
+                          >
+                            تعديل
+                          </button>
+                          {tr.name !== 'عام' && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (confirm(`هل أنت متأكد من حذف مسار "${tr.name}"؟`)) {
+                                  setTracks(prev => prev.filter((_, i) => i !== idx));
+                                }
+                              }}
+                              className="text-nred-600 hover:bg-nred-50 border border-nred-200 px-2.5 py-1 rounded-lg text-xs font-bold transition-all"
+                            >
+                              حذف
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                // Track Add/Edit Form View
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between border-b border-ink-150 pb-2">
+                    <h4 className="text-sm font-bold text-ink-800">
+                      {editingTrackIndex === -1 ? 'إضافة مسار جديد' : `تعديل مسار: ${tracks[editingTrackIndex]?.name}`}
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => setEditingTrackIndex(null)}
+                      className="text-xs text-ink-500 hover:underline"
+                    >
+                      ← العودة للقائمة
+                    </button>
+                  </div>
+
+                  <div>
+                    <label className="label font-bold text-ink-800 mb-1.5">اسم المسار <span className="req">*</span></label>
+                    <input
+                      type="text"
+                      className="field py-3 rounded-xl bg-ink-50/30"
+                      required
+                      placeholder="مثال: مسار تقني..."
+                      value={trackFormName}
+                      onChange={e => setTrackFormName(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="label font-bold text-ink-800 mb-1.5">صور المسار (يمكن إضافة أكثر من صورة)</label>
+                    
+                    {/* Image thumbnails list */}
+                    {trackFormImages.length > 0 && (
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 mb-3">
+                        {trackFormImages.map((img, imgIdx) => (
+                          <div key={imgIdx} className="relative aspect-video rounded-xl overflow-hidden border border-ink-200 group">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={img} alt="Track thumbnail" className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => setTrackFormImages(prev => prev.filter((_, i) => i !== imgIdx))}
+                              className="absolute top-1 right-1 w-6 h-6 rounded-full bg-nred-600/80 text-white flex items-center justify-center text-xs font-bold opacity-90 hover:bg-nred-700 hover:scale-105 shadow-sm transition-all"
+                              title="حذف الصورة"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Click-to-upload area */}
+                    <div
+                      onClick={() => trackFileRef.current?.click()}
+                      className="border-2 border-dashed border-ink-200 rounded-2xl p-6 text-center cursor-pointer hover:bg-ink-50/50 transition-colors"
+                    >
+                      <input
+                        ref={trackFileRef}
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={async (e) => {
+                          const files = e.target.files;
+                          if (!files) return;
+                          for (const file of Array.from(files)) {
+                            try {
+                              const base64 = await compressImage(file, 1200, 0.7); // compress following site's size rules
+                              setTrackFormImages(prev => [...prev, base64]);
+                            } catch {
+                              pushToast('error', 'تعذر معالجة إحدى الصور');
+                            }
+                          }
+                          pushToast('info', 'تمت إضافة ومعالجة الصور بنجاح ✓');
+                        }}
+                      />
+                      <div className="text-ink-400 text-sm font-medium">🖼️ اضغط لرفع صورة أو عدة صور للمسار</div>
+                      <p className="text-[0.7rem] text-ink-400 mt-1">يتم ضغط الصور تلقائياً للامتثال لقواعد الحجم.</p>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditingTrackIndex(null)}
+                      className="btn bg-white border border-ink-200 hover:bg-ink-50 text-ink-800 text-xs font-bold py-2 px-4 rounded-xl"
+                    >
+                      إلغاء
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const name = trackFormName.trim();
+                        if (!name) return pushToast('error', 'يرجى إدخال اسم المسار');
+                        
+                        // Check duplicate name (except current index)
+                        const isDup = tracks.some((t, i) => t.name === name && i !== editingTrackIndex);
+                        if (isDup) return pushToast('error', 'هناك مسار آخر بنفس الاسم');
+
+                        if (editingTrackIndex === -1) {
+                          // Add
+                          setTracks(prev => [...prev, { name, images: trackFormImages }]);
+                        } else {
+                          // Edit
+                          setTracks(prev => prev.map((t, i) => i === editingTrackIndex ? { name, images: trackFormImages } : t));
+                        }
+                        setEditingTrackIndex(null);
+                      }}
+                      className="btn bg-brand hover:bg-brand/90 text-white text-xs font-bold py-2 px-4 rounded-xl shadow-soft"
+                    >
+                      حفظ المسار
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 p-4 sm:p-5 border-t border-ink-150 bg-ink-50/50 rounded-b-2xl shrink-0">
+              <button
+                type="button"
+                onClick={() => setManageTracksOpen(false)}
+                className="btn bg-white text-ink-700 border border-ink-200 hover:bg-ink-50 transition-colors text-[0.95rem] font-bold rounded-xl py-3 px-6"
+              >
+                إلغاء
+              </button>
+              {editingTrackIndex === null && (
+                <button
+                  type="button"
+                  disabled={saveTracksBusy}
+                  onClick={async () => {
+                    setSaveTracksBusy(true);
+                    try {
+                      const res = await fetch('/api/supervisor/tracks', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ tracks })
+                      });
+                      const data = await res.json();
+                      if (!res.ok) throw new Error(data.error || 'فشل حفظ التغييرات');
+                      pushToast('success', 'تم حفظ وتحديث المسارات بنجاح ✓');
+                      setManageTracksOpen(false);
+                      loadData();
+                    } catch (err: any) {
+                      pushToast('error', err.message || 'تعذر الاتصال بالخادم');
+                    } finally {
+                      setSaveTracksBusy(false);
+                    }
+                  }}
+                  className="btn bg-emerald-600 hover:bg-emerald-700 border-transparent text-white text-[0.95rem] font-bold shadow-soft rounded-xl py-3 px-8"
+                >
+                  {saveTracksBusy ? 'جارٍ الحفظ…' : 'حفظ التغييرات النهائية ✓'}
+                </button>
+              )}
             </div>
           </div>
         </div>

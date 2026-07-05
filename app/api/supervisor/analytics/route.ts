@@ -145,7 +145,7 @@ export async function GET(req: NextRequest) {
       const late    = day.filter((a: any) => a.status === 'late').length;
       const excused = day.filter((a: any) => a.status === 'excused').length;
       return { date, label: weekLabel(date), present, absent, late, excused,
-        rate: (present + absent) > 0 ? Math.round(present / (present + absent) * 100) : 0 };
+        rate: (present + late + absent) > 0 ? Math.round((present + late) / (present + late + absent) * 100) : 0 };
     });
 
     // By stage last 14 days
@@ -159,7 +159,7 @@ export async function GET(req: NextRequest) {
         const late    = day.filter((a: any) => a.status === 'late').length;
         const excused = day.filter((a: any) => a.status === 'excused').length;
         return { date, label: weekLabel(date), present, absent, late, excused,
-          rate: (present + absent) > 0 ? Math.round(present / (present + absent) * 100) : 0 };
+          rate: (present + late + absent) > 0 ? Math.round((present + late) / (present + late + absent) * 100) : 0 };
       });
     }
 
@@ -167,8 +167,8 @@ export async function GET(req: NextRequest) {
     const last7Dates = last14Dates.slice(-7);
     const stageAvg7 = STAGES.map((stage) => {
       const rows = last14ByStage[stage].slice(-7);
-      const totalPresent = rows.reduce((s, r) => s + r.present, 0);
-      const totalAll = rows.reduce((s, r) => s + r.present + r.absent, 0);
+      const totalPresent = rows.reduce((s, r) => s + r.present + r.late, 0);
+      const totalAll = rows.reduce((s, r) => s + r.present + r.late + r.absent, 0);
       return { stage, avg: totalAll > 0 ? Math.round(totalPresent / totalAll * 100) : 0 };
     });
 
@@ -252,7 +252,7 @@ export async function GET(req: NextRequest) {
     // Top 5 most present students — per stage
     const presentByStudent: Record<number, number> = {};
     for (const a of attendance) {
-      if (a.status === 'present') presentByStudent[a.registrationId] = (presentByStudent[a.registrationId] || 0) + 1;
+      if (a.status === 'present' || a.status === 'late') presentByStudent[a.registrationId] = (presentByStudent[a.registrationId] || 0) + 1;
     }
     const top5MostPresentPerStage: Record<string, any[]> = {};
     for (const stage of STAGES) {

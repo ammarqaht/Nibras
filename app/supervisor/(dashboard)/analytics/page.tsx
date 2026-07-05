@@ -163,7 +163,7 @@ function GroupedAttendanceBars({
   ) as Record<string, DayRow[]>;
 
   const maxVal = Math.max(
-    ...last7Overall.map(d => d.present + d.absent),
+    ...last7Overall.map(d => d.present + d.late + d.absent),
     1
   );
   const chartH = 110;
@@ -173,8 +173,8 @@ function GroupedAttendanceBars({
       <div className="flex items-end gap-2">
         {last7Overall.map((day, di) => {
           const isToday = di === last7Overall.length - 1;
-          const totalPresent = day.present;
-          const stageRows = STAGES.map(s => last7ByStage[s]?.[di] ?? { present: 0, absent: 0 });
+          const totalPresent = day.present + day.late;
+          const stageRows = STAGES.map(s => last7ByStage[s]?.[di] ?? { present: 0, late: 0, absent: 0 });
 
           return (
             <div key={day.date} className="flex-1 flex flex-col items-center group relative">
@@ -185,16 +185,16 @@ function GroupedAttendanceBars({
               {/* tooltip */}
               <div className="absolute bottom-full mb-1 bg-gray-800 text-white text-xs rounded-lg px-2 py-1.5 opacity-0 group-hover:opacity-100 transition pointer-events-none whitespace-nowrap z-20 text-center" style={{ direction:'rtl' }}>
                 <div className="font-semibold mb-0.5">{getDayName(day.date)} — {day.label}</div>
-                <div>حاضر {totalPresent} · غائب {day.absent}</div>
+                <div>حضور {totalPresent} · غائب {day.absent}</div>
                 {STAGES.map((s, si) => (
-                  <div key={s} style={{ color: STAGE_COLOR[s] }}>{s}: {stageRows[si].present}</div>
+                  <div key={s} style={{ color: STAGE_COLOR[s] }}>{s}: {stageRows[si].present + stageRows[si].late}</div>
                 ))}
               </div>
               {/* 3 bars */}
               <div className="w-full flex items-end gap-0.5" style={{ height: chartH }}>
                 {STAGES.map((stage, si) => {
                   const r = stageRows[si];
-                  const h = r.present > 0 ? Math.max(Math.round((r.present / maxVal) * chartH), 4) : 0;
+                  const h = (r.present + r.late) > 0 ? Math.max(Math.round(((r.present + r.late) / maxVal) * chartH), 4) : 0;
                   return (
                     <div key={stage} className="flex-1 rounded-t transition-all duration-500"
                       style={{ height: h, backgroundColor: isToday ? STAGE_COLOR[stage] : STAGE_COLOR[stage]+'88', alignSelf:'flex-end' }} />
@@ -611,8 +611,8 @@ export default function AnalyticsPage() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4 pt-4 border-t border-gray-100">
               {(() => {
                 const last7 = att.last14Overall.slice(-7);
-                const tp = last7.reduce((s,d)=>s+d.present,0);
-                const ta = last7.reduce((s,d)=>s+d.present+d.absent,0);
+                const tp = last7.reduce((s,d)=>s+d.present+d.late,0);
+                const ta = last7.reduce((s,d)=>s+d.present+d.late+d.absent,0);
                 return (
                   <div className="rounded-xl bg-gray-50 p-3 text-center">
                     <p className="text-xs text-gray-400 mb-1">متوسط 7 أيام</p>

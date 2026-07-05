@@ -58,6 +58,8 @@ export default function GroupsPage() {
   const [stageFilter, setStageFilter] = useState('');
   const [selectedGroups, setSelectedGroups] = useState<Record<number, number>>({});
   const [selectedGroupModal, setSelectedGroupModal] = useState<Group | null>(null);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editNameVal, setEditNameVal] = useState('');
 
   const [adminStageTab, setAdminStageTab] = useState<string>(isStage && supervisorStage ? supervisorStage : 'ابتدائي');
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
@@ -119,15 +121,19 @@ export default function GroupsPage() {
     const groupStudents = students.filter((s) => s.groupId === gId);
     if (groupStudents.length === 0) return 0;
     const groupPoints = points.filter(p =>
-      p.reason.endsWith('(رصد جماعي للأسرة)') &&
+      (p.pointType === 'collective' || p.reason.endsWith('(رصد جماعي للأسرة)')) &&
       groupStudents.some(s => s.id === p.registrationId)
     );
-    const uniqueEvents = new Map<string, number>();
+    const seen = new Set<string>();
+    let total = 0;
     groupPoints.forEach(p => {
-      const key = `${p.reason}-${p.delta}-${p.createdAt}`;
-      uniqueEvents.set(key, p.delta);
+      const key = `${p.reason}__${p.delta}__${(p.createdAt || '').slice(0, 16)}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        total += p.delta;
+      }
     });
-    return Array.from(uniqueEvents.values()).reduce((sum, d) => sum + d, 0);
+    return total;
   };
 
   async function create(e: React.FormEvent) {
@@ -200,6 +206,31 @@ export default function GroupsPage() {
       setShowAddStudents(false);
       setCheckedAddStudentIds([]);
       load();
+    }
+  }
+
+  async function handleUpdateGroupName(id: number, newName: string) {
+    setBusy(true);
+    try {
+      const r = await fetch('/api/supervisor/groups', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, name: newName })
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        pushToast('error', j.error ?? 'فشل تعديل اسم المجموعة');
+      } else {
+        pushToast('success', 'تم تعديل اسم المجموعة بنجاح');
+        if (selectedGroupModal && selectedGroupModal.id === id) {
+          setSelectedGroupModal({ ...selectedGroupModal, name: newName });
+        }
+        load();
+      }
+    } catch {
+      pushToast('error', 'فشل تعديل اسم المجموعة');
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -452,8 +483,10 @@ export default function GroupsPage() {
 
   const activeGroupStudents = useMemo(() => {
     if (!activeGroup) return [];
-    return students.filter(s => s.groupId === activeGroup.id);
-  }, [activeGroup, students]);
+    return students
+      .filter(s => s.groupId === activeGroup.id)
+      .sort((a, b) => getStudentPoints(b.id) - getStudentPoints(a.id));
+  }, [activeGroup, students, studentPointsMap]);
 
   const activeTotalPoints = useMemo(() => {
     if (!activeGroup) return 0;
@@ -787,9 +820,27 @@ export default function GroupsPage() {
                         <span className="pill pill-green font-bold text-[11px]">{getGroupPoints(g.id)} نقطة</span>
                       </div>
                       {canManageGroups && (
-                        <button onClick={(e) => { e.stopPropagation(); deleteGroup(g.id); }} className="text-red-500 hover:text-red-750 p-1 flex items-center justify-center shrink-0" title="حذف المجموعة">
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /></svg>
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const newName = window.prompt("تعديل اسم المجموعة:", g.name);
+                              if (newName && newName.trim() && newName.trim() !== g.name) {
+                                handleUpdateGroupName(g.id, newName.trim());
+                              }
+                            }}
+                            className="text-ink-400 hover:text-brand p-1 flex items-center justify-center shrink-0"
+                            title="تعديل اسم المجموعة"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                            </svg>
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); deleteGroup(g.id); }} className="text-red-500 hover:text-red-750 p-1 flex items-center justify-center shrink-0" title="حذف المجموعة">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /></svg>
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1168,7 +1219,60 @@ export default function GroupsPage() {
             <div className="p-5 border-b border-ink-200 bg-ink-50">
               <div className="flex justify-between items-start">
                 <div className="space-y-1 min-w-0">
-                  <h3 className="text-base font-bold text-ink-900 truncate">{selectedGroupModal.name}</h3>
+                  {isEditingName ? (
+                    <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                      <input
+                        type="text"
+                        className="field py-1 px-2.5 text-xs font-bold w-48 border border-brand bg-white rounded-lg"
+                        value={editNameVal}
+                        onChange={e => setEditNameVal(e.target.value)}
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (!editNameVal.trim()) return;
+                          await handleUpdateGroupName(selectedGroupModal.id, editNameVal.trim());
+                          setIsEditingName(false);
+                        }}
+                        className="bg-brand text-white text-[11px] font-bold py-1 px-2.5 rounded-lg shadow-sm hover:opacity-90 cursor-pointer"
+                      >
+                        حفظ
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsEditingName(false);
+                        }}
+                        className="bg-white border border-ink-300 text-ink-600 text-[11px] font-bold py-1 px-2.5 rounded-lg hover:bg-ink-50 cursor-pointer"
+                      >
+                        إلغاء
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="text-base font-bold text-ink-900 truncate">{selectedGroupModal.name}</h3>
+                      {canManageGroups && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsEditingName(true);
+                            setEditNameVal(selectedGroupModal.name);
+                          }}
+                          className="text-ink-400 hover:text-brand transition-colors p-1 flex items-center justify-center cursor-pointer"
+                          title="تعديل الاسم"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  )}
                   <div className="flex flex-wrap items-center gap-2 text-sm text-ink-500">
                     <span className="pill pill-gray text-xs">{selectedGroupModal.stage}</span>
                     <span>•</span>

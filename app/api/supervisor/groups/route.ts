@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { getGroups, createGroup, deleteGroup, getSupervisorByEmail, getAccessibleGroupIds } from '@/lib/services';
+import { getGroups, createGroup, updateGroup, deleteGroup, getSupervisorByEmail, getAccessibleGroupIds } from '@/lib/services';
 
 export async function GET(req: NextRequest) {
   try {
@@ -98,5 +98,41 @@ export async function DELETE(req: NextRequest) {
   } catch (error) {
     console.error('groups DELETE error', error);
     return NextResponse.json({ error: 'حدث خطأ أثناء حذف المجموعة' }, { status: 500 });
+  }
+}
+
+export async function PUT(req: NextRequest) {
+  try {
+    const session = getSession(req);
+    if (!session) {
+      return NextResponse.json({ error: 'غير مصرح بالدخول' }, { status: 401 });
+    }
+
+    const supervisor = await getSupervisorByEmail(session.email);
+    if (!supervisor) {
+      return NextResponse.json({ error: 'حساب غير موجود' }, { status: 401 });
+    }
+
+    const roles = supervisor.role.split(',').map(r => r.trim());
+    const canManageGroups = roles.includes('stage_supervisor') || roles.includes('admin');
+    if (!canManageGroups) {
+      return NextResponse.json({ error: 'غير مصرح لك بإدارة المجموعات' }, { status: 403 });
+    }
+
+    const body = await req.json();
+    const { id, name } = body;
+    if (!id || !name) {
+      return NextResponse.json({ error: 'البيانات غير كاملة' }, { status: 400 });
+    }
+
+    const updated = await updateGroup(Number(id), name.trim());
+    if (!updated) {
+      return NextResponse.json({ error: 'المجموعة غير موجودة' }, { status: 444 });
+    }
+
+    return NextResponse.json({ success: true, group: updated });
+  } catch (error) {
+    console.error('groups PUT error', error);
+    return NextResponse.json({ error: 'حدث خطأ أثناء تعديل المجموعة' }, { status: 500 });
   }
 }

@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'غير مصرح لك بإنشاء المهام' }, { status: 403 });
     }
     const body = await req.json();
-    const { title, description, maxPoints, dueDate, track, submissionMethod, timeLimitHours, lateAfterHours, assignedAdmins, imageUrl, resourceLink, visibility, visibleToIds } = body;
+    const { title, description, maxPoints, dueDate, track, stage, submissionMethod, timeLimitHours, lateAfterHours, assignedAdmins, imageUrl, resourceLink, visibility, visibleToIds } = body;
 
     if (!title || !description || !maxPoints || !dueDate) {
       return NextResponse.json({ error: 'البيانات غير كاملة' }, { status: 400 });
@@ -68,6 +68,7 @@ export async function POST(req: NextRequest) {
       startDate: body.startDate || null,
       dueDate: new Date(dueDate).toISOString(),
       track: track ? track.trim() : 'عام',
+      stage: stage ? String(stage).trim() : null,
       isActive: true,
       submissionMethod: submissionMethod || 'رفع ملف',
       durationHours: timeLimitHours ? parseInt(timeLimitHours, 10) : null,
