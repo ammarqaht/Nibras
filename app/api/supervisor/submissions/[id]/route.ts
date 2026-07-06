@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { updateSubmission, deleteSubmission, getSubmissionById, createNotification } from '@/lib/services';
+import { updateSubmission, deleteSubmission, getSubmissionById, getTasks, createNotification } from '@/lib/services';
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -9,23 +9,32 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: 'غير مصرح بالدخول' }, { status: 401 });
     }
 
-    // Only scientific_supervisor, tasks_supervisor, or admin can grade/modify submissions
-    const roles = (session.role || '').split(',').map((r: string) => r.trim());
-    const canGrade = roles.some(r => ['scientific_supervisor', 'tasks_supervisor', 'admin'].includes(r));
-    if (!canGrade) {
-      return NextResponse.json({ error: 'تصحيح المهام مخصص لمشرف العلمية أو مشرف المهام فقط' }, { status: 403 });
-    }
-
     const { id } = await params;
     const body = await req.json();
+
+    // Fetch existing submission to detect status change and get student/task info
+    const existing = await getSubmissionById(id);
+
+    // Grading roles (scientific/tasks/admin) may grade any submission. Any other
+    // supervisor may grade a submission only if its task is assigned to them
+    // (assignedAdmins empty = open to all, otherwise must include their id).
+    const roles = (session.role || '').split(',').map((r: string) => r.trim());
+    let canGrade = roles.some(r => ['scientific_supervisor', 'tasks_supervisor', 'admin'].includes(r));
+    if (!canGrade && existing) {
+      const task = (await getTasks()).find(t => t.id === existing.taskId);
+      const assigned = (task?.assignedAdmins ?? []).map(String);
+      if (task && (assigned.length === 0 || assigned.includes(String(session.id)))) {
+        canGrade = true;
+      }
+    }
+    if (!canGrade) {
+      return NextResponse.json({ error: 'لا تملك صلاحية تصحيح هذه المهمة' }, { status: 403 });
+    }
 
     // Rejecting a submission requires a reason for the student
     if (body.status === 'rejected' && !String(body.feedback ?? '').trim()) {
       return NextResponse.json({ error: 'يجب إضافة سبب رد المهمة' }, { status: 400 });
     }
-
-    // Fetch existing submission to detect status change and get student/task info
-    const existing = await getSubmissionById(id);
 
     const patch: any = {};
     if (body.status !== undefined) patch.status = body.status;

@@ -802,23 +802,13 @@ export async function deleteAttendancePointsByDate(registrationId: number, date:
 }
 
 // ==================== POINTS SERVICES ====================
+// Returns ALL point records. Points are cumulative (leaderboard totals, the
+// spendable balance, the store) so they must never be auto-deleted — doing so
+// silently shrinks totals and makes the supervisor view disagree with the
+// student view (which reads the same records via getStudentPoints).
 export async function getPoints(): Promise<PointInfo[]> {
-  const fiveDaysAgo = new Date();
-  fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
-
   if (hasDatabase) {
     const prisma = getPrisma()!;
-    try {
-      await prisma.point.deleteMany({
-        where: {
-          createdAt: {
-            lt: fiveDaysAgo
-          }
-        }
-      });
-    } catch (err) {
-      console.warn("Failed to clean up old points:", err);
-    }
     const list = await prisma.point.findMany({
       orderBy: { createdAt: 'desc' }
     });
@@ -837,11 +827,7 @@ export async function getPoints(): Promise<PointInfo[]> {
     }));
   } else {
     const list = await readJsonFile<PointInfo[]>(FILE_POINTS, []);
-    const filtered = list.filter(p => new Date(p.createdAt) >= fiveDaysAgo);
-    if (filtered.length !== list.length) {
-      await writeJsonFile(FILE_POINTS, filtered);
-    }
-    return filtered;
+    return [...list].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
   }
 }
 
@@ -2664,7 +2650,16 @@ export async function getStudentByCredentials(membershipNo: number, nationalId: 
 export async function getStudentScheduleToday(stage: string): Promise<ScheduleInfo[]> {
   const schedules = await getSchedules();
   const today = new Date().toISOString().split('T')[0];
-  return schedules.filter(s => s.date === today && (s.stage === stage || s.stage === 'الكل'));
+  return schedules.filter(s => s.date === today && scheduleTargetsStage(s.stage, stage));
+}
+
+// A schedule item may target one stage, several comma-separated stages, or "الكل".
+// Returns true when the given student stage is covered by the item's stage field.
+export function scheduleTargetsStage(itemStage: string | null | undefined, studentStage: string): boolean {
+  const raw = (itemStage ?? '').trim();
+  if (!raw || raw === 'الكل') return true;
+  const stages = raw.split(',').map(s => s.trim()).filter(Boolean);
+  return stages.length === 0 || stages.includes(studentStage);
 }
 
 export async function getStudentPoints(registrationId: number): Promise<PointInfo[]> {

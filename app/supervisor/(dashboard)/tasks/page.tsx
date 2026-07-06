@@ -139,7 +139,11 @@ export default function TasksPage() {
   const { user } = useSupervisor();
   const roles = useMemo(() => (user?.role || '').split(',').map(r => r.trim()), [user]);
   const isScientific = useMemo(() => roles.includes('scientific_supervisor') || roles.includes('admin'), [roles]);
-  const canGrade = useMemo(() => roles.some(r => ['scientific_supervisor', 'tasks_supervisor', 'admin'].includes(r)), [roles]);
+  // Admins/scientific see and grade all submissions; other supervisors only
+  // receive submissions for tasks assigned to them and may grade those. Since
+  // the submissions list is already scoped server-side, any supervisor may grade
+  // what they can see (the API enforces the assignment rule as well).
+  const canGrade = useMemo(() => !!user, [user]);
 
   const [activeTab, setActiveTab] = useState<'manage' | 'submissions' | 'log' | 'add'>('manage');
   const [loading, setLoading] = useState(true);
@@ -173,6 +177,7 @@ export default function TasksPage() {
   const [manageSearch, setManageSearch] = useState('');
   const [manageTrackFilter, setManageTrackFilter] = useState('');
   const [manageSortFilter, setManageSortFilter] = useState('default');
+  const [manageStageFilter, setManageStageFilter] = useState<string[]>([]);
 
   // Modals states
   const [evalSub, setEvalSub] = useState<Submission | null>(null);
@@ -298,7 +303,15 @@ export default function TasksPage() {
     let result = tasks.filter(t => {
       const matchQ = !manageSearch.trim() || t.title.toLowerCase().includes(manageSearch.trim().toLowerCase()) || t.description.toLowerCase().includes(manageSearch.trim().toLowerCase());
       const matchTrack = !manageTrackFilter || t.track === manageTrackFilter;
-      return matchQ && matchTrack;
+      // Multi-select stage filter: a task matches if it targets all stages
+      // (الكل/empty) or any of its target stages is among the selected ones.
+      let matchStage = manageStageFilter.length === 0;
+      if (!matchStage) {
+        const raw = (t.stage ?? '').trim();
+        if (!raw || raw === 'الكل') matchStage = true;
+        else matchStage = raw.split(',').map(s => s.trim()).filter(Boolean).some(s => manageStageFilter.includes(s));
+      }
+      return matchQ && matchTrack && matchStage;
     });
     
     if (manageSortFilter === 'points') {
@@ -309,7 +322,7 @@ export default function TasksPage() {
       result = result.sort((a, b) => +new Date(a.dueDate) - +new Date(b.dueDate));
     }
     return result;
-  }, [tasks, manageSearch, manageTrackFilter, manageSortFilter]);
+  }, [tasks, manageSearch, manageTrackFilter, manageSortFilter, manageStageFilter]);
 
   const uniqueTasksPending = useMemo(() => tasks.filter(t => new Set(pendingSubmissions.map(s => s.taskId)).has(t.id)), [tasks, pendingSubmissions]);
   const uniqueTasksLog = useMemo(() => tasks.filter(t => new Set(logSubmissions.map(s => s.taskId)).has(t.id)), [tasks, logSubmissions]);
@@ -517,11 +530,32 @@ export default function TasksPage() {
     }
   }
 
+  // Returns the students actually targeted by a task: restricted tasks use the
+  // explicit id list; otherwise students are scoped to the task's target stages.
+  function scopedStudentsFor(task: Task) {
+    const activeStudents = students.filter(s => s.registrationStatus === 'approved' || s.paymentStatus === 'exempted');
+    if (task.visibility === 'restricted') {
+      return activeStudents.filter(s => task.visibleToIds.includes(s.id));
+    }
+    const stages = (task.stage && task.stage.trim() && task.stage.trim() !== 'الكل')
+      ? task.stage.split(',').map(s => s.trim()).filter(Boolean)
+      : [];
+    return stages.length ? activeStudents.filter(s => stages.includes(s.stage)) : activeStudents;
+  }
+
+  // Order used in the stats list: awaiting review → submitted → rejected → not submitted.
+  function statsStatusRank(item: { submitted: boolean; submission: Submission | null }) {
+    if (!item.submitted || !item.submission) return 3; // لم يسلم
+    if (item.submission.status === 'pending') return 0;  // بانتظار المراجعة
+    if (item.submission.status === 'approved') return 1; // تم التسليم
+    if (item.submission.status === 'rejected') return 2; // مردود
+    return 3;
+  }
+
   // Statistics modal helper
   const statsStudentList = useMemo(() => {
     if (!statsTask) return [];
-    const activeStudents = students.filter(s => s.registrationStatus === 'approved' || s.paymentStatus === 'exempted');
-    const scopedStudents = statsTask.visibility === 'restricted' ? activeStudents.filter(s => statsTask.visibleToIds.includes(s.id)) : activeStudents;
+    const scopedStudents = scopedStudentsFor(statsTask);
     const taskSubmissionsMap = new Map(submissions.filter(s => s.taskId === statsTask.id).map(s => [s.registrationId, s]));
 
     const list = scopedStudents.map(student => {
@@ -533,14 +567,14 @@ export default function TasksPage() {
     if (statsSearch.trim()) filtered = list.filter(item => item.studentName.toLowerCase().includes(statsSearch.trim().toLowerCase()));
     if (statsFilter === 'submitted') filtered = filtered.filter(item => item.submitted);
     else if (statsFilter === 'missing') filtered = filtered.filter(item => !item.submitted);
-    return filtered;
+    return [...filtered].sort((a, b) => statsStatusRank(a) - statsStatusRank(b));
   }, [statsTask, students, submissions, statsSearch, statsFilter]);
 
   const statsCounts = useMemo(() => {
     if (!statsTask) return { total: 0, submitted: 0, missing: 0, pending: 0 };
-    const activeStudents = students.filter(s => s.registrationStatus === 'approved' || s.paymentStatus === 'exempted');
-    const scopedStudents = statsTask.visibility === 'restricted' ? activeStudents.filter(s => statsTask.visibleToIds.includes(s.id)) : activeStudents;
-    const taskSubmissions = submissions.filter(s => s.taskId === statsTask.id);
+    const scopedStudents = scopedStudentsFor(statsTask);
+    const scopedIds = new Set(scopedStudents.map(s => s.id));
+    const taskSubmissions = submissions.filter(s => s.taskId === statsTask.id && scopedIds.has(s.registrationId));
     const submittedIds = new Set(taskSubmissions.map(s => s.registrationId));
     const total = scopedStudents.length;
     const submitted = scopedStudents.filter(s => submittedIds.has(s.id)).length;
@@ -707,6 +741,29 @@ export default function TasksPage() {
                     <option value="dueDate">حسب الاستحقاق</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Multi-select stage filter */}
+              <div className="flex items-center gap-2 flex-wrap mb-4">
+                <span className="text-[0.82rem] font-bold text-ink-500">المراحل:</span>
+                {['ابتدائي', 'متوسط', 'ثانوي'].map(st => {
+                  const active = manageStageFilter.includes(st);
+                  return (
+                    <button
+                      key={st}
+                      type="button"
+                      onClick={() => setManageStageFilter(prev => prev.includes(st) ? prev.filter(x => x !== st) : [...prev, st])}
+                      className={`choice text-xs font-bold px-4 py-1.5 rounded-xl ${active ? 'is-active' : ''}`}
+                    >
+                      {st}
+                    </button>
+                  );
+                })}
+                {manageStageFilter.length > 0 && (
+                  <button type="button" onClick={() => setManageStageFilter([])} className="text-xs text-ink-400 hover:text-nred-500 px-1 font-semibold">
+                    مسح
+                  </button>
+                )}
               </div>
 
               {/* Tasks List — cards */}
@@ -973,11 +1030,7 @@ export default function TasksPage() {
                                 prev.includes(st) ? prev.filter(x => x !== st) : [...prev, st]
                               );
                             }}
-                            className={`choice flex-1 text-xs font-bold py-2.5 px-3 rounded-xl border text-center transition-all ${
-                              active
-                                ? 'bg-brand text-white border-brand shadow-soft'
-                                : 'bg-ink-50/10 text-ink-600 border-ink-200/60 hover:bg-cream-100'
-                            }`}
+                            className={`choice flex-1 text-xs font-bold rounded-xl text-center ${active ? 'is-active' : ''}`}
                           >
                             {st}
                           </button>
@@ -1201,11 +1254,7 @@ export default function TasksPage() {
                                 prev.includes(st) ? prev.filter(x => x !== st) : [...prev, st]
                               );
                             }}
-                            className={`choice flex-1 text-xs font-bold py-2.5 px-3 rounded-xl border text-center transition-all ${
-                              active
-                                ? 'bg-brand text-white border-brand shadow-soft'
-                                : 'bg-ink-50/10 text-ink-600 border-ink-200/60 hover:bg-cream-100'
-                            }`}
+                            className={`choice flex-1 text-xs font-bold rounded-xl text-center ${active ? 'is-active' : ''}`}
                           >
                             {st}
                           </button>
@@ -1440,32 +1489,32 @@ export default function TasksPage() {
       {/* MODAL 4: STATISTICS */}
       {statsTask && (
         <div className="modal-backdrop flex items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto" onClick={() => setStatsTask(null)}>
-          <div className="modal-panel w-[92vw] sm:w-full sm:max-w-xl rounded-2xl max-h-[85vh] flex flex-col shadow-elevated" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-ink-150 bg-ink-50/50 rounded-t-2xl shrink-0">
+          <div className="modal-panel w-[92vw] sm:w-full sm:max-w-lg rounded-2xl max-h-[78vh] flex flex-col shadow-elevated" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-3.5 sm:p-4 border-b border-ink-150 bg-ink-50/50 rounded-t-2xl shrink-0">
               <div>
-                <h3 className="text-lg sm:text-xl font-extrabold text-ink-900">إحصائيات تسليمات الطلاب</h3>
-                <div className="text-[0.9rem] font-bold text-ink-500 mt-1">{statsTask.title}</div>
+                <h3 className="text-base sm:text-lg font-extrabold text-ink-900">إحصائيات تسليمات الطلاب</h3>
+                <div className="text-[0.8rem] font-bold text-ink-500 mt-0.5">{statsTask.title}</div>
               </div>
               <button className="text-3xl text-ink-400 hover:text-ink-900 transition-colors leading-none" onClick={() => setStatsTask(null)}>×</button>
             </div>
-            <div className="p-4 sm:p-5 space-y-5 flex-1 overflow-y-auto scroll-soft">
-              {/* Stats Strip */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
-                <div className="bg-ink-50 p-4 rounded-xl border border-ink-150 shadow-sm">
-                  <div className="text-3xl font-extrabold text-ink-800">{statsCounts.total}</div>
-                  <div className="text-[0.8rem] text-ink-500 font-bold mt-1">إجمالي المستهدفين</div>
+            <div className="p-3.5 sm:p-4 space-y-3.5 flex-1 overflow-y-auto scroll-soft">
+              {/* Stats Strip — order: awaiting review, submitted, rejected, not submitted */}
+              <div className="grid grid-cols-4 gap-2 text-center">
+                <div className="bg-brand-50 p-2.5 rounded-xl border border-brand-100 shadow-sm">
+                  <div className="text-2xl font-extrabold text-brand-600">{statsCounts.pending}</div>
+                  <div className="text-[0.68rem] text-brand-700 font-bold mt-0.5">بانتظار المراجعة</div>
                 </div>
-                <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 shadow-sm">
-                  <div className="text-3xl font-extrabold text-emerald-600">{statsCounts.submitted}</div>
-                  <div className="text-[0.8rem] text-emerald-700 font-bold mt-1">تم التسليم</div>
+                <div className="bg-emerald-50 p-2.5 rounded-xl border border-emerald-100 shadow-sm">
+                  <div className="text-2xl font-extrabold text-emerald-600">{statsCounts.submitted}</div>
+                  <div className="text-[0.68rem] text-emerald-700 font-bold mt-0.5">تم التسليم</div>
                 </div>
-                <div className="bg-nred-50 p-4 rounded-xl border border-nred-100 shadow-sm">
-                  <div className="text-3xl font-extrabold text-nred-600">{statsCounts.missing}</div>
-                  <div className="text-[0.8rem] text-nred-700 font-bold mt-1">لم يسلموا</div>
+                <div className="bg-nred-50 p-2.5 rounded-xl border border-nred-100 shadow-sm">
+                  <div className="text-2xl font-extrabold text-nred-600">{statsCounts.missing}</div>
+                  <div className="text-[0.68rem] text-nred-700 font-bold mt-0.5">لم يسلموا</div>
                 </div>
-                <div className="bg-brand-50 p-4 rounded-xl border border-brand-100 shadow-sm">
-                  <div className="text-3xl font-extrabold text-brand-600">{statsCounts.pending}</div>
-                  <div className="text-[0.8rem] text-brand-700 font-bold mt-1">بانتظار التقييم</div>
+                <div className="bg-ink-50 p-2.5 rounded-xl border border-ink-150 shadow-sm">
+                  <div className="text-2xl font-extrabold text-ink-800">{statsCounts.total}</div>
+                  <div className="text-[0.68rem] text-ink-500 font-bold mt-0.5">إجمالي المستهدفين</div>
                 </div>
               </div>
 
