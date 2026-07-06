@@ -215,7 +215,7 @@ export default function TasksPage() {
   const [addTrack, setAddTrack] = useState('عام');
   const [addBusy, setAddBusy] = useState(false);
 
-  const [addStages, setAddStages] = useState<string[]>(['ابتدائي', 'متوسط', 'ثانوي']);
+  const [addStages, setAddStages] = useState<string[]>([]);
   const [editStages, setEditStages] = useState<string[]>([]);
   const [editTaskImages, setEditTaskImages] = useState<string[]>([]);
 
@@ -366,7 +366,7 @@ export default function TasksPage() {
       if (!res.ok) throw new Error(data.error || 'فشل إضافة المهمة');
 
       pushToast('success', 'تم نشر المهمة بنجاح ✓');
-      setAddTitle(''); setAddDesc(''); setAddPoints('10'); setAddStartDate(''); setAddDeadline(''); setAddMethod('رفع ملف'); setAddLateAfter(''); setAddTimeLimit(''); setAddResourceLink(''); setAddImages([]); setAddAdmins([]); setAddTrack('عام'); setAddStages(['ابتدائي', 'متوسط', 'ثانوي']);
+      setAddTitle(''); setAddDesc(''); setAddPoints('10'); setAddStartDate(''); setAddDeadline(''); setAddMethod('رفع ملف'); setAddLateAfter(''); setAddTimeLimit(''); setAddResourceLink(''); setAddImages([]); setAddAdmins([]); setAddTrack('عام'); setAddStages([]);
       await loadData();
       setActiveTab('manage');
     } catch (err: any) {
