@@ -181,6 +181,35 @@ export default function AnnouncementsPage() {
     loadAnnouncements();
   }
 
+  async function toggleVisibility(a: Announcement) {
+    setBusy(true);
+    try {
+      const isCurrentlyHidden = a.expiresAt ? new Date(a.expiresAt).getFullYear() <= 1970 : false;
+      const newExpiresAt = isCurrentlyHidden ? null : new Date(0).toISOString();
+      const res = await fetch(`/api/supervisor/announcements`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: a.id,
+          title: a.title,
+          body: a.body,
+          audience: a.audience,
+          imageUrl: a.imageUrl,
+          images: a.images,
+          expiresAt: newExpiresAt
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'فشل تحديث حالة الظهور');
+      pushToast('success', isCurrentlyHidden ? 'تم إظهار الإعلان للطلاب بنجاح ✓' : 'تم إخفاء الإعلان عن الطلاب بنجاح ✓');
+      loadAnnouncements();
+    } catch (err: any) {
+      pushToast('error', err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const audLabel = (audienceStr: string) => {
     if (audienceStr === 'all') return 'الجميع';
     if (audienceStr === 'students') return 'الطلاب';
@@ -420,11 +449,13 @@ export default function AnnouncementsPage() {
           <div className="card p-12 text-center text-ink-400 text-sm">لا توجد إعلانات منشورة حالياً.</div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {items.map((a) => (
-              <div
-                key={a.id}
-                className="card bg-white border border-ink-150 hover:shadow-md transition-shadow flex flex-col overflow-hidden"
-              >
+            {items.map((a) => {
+              const isHidden = a.expiresAt ? new Date(a.expiresAt).getFullYear() <= 1970 : false;
+              return (
+                <div
+                  key={a.id}
+                  className="card bg-white border border-ink-150 hover:shadow-md transition-shadow flex flex-col overflow-hidden"
+                >
                 {/* Cover image */}
                 {a.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -465,9 +496,10 @@ export default function AnnouncementsPage() {
                     </span>
                     {a.expiresAt && (() => {
                       const expired = new Date(a.expiresAt).getTime() < Date.now();
+                      const isHidden = new Date(a.expiresAt).getFullYear() <= 1970;
                       return (
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${expired ? 'bg-nred-50 text-nred-600 border border-nred-200' : 'bg-cream-100 text-brand-600 border border-brand-200/50'}`}>
-                          {expired ? '⛔ منتهٍ' : `⏳ ينتهي ${new Date(a.expiresAt).toLocaleDateString('ar', { month: 'short', day: 'numeric' })}`}
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isHidden ? 'bg-ink-100 text-ink-600 border border-ink-200' : expired ? 'bg-nred-50 text-nred-600 border border-nred-200' : 'bg-cream-100 text-brand-600 border border-brand-200/50'}`}>
+                          {isHidden ? '👁️ مخفي عن الطلاب' : expired ? '⛔ منتهٍ' : `⏳ ينتهي ${new Date(a.expiresAt).toLocaleDateString('ar', { month: 'short', day: 'numeric' })}`}
                         </span>
                       );
                     })()}
@@ -500,6 +532,26 @@ export default function AnnouncementsPage() {
                     تعديل
                   </button>
                   <button
+                    onClick={() => toggleVisibility(a)}
+                    className="btn btn-secondary py-1.5 px-2.5 text-xs font-semibold flex items-center justify-center shrink-0"
+                    type="button"
+                    title={isHidden ? "إظهار للطلاب" : "إخفاء عن الطلاب"}
+                  >
+                    {isHidden ? (
+                      <svg className="w-3.5 h-3.5 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    ) : (
+                      <svg className="w-3.5 h-3.5 text-nred-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+                        <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
+                        <path d="M6.61 6.61A13.52 13.52 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
+                        <line x1="2" y1="2" x2="22" y2="22" />
+                      </svg>
+                    )}
+                  </button>
+                  <button
                     onClick={() => del(a.id)}
                     className="btn btn-danger py-1.5 px-2.5 text-xs font-semibold flex items-center justify-center"
                     type="button"
@@ -514,7 +566,8 @@ export default function AnnouncementsPage() {
                   </>}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
