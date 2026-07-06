@@ -22,6 +22,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (body.stage !== undefined) patch.stage = body.stage ? String(body.stage).trim() : null;
     if (body.isActive !== undefined) patch.isActive = Boolean(body.isActive);
     if (body.submissionMethod !== undefined) patch.submissionMethod = body.submissionMethod;
+    if (body.cost !== undefined) patch.cost = body.cost ? parseInt(body.cost, 10) : 0;
     if (body.imageUrl !== undefined) patch.imageUrl = body.imageUrl;
     if (body.resourceLink !== undefined) patch.resourceLink = body.resourceLink;
     if (body.visibility !== undefined) patch.visibility = body.visibility;

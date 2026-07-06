@@ -16,6 +16,7 @@ type Task = {
   createdAt: string;
   track: string | null;
   stage: string | null;
+  cost: number;
   isActive: boolean;
   submissionMethod: string | null;
   durationHours: number | null;
@@ -204,6 +205,7 @@ export default function TasksPage() {
   const [addTitle, setAddTitle] = useState('');
   const [addDesc, setAddDesc] = useState('');
   const [addPoints, setAddPoints] = useState('10');
+  const [addCost, setAddCost] = useState('0');
   const [addStartDate, setAddStartDate] = useState('');
   const [addDeadline, setAddDeadline] = useState('');
   const [addMethod, setAddMethod] = useState('رفع ملف');
@@ -359,6 +361,7 @@ export default function TasksPage() {
           resourceLink: addResourceLink.trim() || null,
           visibility: 'all',
           visibleToIds: [],
+          cost: parseInt(addCost, 10) || 0,
         })
       });
 
@@ -366,7 +369,7 @@ export default function TasksPage() {
       if (!res.ok) throw new Error(data.error || 'فشل إضافة المهمة');
 
       pushToast('success', 'تم نشر المهمة بنجاح ✓');
-      setAddTitle(''); setAddDesc(''); setAddPoints('10'); setAddStartDate(''); setAddDeadline(''); setAddMethod('رفع ملف'); setAddLateAfter(''); setAddTimeLimit(''); setAddResourceLink(''); setAddImages([]); setAddAdmins([]); setAddTrack('عام'); setAddStages([]);
+      setAddTitle(''); setAddDesc(''); setAddPoints('10'); setAddCost('0'); setAddStartDate(''); setAddDeadline(''); setAddMethod('رفع ملف'); setAddLateAfter(''); setAddTimeLimit(''); setAddResourceLink(''); setAddImages([]); setAddAdmins([]); setAddTrack('عام'); setAddStages([]);
       await loadData();
       setActiveTab('manage');
     } catch (err: any) {
@@ -461,6 +464,7 @@ export default function TasksPage() {
           assignedAdmins: editTask.assignedAdmins,
           imageUrl: editTaskImages.length > 0 ? JSON.stringify(editTaskImages) : null,
           resourceLink: editTask.resourceLink,
+          cost: editTask.cost || 0,
         })
       });
       const data = await res.json();
@@ -796,6 +800,11 @@ export default function TasksPage() {
                           <span className="px-2.5 py-1 rounded-full text-[0.72rem] font-bold bg-brand-50 text-brand-700 border border-brand-200/60 inline-flex items-center gap-1">
                             🎯 {task.maxPoints}
                           </span>
+                          {task.cost > 0 && (
+                            <span className="px-2.5 py-1 rounded-full text-[0.72rem] font-bold bg-amber-50 text-amber-700 border border-amber-200/50 inline-flex items-center gap-1">
+                              💰 {task.cost}
+                            </span>
+                          )}
                           <span className="px-2.5 py-1 rounded-full text-[0.72rem] font-bold bg-nblue-50 text-nblue-700 border border-nblue-200/50 inline-flex items-center gap-1 font-mono">
                             📅 {task.dueDate.split('T')[0]}
                           </span>
@@ -1052,6 +1061,10 @@ export default function TasksPage() {
                     <input type="number" className="field py-3 rounded-xl bg-ink-50/20 text-center font-extrabold text-brand-600 text-lg w-full" required min={1} value={addPoints} onChange={e => setAddPoints(e.target.value.replace(/\D/g, ''))} />
                   </div>
                   <div>
+                    <label className="label mb-1.5 font-bold text-ink-800">تكلفة شراء المهمة (💰 نقاط)</label>
+                    <input type="number" className="field py-3 rounded-xl bg-ink-50/20 text-center font-extrabold text-amber-600 text-lg w-full" min={0} value={addCost} onChange={e => setAddCost(e.target.value.replace(/\D/g, ''))} />
+                  </div>
+                  <div>
                     <label className="label mb-1.5 font-bold text-ink-800">طريقة التسليم <span className="req">*</span></label>
                     <select className="field py-3 rounded-xl bg-ink-50/20" value={addMethod} onChange={e => setAddMethod(e.target.value)}>
                       <option value="رفع ملف">رفع ملف (صورة / مستند / فيديو)</option>
@@ -1265,6 +1278,10 @@ export default function TasksPage() {
                   <div>
                     <label className="label font-bold text-ink-800 mb-1.5">النقاط (🎯)</label>
                     <input type="number" className="field py-3 rounded-xl bg-ink-50/30 text-center font-extrabold text-brand-600 w-full" required min={1} value={editTask.maxPoints} onChange={e => setEditTask({ ...editTask, maxPoints: parseInt(e.target.value.replace(/\D/g, ''), 10) || 1 })} />
+                  </div>
+                  <div>
+                    <label className="label font-bold text-ink-800 mb-1.5">تكلفة شراء المهمة (💰 نقاط)</label>
+                    <input type="number" className="field py-3 rounded-xl bg-ink-50/30 text-center font-extrabold text-amber-600 w-full" min={0} value={editTask.cost || 0} onChange={e => setEditTask({ ...editTask, cost: parseInt(e.target.value.replace(/\D/g, ''), 10) || 0 })} />
                   </div>
                   <div>
                     <label className="label font-bold text-ink-800 mb-1.5">وقت البداية (اختياري)</label>
