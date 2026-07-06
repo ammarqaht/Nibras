@@ -84,15 +84,24 @@ const parseTaskImages = (urlStr: string | null): string[] => {
 };
 
 
+// A submission only becomes gradable once the student actually uploads their
+// work (status 'pending'). 'claimed' = requested but not submitted yet,
+// 'expired' = the claim window passed without a submission.
+const SUBMITTED_STATUSES = ['pending', 'approved', 'rejected'];
+
 function statusLabel(status: string) {
   if (status === 'approved') return 'مقبولة ✓';
   if (status === 'rejected') return 'مردودة ✗';
+  if (status === 'claimed') return 'لم يُسلَّم بعد';
+  if (status === 'expired') return 'انتهى وقتها';
   return 'بانتظار المراجعة';
 }
 
 function statusBadgeClass(status: string) {
   if (status === 'approved') return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
   if (status === 'rejected') return 'bg-nred-50 text-nred-700 border border-nred-200';
+  if (status === 'claimed') return 'bg-amber-50 text-amber-700 border border-amber-200';
+  if (status === 'expired' || status === 'missing') return 'bg-ink-50 text-ink-500 border border-ink-200';
   return 'bg-brand-50 text-brand-700 border border-brand-200';
 }
 
@@ -101,13 +110,16 @@ function statusDotClass(status: string) {
   if (status === 'approved') return 'bg-emerald-500';
   if (status === 'rejected') return 'bg-nred-500';
   if (status === 'pending') return 'bg-brand-500';
-  if (status === 'missing') return 'bg-ink-300';
-  return 'bg-ink-300';
+  if (status === 'claimed') return 'bg-amber-400'; // requested but not submitted
+  if (status === 'expired') return 'bg-ink-400';
+  return 'bg-ink-300'; // missing — not submitted
 }
 function statusText(status: string) {
   if (status === 'approved') return 'مقبولة';
   if (status === 'rejected') return 'مردودة';
   if (status === 'pending') return 'بانتظار التقييم';
+  if (status === 'claimed') return 'لم يُسلَّم بعد';
+  if (status === 'expired') return 'انتهى وقتها';
   return 'لم تسلم';
 }
 
@@ -198,7 +210,7 @@ export default function TasksPage() {
 
   const [statsTask, setStatsTask] = useState<Task | null>(null);
   const [statsSearch, setStatsSearch] = useState('');
-  const [statsFilter, setStatsFilter] = useState<'all' | 'submitted' | 'missing'>('all');
+  const [statsFilter, setStatsFilter] = useState<'all' | 'submitted' | 'missing' | 'claimed'>('all');
 
   // Add task state
   const addFileRef = useRef<HTMLInputElement>(null);
@@ -278,7 +290,9 @@ export default function TasksPage() {
   }, [editTask]);
 
   const pendingSubmissions = useMemo(() => submissions.filter(s => s.status === 'pending'), [submissions]);
-  const logSubmissions = useMemo(() => submissions.filter(s => s.status !== 'pending'), [submissions]);
+  // The log is the record of graded work only. 'claimed'/'expired' submissions
+  // were never submitted, so they must not appear here as "awaiting review".
+  const logSubmissions = useMemo(() => submissions.filter(s => s.status === 'approved' || s.status === 'rejected'), [submissions]);
 
   const filteredPendingSubmissions = useMemo(() => {
     return pendingSubmissions.filter(s => {
@@ -547,44 +561,58 @@ export default function TasksPage() {
     return stages.length ? activeStudents.filter(s => stages.includes(s.stage)) : activeStudents;
   }
 
-  // Order used in the stats list: awaiting review → submitted → rejected → not submitted.
-  function statsStatusRank(item: { submitted: boolean; submission: Submission | null }) {
-    if (!item.submitted || !item.submission) return 3; // لم يسلم
-    if (item.submission.status === 'pending') return 0;  // بانتظار المراجعة
-    if (item.submission.status === 'approved') return 1; // تم التسليم
-    if (item.submission.status === 'rejected') return 2; // مردود
-    return 3;
+  // Order used in the stats list: awaiting review → submitted → rejected →
+  // requested (claimed) → expired → not submitted.
+  function statsStatusRank(rawStatus: string) {
+    if (rawStatus === 'pending') return 0;   // بانتظار المراجعة
+    if (rawStatus === 'approved') return 1;  // تم التسليم
+    if (rawStatus === 'rejected') return 2;  // مردود
+    if (rawStatus === 'claimed') return 3;   // طلب المهمة (لم يُسلَّم)
+    if (rawStatus === 'expired') return 4;   // انتهى وقتها
+    return 5;                                // لم يسلم
   }
 
   // Statistics modal helper
   const statsStudentList = useMemo(() => {
     if (!statsTask) return [];
     const scopedStudents = scopedStudentsFor(statsTask);
-    const taskSubmissionsMap = new Map(submissions.filter(s => s.taskId === statsTask.id).map(s => [s.registrationId, s]));
+    // Keep every submission record (any status) so we can distinguish students
+    // who actually submitted from those who only requested/claimed the task.
+    const allSubsMap = new Map(submissions.filter(s => s.taskId === statsTask.id).map(s => [s.registrationId, s]));
 
     const list = scopedStudents.map(student => {
-      const sub = taskSubmissionsMap.get(student.id);
-      return { ...student, submitted: !!sub, submission: sub || null };
+      const sub = allSubsMap.get(student.id) || null;
+      const isReal = !!sub && SUBMITTED_STATUSES.includes(sub.status);
+      const rawStatus = isReal ? sub!.status
+        : sub?.status === 'claimed' ? 'claimed'
+        : sub?.status === 'expired' ? 'expired'
+        : 'missing';
+      return { ...student, submitted: isReal, submission: isReal ? sub : null, rawStatus };
     });
 
     let filtered = list;
-    if (statsSearch.trim()) filtered = list.filter(item => item.studentName.toLowerCase().includes(statsSearch.trim().toLowerCase()));
+    if (statsSearch.trim()) filtered = filtered.filter(item => item.studentName.toLowerCase().includes(statsSearch.trim().toLowerCase()));
     if (statsFilter === 'submitted') filtered = filtered.filter(item => item.submitted);
     else if (statsFilter === 'missing') filtered = filtered.filter(item => !item.submitted);
-    return [...filtered].sort((a, b) => statsStatusRank(a) - statsStatusRank(b));
+    else if (statsFilter === 'claimed') filtered = filtered.filter(item => item.rawStatus === 'claimed');
+    return [...filtered].sort((a, b) => statsStatusRank(a.rawStatus) - statsStatusRank(b.rawStatus));
   }, [statsTask, students, submissions, statsSearch, statsFilter]);
 
   const statsCounts = useMemo(() => {
-    if (!statsTask) return { total: 0, submitted: 0, missing: 0, pending: 0 };
+    if (!statsTask) return { total: 0, submitted: 0, missing: 0, pending: 0, claimed: 0 };
     const scopedStudents = scopedStudentsFor(statsTask);
     const scopedIds = new Set(scopedStudents.map(s => s.id));
-    const taskSubmissions = submissions.filter(s => s.taskId === statsTask.id && scopedIds.has(s.registrationId));
+    const scopedSubs = submissions.filter(s => s.taskId === statsTask.id && scopedIds.has(s.registrationId));
+    // Count only real submissions — exclude 'claimed'/'expired' (not submitted).
+    const taskSubmissions = scopedSubs.filter(s => SUBMITTED_STATUSES.includes(s.status));
     const submittedIds = new Set(taskSubmissions.map(s => s.registrationId));
     const total = scopedStudents.length;
     const submitted = scopedStudents.filter(s => submittedIds.has(s.id)).length;
     const pending = taskSubmissions.filter(s => s.status === 'pending').length;
+    // Students who requested/claimed the task but have not submitted yet.
+    const claimed = scopedSubs.filter(s => s.status === 'claimed').length;
     const missing = total - submitted;
-    return { total, submitted, missing, pending };
+    return { total, submitted, missing, pending, claimed };
   }, [statsTask, students, submissions]);
 
   async function handleImagePick(e: React.ChangeEvent<HTMLInputElement>, isEdit = false) {
@@ -1515,23 +1543,27 @@ export default function TasksPage() {
               <button className="text-3xl text-ink-400 hover:text-ink-900 transition-colors leading-none" onClick={() => setStatsTask(null)}>×</button>
             </div>
             <div className="p-3.5 sm:p-4 space-y-3.5 flex-1 overflow-y-auto scroll-soft">
-              {/* Stats Strip — order: awaiting review, submitted, rejected, not submitted */}
-              <div className="grid grid-cols-4 gap-2 text-center">
+              {/* Stats Strip — awaiting review, submitted, requested (claimed), not submitted, total */}
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 text-center">
                 <div className="bg-brand-50 p-2.5 rounded-xl border border-brand-100 shadow-sm">
-                  <div className="text-2xl font-extrabold text-brand-600">{statsCounts.pending}</div>
-                  <div className="text-[0.68rem] text-brand-700 font-bold mt-0.5">بانتظار المراجعة</div>
+                  <div className="text-xl font-extrabold text-brand-600">{statsCounts.pending}</div>
+                  <div className="text-[0.66rem] text-brand-700 font-bold mt-0.5">بانتظار المراجعة</div>
                 </div>
                 <div className="bg-emerald-50 p-2.5 rounded-xl border border-emerald-100 shadow-sm">
-                  <div className="text-2xl font-extrabold text-emerald-600">{statsCounts.submitted}</div>
-                  <div className="text-[0.68rem] text-emerald-700 font-bold mt-0.5">تم التسليم</div>
+                  <div className="text-xl font-extrabold text-emerald-600">{statsCounts.submitted}</div>
+                  <div className="text-[0.66rem] text-emerald-700 font-bold mt-0.5">تم التسليم</div>
+                </div>
+                <div className="bg-amber-50 p-2.5 rounded-xl border border-amber-100 shadow-sm">
+                  <div className="text-xl font-extrabold text-amber-600">{statsCounts.claimed}</div>
+                  <div className="text-[0.66rem] text-amber-700 font-bold mt-0.5">طلبوا المهمة</div>
                 </div>
                 <div className="bg-nred-50 p-2.5 rounded-xl border border-nred-100 shadow-sm">
-                  <div className="text-2xl font-extrabold text-nred-600">{statsCounts.missing}</div>
-                  <div className="text-[0.68rem] text-nred-700 font-bold mt-0.5">لم يسلموا</div>
+                  <div className="text-xl font-extrabold text-nred-600">{statsCounts.missing}</div>
+                  <div className="text-[0.66rem] text-nred-700 font-bold mt-0.5">لم يسلموا</div>
                 </div>
                 <div className="bg-ink-50 p-2.5 rounded-xl border border-ink-150 shadow-sm">
-                  <div className="text-2xl font-extrabold text-ink-800">{statsCounts.total}</div>
-                  <div className="text-[0.68rem] text-ink-500 font-bold mt-0.5">إجمالي المستهدفين</div>
+                  <div className="text-xl font-extrabold text-ink-800">{statsCounts.total}</div>
+                  <div className="text-[0.66rem] text-ink-500 font-bold mt-0.5">إجمالي المستهدفين</div>
                 </div>
               </div>
 
@@ -1544,6 +1576,7 @@ export default function TasksPage() {
                 <select className="field py-2.5 px-3 text-[0.85rem] rounded-xl sm:w-56 bg-ink-50/30 border-ink-200 focus:bg-white" value={statsFilter} onChange={e => setStatsFilter(e.target.value as any)}>
                   <option value="all">جميع الطلاب المشمولين</option>
                   <option value="submitted">الذين سلّموا فقط</option>
+                  <option value="claimed">الذين طلبوا ولم يسلّموا</option>
                   <option value="missing">الذين لم يسلّموا</option>
                 </select>
               </div>
@@ -1555,8 +1588,8 @@ export default function TasksPage() {
                 ) : (
                   <ul className="divide-y divide-ink-100">
                     {statsStudentList.map((item) => {
-                      const status = item.submitted ? item.submission!.status : 'missing';
-                      const isApproved = item.submission?.status === 'approved';
+                      const status = item.rawStatus;
+                      const isApproved = status === 'approved';
                       return (
                         <li key={item.id} className="flex items-center gap-3 p-3 hover:bg-cream-100/50 transition-colors">
                           {/* status dot (color only) */}
@@ -1571,12 +1604,12 @@ export default function TasksPage() {
                             </p>
                           </div>
 
-                          {/* grade */}
+                          {/* grade or status label */}
                           <div className="shrink-0 text-left">
                             {isApproved ? (
                               <span className="font-extrabold text-emerald-600 text-[0.95rem] whitespace-nowrap">{item.submission!.grade} 🎯</span>
                             ) : (
-                              <span className="text-ink-300 text-sm">—</span>
+                              <span className={`text-[0.66rem] font-bold whitespace-nowrap px-2 py-0.5 rounded-full ${statusBadgeClass(status)}`}>{statusText(status)}</span>
                             )}
                           </div>
                         </li>
