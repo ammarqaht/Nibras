@@ -269,6 +269,14 @@ body::after {
   background: rgba(26,26,26,0.45);
   backdrop-filter: blur(2px);
   animation: fadeIn 180ms ease;
+  /* Keep every popup clear of the sticky navbar and scrollable if tall.
+     These are unlayered, so they override Tailwind's items-center / p-* utilities. */
+  align-items: flex-start;
+  overflow-y: auto;
+  padding-top: 4.75rem;
+}
+@media (min-width: 640px) {
+  .modal-backdrop { padding-top: 5.25rem; }
 }
 .modal-panel {
   background: #fff;

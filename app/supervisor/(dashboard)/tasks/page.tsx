@@ -239,7 +239,12 @@ function getTrackPillClass(track: string | null) {
 export default function TasksPage() {
   const { user } = useSupervisor();
   const roles = useMemo(() => (user?.role || '').split(',').map(r => r.trim()), [user]);
-  const isScientific = useMemo(() => roles.includes('scientific_supervisor') || roles.includes('admin'), [roles]);
+  // Scientific supervisors, admins, and any user with the '*' (full-access)
+  // permission may add/edit tasks.
+  const isScientific = useMemo(
+    () => roles.includes('scientific_supervisor') || roles.includes('admin') || !!user?.permissions?.includes('*'),
+    [roles, user]
+  );
   // Admins/scientific see and grade all submissions; other supervisors only
   // receive submissions for tasks assigned to them and may grade those. Since
   // the submissions list is already scoped server-side, any supervisor may grade
@@ -500,6 +505,14 @@ export default function TasksPage() {
     }
   }
 
+  // Open the review popup for any submission (pending or already graded),
+  // pre-filling the current grade/comment so points can be edited from within it.
+  function openSubmission(sub: Submission) {
+    setEvalSub(sub);
+    setEvalPoints(sub.grade != null ? String(sub.grade) : '');
+    setEvalComment(sub.feedback || '');
+  }
+
   async function handleEvaluate(status: 'approved' | 'rejected') {
     if (!evalSub) return;
     const grade = parseInt(evalPoints, 10);
@@ -625,36 +638,6 @@ export default function TasksPage() {
     }
   }
 
-  // --- Inline Points Editor ---
-  const [inlineEditSub, setInlineEditSub] = useState<string | null>(null);
-  const [inlinePoints, setInlinePoints] = useState('');
-  const [inlineBusy, setInlineBusy] = useState(false);
-
-  async function saveInlinePoints(sub: Submission) {
-    const val = parseInt(inlinePoints, 10);
-    const capMax = sub.wasLate ? Math.floor(sub.taskMaxPoints / 2) : sub.taskMaxPoints;
-    if (isNaN(val) || val < 0 || val > capMax) {
-      return pushToast('error', sub.wasLate
-        ? `التسليم متأخر — يجب أن تكون الدرجة بين 0 و ${capMax}`
-        : `يجب أن تكون الدرجة بين 0 و ${capMax}`);
-    }
-    setInlineBusy(true);
-    try {
-      const res = await fetch(`/api/supervisor/submissions/${sub.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ grade: val })
-      });
-      if (!res.ok) throw new Error('Failed to update');
-      pushToast('success', 'تم تعديل الدرجة بنجاح ✓');
-      setInlineEditSub(null);
-      loadData();
-    } catch {
-      pushToast('error', 'فشل تعديل الدرجة');
-    } finally {
-      setInlineBusy(false);
-    }
-  }
 
   // Returns the students actually targeted by a task: restricted tasks use the
   // explicit id list; otherwise students are scoped to the task's target stages.
@@ -769,6 +752,14 @@ export default function TasksPage() {
       { tasks: 0, claimed: 0, pending: 0, approved: 0, rejected: 0, missing: 0, total: 0 }
     );
   }, [taskStatsRows]);
+
+  // Distinct students targeted by any of the (filtered) tasks — counted once,
+  // regardless of how many tasks they appear in.
+  const overallTargetedUnique = useMemo(() => {
+    const set = new Set<number>();
+    for (const { task } of taskStatsRows) for (const s of scopedStudentsFor(task)) set.add(s.id);
+    return set.size;
+  }, [taskStatsRows, students]);
 
   const stageStats = useMemo(() => {
     const stages = ['ابتدائي', 'متوسط', 'ثانوي'];
@@ -1132,7 +1123,7 @@ export default function TasksPage() {
                     بانتظار المراجعة ({filteredPendingSubmissions.length})
                   </div>
                   {filteredPendingSubmissions.map(sub => (
-                    <SubmissionCard key={sub.id} sub={sub} onEvaluate={canGrade ? setEvalSub : undefined} supervisors={supervisors} />
+                    <SubmissionCard key={sub.id} sub={sub} onEvaluate={canGrade ? openSubmission : undefined} supervisors={supervisors} />
                   ))}
                 </div>
               )}
@@ -1197,9 +1188,7 @@ export default function TasksPage() {
                   {filteredLogSubmissions.map(sub => (
                     <SubmissionCard
                       key={sub.id} sub={sub} supervisors={supervisors} isLog canGrade={canGrade}
-                      inlineEditSub={inlineEditSub} inlinePoints={inlinePoints}
-                      setInlineEditSub={setInlineEditSub} setInlinePoints={setInlinePoints}
-                      saveInlinePoints={saveInlinePoints} inlineBusy={inlineBusy}
+                      onEvaluate={canGrade ? openSubmission : undefined}
                     />
                   ))}
                 </div>
@@ -1245,7 +1234,7 @@ export default function TasksPage() {
                     <div className="text-[0.8rem] font-bold text-ink-500 mt-1">مردودة</div>
                   </div>
                   <div className="card p-4 flex flex-col items-center justify-center text-center shadow-soft">
-                    <div className="text-3xl font-extrabold text-ink-800">{overallStats.total}</div>
+                    <div className="text-3xl font-extrabold text-ink-800">{overallTargetedUnique}</div>
                     <div className="text-[0.8rem] font-bold text-ink-500 mt-1">إجمالي المستهدفين</div>
                   </div>
                 </div>
@@ -1303,48 +1292,97 @@ export default function TasksPage() {
                 {taskStatsRows.length === 0 ? (
                   <div className="card p-12 text-center text-ink-400 border border-ink-150 shadow-soft">لا توجد مهام مطابقة.</div>
                 ) : (
-                  <div className="overflow-x-auto rounded-2xl border border-ink-150 shadow-soft bg-white">
-                    <table className="w-full text-[0.82rem] min-w-[640px]">
-                      <thead>
-                        <tr className="bg-ink-50/60 text-ink-500 text-[0.72rem]">
-                          <th className="text-right font-bold py-3 px-4">المهمة</th>
-                          <th className="text-center font-bold py-3 px-2">المرحلة</th>
-                          <th className="text-center font-bold py-3 px-2">طلبوا</th>
-                          <th className="text-center font-bold py-3 px-2">بالانتظار</th>
-                          <th className="text-center font-bold py-3 px-2">معتمدة</th>
-                          <th className="text-center font-bold py-3 px-2">مردودة</th>
-                          <th className="text-center font-bold py-3 px-2">لم يسلّموا</th>
-                          <th className="text-center font-bold py-3 px-2">المستهدفون</th>
-                          <th className="py-3 px-2"></th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-ink-100">
-                        {taskStatsRows.map(({ task, stats }) => (
-                          <tr key={task.id} className="hover:bg-cream-100/40 transition-colors">
-                            <td className="py-3 px-4">
-                              <div className="font-bold text-ink-900 truncate max-w-[220px]">{task.title}</div>
-                              <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[0.62rem] font-bold ${getTrackPillClass(task.track)}`}>{task.track || 'عام'}</span>
-                            </td>
-                            <td className="text-center py-3 px-2 text-ink-500 text-[0.72rem]">{task.stage || 'الكل'}</td>
-                            <td className="text-center py-3 px-2 font-extrabold text-amber-600">{stats.claimed}</td>
-                            <td className="text-center py-3 px-2 font-extrabold text-brand-600">{stats.pending}</td>
-                            <td className="text-center py-3 px-2 font-extrabold text-emerald-600">{stats.approved}</td>
-                            <td className="text-center py-3 px-2 font-extrabold text-nred-600">{stats.rejected}</td>
-                            <td className="text-center py-3 px-2 font-extrabold text-ink-400">{stats.missing}</td>
-                            <td className="text-center py-3 px-2 font-extrabold text-ink-800">{stats.total}</td>
-                            <td className="text-center py-3 px-2">
-                              <button
-                                onClick={() => { setStatsTask(task); setStatsSearch(''); setStatsFilter('all'); }}
-                                className="border border-nblue-400/30 text-nblue-700 bg-nblue-50/60 hover:bg-nblue-100/60 px-3 py-1.5 rounded-lg text-[0.7rem] font-bold transition-colors whitespace-nowrap"
-                              >
-                                التفاصيل
-                              </button>
-                            </td>
+                  <>
+                    {/* Desktop: table */}
+                    <div className="hidden md:block overflow-x-auto rounded-2xl border border-ink-150 shadow-soft bg-white">
+                      <table className="w-full text-[0.82rem]">
+                        <thead>
+                          <tr className="bg-ink-50/60 text-ink-500 text-[0.72rem]">
+                            <th className="text-right font-bold py-3 px-4">المهمة</th>
+                            <th className="text-center font-bold py-3 px-2">المرحلة</th>
+                            <th className="text-center font-bold py-3 px-2">طلبوا</th>
+                            <th className="text-center font-bold py-3 px-2">بالانتظار</th>
+                            <th className="text-center font-bold py-3 px-2">معتمدة</th>
+                            <th className="text-center font-bold py-3 px-2">مردودة</th>
+                            <th className="text-center font-bold py-3 px-2">لم يسلّموا</th>
+                            <th className="text-center font-bold py-3 px-2">المستهدفون</th>
+                            <th className="py-3 px-2"></th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody className="divide-y divide-ink-100">
+                          {taskStatsRows.map(({ task, stats }) => (
+                            <tr
+                              key={task.id}
+                              className="hover:bg-cream-100/40 transition-colors cursor-pointer"
+                              onClick={() => { setStatsTask(task); setStatsSearch(''); setStatsFilter('all'); }}
+                            >
+                              <td className="py-3 px-4">
+                                <div className="font-bold text-ink-900 truncate max-w-[220px]">{task.title}</div>
+                                <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[0.62rem] font-bold ${getTrackPillClass(task.track)}`}>{task.track || 'عام'}</span>
+                              </td>
+                              <td className="text-center py-3 px-2 text-ink-500 text-[0.72rem]">{task.stage || 'الكل'}</td>
+                              <td className="text-center py-3 px-2 font-extrabold text-amber-600">{stats.claimed}</td>
+                              <td className="text-center py-3 px-2 font-extrabold text-brand-600">{stats.pending}</td>
+                              <td className="text-center py-3 px-2 font-extrabold text-emerald-600">{stats.approved}</td>
+                              <td className="text-center py-3 px-2 font-extrabold text-nred-600">{stats.rejected}</td>
+                              <td className="text-center py-3 px-2 font-extrabold text-ink-400">{stats.missing}</td>
+                              <td className="text-center py-3 px-2 font-extrabold text-ink-800">{stats.total}</td>
+                              <td className="text-center py-3 px-2">
+                                <span className="border border-nblue-400/30 text-nblue-700 bg-nblue-50/60 px-3 py-1.5 rounded-lg text-[0.7rem] font-bold whitespace-nowrap">التفاصيل</span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Mobile: clickable cards (no horizontal scroll) */}
+                    <div className="md:hidden space-y-3">
+                      {taskStatsRows.map(({ task, stats }) => (
+                        <button
+                          key={task.id}
+                          type="button"
+                          onClick={() => { setStatsTask(task); setStatsSearch(''); setStatsFilter('all'); }}
+                          className="w-full text-right card p-3.5 border border-ink-150 shadow-soft active:bg-cream-100/50 transition-colors"
+                        >
+                          <div className="flex items-center justify-between gap-2 mb-2.5">
+                            <h4 className="font-bold text-ink-900 text-[0.9rem] truncate flex-1">{task.title}</h4>
+                            <span className="text-ink-300">›</span>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                            <span className="px-2 py-0.5 rounded-full text-[0.62rem] font-bold bg-ink-100 text-ink-600">🏷️ {task.stage || 'الكل'}</span>
+                            <span className={`px-2 py-0.5 rounded-full text-[0.62rem] font-bold ${getTrackPillClass(task.track)}`}>{task.track || 'عام'}</span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-1.5 text-center">
+                            <div className="bg-amber-50 rounded-lg py-1.5 border border-amber-100">
+                              <div className="text-base font-extrabold text-amber-600">{stats.claimed}</div>
+                              <div className="text-[0.58rem] text-amber-700 font-bold">طلبوا</div>
+                            </div>
+                            <div className="bg-brand-50 rounded-lg py-1.5 border border-brand-100">
+                              <div className="text-base font-extrabold text-brand-600">{stats.pending}</div>
+                              <div className="text-[0.58rem] text-brand-700 font-bold">بالانتظار</div>
+                            </div>
+                            <div className="bg-emerald-50 rounded-lg py-1.5 border border-emerald-100">
+                              <div className="text-base font-extrabold text-emerald-600">{stats.approved}</div>
+                              <div className="text-[0.58rem] text-emerald-700 font-bold">معتمدة</div>
+                            </div>
+                            <div className="bg-nred-50 rounded-lg py-1.5 border border-nred-100">
+                              <div className="text-base font-extrabold text-nred-600">{stats.rejected}</div>
+                              <div className="text-[0.58rem] text-nred-700 font-bold">مردودة</div>
+                            </div>
+                            <div className="bg-ink-50 rounded-lg py-1.5 border border-ink-150">
+                              <div className="text-base font-extrabold text-ink-500">{stats.missing}</div>
+                              <div className="text-[0.58rem] text-ink-500 font-bold">لم يسلّموا</div>
+                            </div>
+                            <div className="bg-nblue-50 rounded-lg py-1.5 border border-nblue-100">
+                              <div className="text-base font-extrabold text-nblue-700">{stats.total}</div>
+                              <div className="text-[0.58rem] text-nblue-700 font-bold">المستهدفون</div>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </>
                 )}
               </div>
             </div>
@@ -1588,7 +1626,7 @@ export default function TasksPage() {
                 رد المهمة للطلب (رفض)
               </button>
               <button onClick={() => handleEvaluate('approved')} disabled={evalBusy} className="btn bg-emerald-600 hover:bg-emerald-700 border-transparent text-white text-[0.95rem] font-bold shadow-soft rounded-xl py-3 px-8">
-                {evalBusy ? 'جارٍ الحفظ…' : 'اعتماد وقبول التسليم ✓'}
+                {evalBusy ? 'جارٍ الحفظ…' : evalSub.status === 'approved' ? 'حفظ النقاط ✓' : 'اعتماد وقبول التسليم ✓'}
               </button>
             </div>
           </div>
@@ -2232,7 +2270,6 @@ export default function TasksPage() {
 /* SUBMISSION CARD COMPONENT */
 function SubmissionCard({
   sub, onEvaluate, supervisors, isLog = false, canGrade = true,
-  inlineEditSub, inlinePoints, setInlineEditSub, setInlinePoints, saveInlinePoints, inlineBusy
 }: any) {
   const isPending = sub.status === 'pending';
   const isApproved = sub.status === 'approved';
@@ -2285,20 +2322,6 @@ function SubmissionCard({
             </span>
           )}
 
-          {/* Inline Edit Points for approved submissions */}
-          {!isPending && isApproved && inlineEditSub === sub.id && (
-            <div className="flex items-center gap-1 bg-ink-50 p-1 rounded-lg border border-ink-200" onClick={e => e.stopPropagation()}>
-              <input type="number" min={0} max={sub.taskMaxPoints} className="field py-0.5 px-2 w-16 text-center font-extrabold text-[0.8rem] text-brand-600 rounded border-brand-200 bg-white" value={inlinePoints} onChange={e => setInlinePoints?.(e.target.value.replace(/\D/g, ''))} />
-              <button onClick={() => saveInlinePoints?.(sub)} disabled={inlineBusy} className="bg-brand text-white px-2 py-0.5 rounded text-[10px] font-bold shadow-sm cursor-pointer hover:bg-brand/90">حفظ</button>
-              <button onClick={() => setInlineEditSub?.(null)} className="bg-white border border-ink-200 text-ink-600 px-2 py-0.5 rounded text-[10px] font-bold shadow-sm cursor-pointer hover:bg-ink-100">إلغاء</button>
-            </div>
-          )}
-          {!isPending && isApproved && canGrade && inlineEditSub !== sub.id && (
-            <button onClick={() => { setInlineEditSub?.(sub.id); setInlinePoints?.(String(sub.grade || 0)); }} className="text-brand hover:underline font-bold text-[0.7rem] mr-1 cursor-pointer">
-              ✏️ تعديل النقاط
-            </button>
-          )}
-
           {/* Feedback comment placeholder if exists */}
           {sub.feedback && (
             <span className="text-[0.7rem] text-ink-500 bg-ink-50 px-2 py-0.5 rounded border border-ink-150 max-w-[150px] truncate" title={sub.feedback}>
@@ -2332,7 +2355,7 @@ function SubmissionCard({
           )}
           {!isPending && onEvaluate && (
             <button onClick={() => onEvaluate(sub)} className="text-brand-600 bg-brand-50 hover:bg-brand-100 border border-brand-200 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer">
-              عرض التفاصيل
+              عرض التسليم وتعديل النقاط
             </button>
           )}
         </div>
