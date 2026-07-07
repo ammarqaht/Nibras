@@ -130,6 +130,8 @@ export default function StudentHome() {
   const [points, setPoints] = useState<PointRec[]>([]);
   const [announcements, setAnnouncements] = useState<AnnouncementPeek[]>([]);
   const [activeAnnouncement, setActiveAnnouncement] = useState<AnnouncementPeek | null>(null);
+  // Queue of unseen task-grading notifications (accepted/rejected) shown as popups.
+  const [gradeQueue, setGradeQueue] = useState<{ id: string; title: string; body: string }[]>([]);
   const [family, setFamily] = useState<FamilyPeek | null>(null);
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [showLedger, setShowLedger] = useState(false);
@@ -156,7 +158,20 @@ export default function StudentHome() {
     fetch('/api/student/announcements-feed').then(r => r.json()).then(d => setAnnouncements(d.announcements || [])).catch(() => {});
     fetch('/api/student/family').then(r => r.json()).then(d => setFamily(d));
     fetch('/api/student/excuse').then(r => r.json()).then(d => setMyExcuses(d.excuses || [])).catch(() => {});
+    // Task-grading notifications (accept/reject) — queue the ones not seen yet.
+    fetch('/api/student/notifications').then(r => r.json()).then(d => {
+      const graded = (d.notifications || []).filter((n: any) => n.type === 'student_graded');
+      const unseen = graded.filter((n: any) => !localStorage.getItem(`seen_notif_${n.id}`));
+      // Oldest first so the student reads them in order.
+      setGradeQueue(unseen.reverse().map((n: any) => ({ id: n.id, title: n.title, body: n.body })));
+    }).catch(() => {});
   }, []);
+
+  const activeGrade = gradeQueue[0] || null;
+  const closeGrade = () => {
+    if (activeGrade) localStorage.setItem(`seen_notif_${activeGrade.id}`, 'true');
+    setGradeQueue(prev => prev.slice(1));
+  };
 
   useEffect(() => {
     if (announcements.length > 0) {
@@ -660,6 +675,36 @@ export default function StudentHome() {
           </div>
         </div>
       )}
+      {activeGrade && (() => {
+        const rejected = activeGrade.title.includes('رد');
+        return (
+          <div className="modal-backdrop flex items-center justify-center p-4 z-50 animate-fadeIn" onClick={closeGrade}>
+            <div className="modal-panel w-full max-w-md p-6 relative bg-white rounded-2xl shadow-xl border border-ink-150" onClick={e => e.stopPropagation()}>
+              <button
+                onClick={closeGrade}
+                className="absolute top-4 left-4 text-2xl text-ink-400 hover:text-ink-900 transition-colors w-8 h-8 flex items-center justify-center rounded-full hover:bg-ink-50"
+                aria-label="إغلاق"
+              >
+                ×
+              </button>
+              <div className="text-center mb-4">
+                <span className="text-4xl">{rejected ? '📝' : '🎉'}</span>
+                <h2 className="font-display text-xl font-bold mt-2" style={{ color: rejected ? '#C42910' : '#1B7A43' }}>{activeGrade.title}</h2>
+              </div>
+              <div className="border-t border-b py-4 my-4 text-center" style={{ borderColor: 'var(--line)' }}>
+                <p className="text-sm leading-relaxed whitespace-pre-line" style={{ color: 'var(--ink)' }}>
+                  {activeGrade.body}
+                </p>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button onClick={closeGrade} className="btn btn-primary w-full py-3 rounded-xl font-bold">
+                  {rejected ? 'حسناً، سأعيد التسليم' : 'موافق'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
