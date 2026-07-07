@@ -270,13 +270,15 @@ body::after {
   backdrop-filter: blur(2px);
   animation: fadeIn 180ms ease;
   /* Keep every popup clear of the sticky navbar and scrollable if tall.
-     These are unlayered, so they override Tailwind's items-center / p-* utilities. */
-  align-items: flex-start;
-  overflow-y: auto;
-  padding-top: 4.75rem;
+     !important guarantees this wins over Tailwind's items-center / p-* utilities
+     regardless of CSS layer ordering in the production build. */
+  align-items: flex-start !important;
+  overflow-y: auto !important;
+  padding-top: 5rem !important;
+  padding-bottom: 1.5rem !important;
 }
 @media (min-width: 640px) {
-  .modal-backdrop { padding-top: 5.25rem; }
+  .modal-backdrop { padding-top: 5.5rem !important; }
 }
 .modal-panel {
   background: #fff;
