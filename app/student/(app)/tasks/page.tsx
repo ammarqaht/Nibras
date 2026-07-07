@@ -53,19 +53,55 @@ function fmtRemaining(ms: number): string {
   return `${m} دقيقة`;
 }
 
+/* Client-side image compression — keeps submission images small (site rule) */
+function compressImage(file: File, maxDim = 1400, quality = 0.7): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > height) {
+          if (width > maxDim) { height = Math.round((height * maxDim) / width); width = maxDim; }
+        } else if (height > maxDim) { width = Math.round((width * maxDim) / height); height = maxDim; }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return resolve(e.target?.result as string);
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 // Map legacy Arabic values + new keys to a canonical method key
 function methodKey(m: string): string {
   switch (m) {
     case 'file': case 'رفع ملف': case 'image': case 'video': case 'any': case 'audio': return 'file';
     case 'text': case 'نص': return 'text';
+    case 'link': case 'رابط': return 'link';
     case 'ack': case 'إقرار بالإنجاز': return 'ack';
     default: return 'file';
   }
 }
 
+// A task may allow several submission methods (comma-joined). Returns the
+// distinct canonical keys, defaulting to file upload.
+function parseMethods(m: string): string[] {
+  if (!m) return ['file'];
+  const parts = m.split(',').map(s => s.trim()).filter(Boolean).map(methodKey);
+  return parts.length ? Array.from(new Set(parts)) : ['file'];
+}
+
 const METHOD_LABELS: Record<string, string> = {
   file: 'رفع ملف',
   text: 'إجابة نصية',
+  link: 'رابط',
   ack: 'إقرار بالإنجاز',
 };
 
@@ -102,7 +138,9 @@ export default function StudentTasks() {
 
   // Submission form state
   const [subText, setSubText] = useState('');
-  const [subFile, setSubFile] = useState<File | null>(null);
+  const [subLink, setSubLink] = useState('');
+  const [subImages, setSubImages] = useState<string[]>([]); // compressed image data URLs (multiple allowed)
+  const [subFile, setSubFile] = useState<File | null>(null); // a single non-image file (e.g. audio/pdf)
   const [subFileDataUrl, setSubFileDataUrl] = useState('');
   const [ackChecked, setAckChecked] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -170,19 +208,49 @@ export default function StudentTasks() {
   function openTask(item: TaskItem) {
     setSelected(item);
     setSubText('');
+    setSubLink('');
+    setSubImages([]);
     setSubFile(null);
     setSubFileDataUrl('');
     setAckChecked(false);
     setSubErr('');
   }
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    setSubFile(f);
-    const reader = new FileReader();
-    reader.onload = ev => setSubFileDataUrl(ev.target?.result as string || '');
-    reader.readAsDataURL(f);
+  // Non-image files (video/pdf/audio) are stored inline in the DB, which is
+  // capped by the server request size — guard against oversized uploads.
+  const MAX_FILE_BYTES = 4 * 1024 * 1024; // ~4MB
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setSubErr('');
+    const imgs: string[] = [];
+    for (const f of Array.from(files)) {
+      if (f.type.startsWith('video/')) {
+        setSubErr('لا يمكن رفع مقاطع الفيديو. شارك رابط الفيديو (يوتيوب/درايف) عبر خانة الرابط.');
+        continue;
+      }
+      if (f.type.startsWith('image/')) {
+        try { imgs.push(await compressImage(f)); } catch { /* skip unreadable image */ }
+      } else {
+        if (f.size > MAX_FILE_BYTES) {
+          setSubErr('حجم الملف كبير جداً (الحد ~4 ميجابايت). يُفضّل رفع صور، أو مشاركة رابط.');
+          continue;
+        }
+        // A single non-image file replaces any previously chosen file/images
+        setSubImages([]);
+        setSubFile(f);
+        const reader = new FileReader();
+        reader.onload = ev => setSubFileDataUrl(ev.target?.result as string || '');
+        reader.readAsDataURL(f);
+      }
+    }
+    if (imgs.length > 0) {
+      setSubFile(null);
+      setSubFileDataUrl('');
+      setSubImages(prev => [...prev, ...imgs]);
+    }
+    e.target.value = ''; // allow re-selecting the same file
   }
 
   async function submitTask(e: React.FormEvent) {
@@ -192,17 +260,37 @@ export default function StudentTasks() {
     setSubErr('');
 
     let fileUrl = '';
-    const method = methodKey(selected.task.submissionMethod);
+    const methods = parseMethods(selected.task.submissionMethod);
 
-    if (method === 'text') {
-      if (!subText.trim()) { setSubErr('الرجاء كتابة النص'); setSubmitting(false); return; }
-      fileUrl = 'text:' + subText.trim();
-    } else if (method === 'ack') {
-      if (!ackChecked) { setSubErr('الرجاء تأكيد الإقرار بالإنجاز'); setSubmitting(false); return; }
-      fileUrl = 'ack://confirmed';
+    // Collect whatever the student provided across the allowed methods.
+    const parts: { text?: string; link?: string; files?: string[]; ack?: boolean } = {};
+    if (methods.includes('text') && subText.trim()) parts.text = subText.trim();
+    if (methods.includes('link') && subLink.trim()) parts.link = subLink.trim();
+    if (methods.includes('file')) {
+      if (subImages.length > 0) parts.files = subImages;
+      else if (subFileDataUrl) parts.files = [subFileDataUrl];
+    }
+    if (methods.includes('ack') && ackChecked) parts.ack = true;
+
+    const keys = Object.keys(parts);
+    if (keys.length === 0) {
+      setSubErr('يرجى تقديم محتوى التسليم (نص أو ملف أو رابط أو إقرار).');
+      setSubmitting(false); return;
+    }
+    if (parts.link && !/^https?:\/\//i.test(parts.link)) {
+      setSubErr('يرجى إدخال رابط صحيح يبدأ بـ http.');
+      setSubmitting(false); return;
+    }
+
+    if (keys.length === 1) {
+      // Single method → keep the legacy compact format for compatibility.
+      if (parts.text !== undefined) fileUrl = 'text:' + parts.text;
+      else if (parts.link !== undefined) fileUrl = 'link:' + parts.link;
+      else if (parts.ack) fileUrl = 'ack://confirmed';
+      else if (parts.files) fileUrl = parts.files.length === 1 ? parts.files[0] : JSON.stringify(parts.files);
     } else {
-      if (!subFileDataUrl) { setSubErr('الرجاء اختيار الملف'); setSubmitting(false); return; }
-      fileUrl = subFileDataUrl;
+      // Multiple methods → store a combined envelope.
+      fileUrl = JSON.stringify(parts);
     }
 
     try {
@@ -222,11 +310,11 @@ export default function StudentTasks() {
   }
 
   const tracks = Array.from(new Set(items.map(i => i.task.track).filter(Boolean))) as string[];
-  const methodsAvail = Array.from(new Set(items.map(i => methodKey(i.task.submissionMethod))));
+  const methodsAvail = Array.from(new Set(items.flatMap(i => parseMethods(i.task.submissionMethod))));
 
   const visible = items.filter(i =>
     (!filterTrack || i.task.track === filterTrack) &&
-    (!filterMethod || methodKey(i.task.submissionMethod) === filterMethod)
+    (!filterMethod || parseMethods(i.task.submissionMethod).includes(filterMethod))
   );
   const sorted = [...visible].sort((a, b) => {
     if (sortBy === 'points-desc') return b.task.maxPoints - a.task.maxPoints;
@@ -348,7 +436,7 @@ export default function StudentTasks() {
                   <div className="flex flex-wrap gap-1.5 text-[11px]">
                     <span className="inline-flex items-center gap-1 rounded-md px-2 py-1" style={{ background: '#E7F6EC', color: '#047857' }}>🏆 {item.task.maxPoints} مكافأة</span>
                     {(item.task.cost ?? 0) > 0 && <span className="inline-flex items-center gap-1 rounded-md px-2 py-1" style={{ background: '#FEF3C7', color: '#B45309' }}>💰 {item.task.cost} مبلغ</span>}
-                    <span className="inline-flex items-center gap-1 rounded-md px-2 py-1" style={{ background: 'var(--bg-soft)', color: 'var(--ink-soft)' }}>📎 {METHOD_LABELS[methodKey(item.task.submissionMethod)]}</span>
+                    <span className="inline-flex items-center gap-1 rounded-md px-2 py-1" style={{ background: 'var(--bg-soft)', color: 'var(--ink-soft)' }}>📎 {parseMethods(item.task.submissionMethod).map(k => METHOD_LABELS[k]).join('، ')}</span>
                   </div>
                 </div>
                 <div className="px-4 py-2.5 border-t flex items-center justify-between gap-2" style={{ borderColor: 'var(--line)' }}>
@@ -380,7 +468,7 @@ export default function StudentTasks() {
             </div>
 
             <div className="p-5 space-y-4">
-              <p className="text-sm leading-relaxed" style={{ color: 'var(--ink)' }}>{selected.task.description}</p>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--ink)' }}>{selected.task.description}</p>
 
               <div className="grid grid-cols-3 gap-2">
                 <InfoBox icon="📅" label="الموعد النهائي" color="#103F91" bg="#EAF0FB"
@@ -534,45 +622,88 @@ export default function StudentTasks() {
                         </h3>
 
                         {(() => {
-                    const method = methodKey(selected.task.submissionMethod);
-                    if (method === 'text') {
-                      return (
-                        <div>
-                          <label className="label">اكتب إجابتك</label>
-                          <textarea className="field" rows={5} value={subText} onChange={e => setSubText(e.target.value)} placeholder="اكتب إجابتك هنا..." />
-                        </div>
-                      );
-                    }
-                    if (method === 'ack') {
-                      return (
-                        <label className="flex items-start gap-3 rounded-xl p-4 cursor-pointer border" style={{ borderColor: ackChecked ? 'var(--accent)' : 'var(--line)', background: ackChecked ? '#FBF6EC' : 'var(--bg-soft)' }}>
-                          <input type="checkbox" checked={ackChecked} onChange={e => setAckChecked(e.target.checked)} className="mt-0.5 w-5 h-5 accent-[var(--accent-deep)]" />
-                          <span className="text-sm" style={{ color: 'var(--ink)' }}>أُقرّ بأنني أنجزت هذه المهمة على الوجه المطلوب.</span>
-                        </label>
-                      );
-                    }
-                    // file
+                    const methods = parseMethods(selected.task.submissionMethod);
                     return (
+                      <div className="space-y-4">
+                        {methods.length > 1 && (
+                          <p className="text-[11px] rounded-lg px-3 py-2" style={{ background: '#EEF3FC', color: '#1D4ED8' }}>
+                            هذه المهمة تقبل أكثر من طريقة تسليم — عبّئ ما يناسبك (يمكنك الجمع بينها).
+                          </p>
+                        )}
+
+                        {methods.includes('text') && (
+                          <div>
+                            <label className="label">اكتب إجابتك</label>
+                            <textarea className="field" rows={5} value={subText} onChange={e => setSubText(e.target.value)} placeholder="اكتب إجابتك هنا..." />
+                          </div>
+                        )}
+
+                        {methods.includes('link') && (
+                          <div>
+                            <label className="label">أرفق رابطاً (فيديو / يوتيوب / درايف)</label>
+                            <input type="url" className="field" value={subLink} onChange={e => setSubLink(e.target.value)} placeholder="https://..." dir="ltr" />
+                          </div>
+                        )}
+
+                        {methods.includes('ack') && (
+                          <label className="flex items-start gap-3 rounded-xl p-4 cursor-pointer border" style={{ borderColor: ackChecked ? 'var(--accent)' : 'var(--line)', background: ackChecked ? '#FBF6EC' : 'var(--bg-soft)' }}>
+                            <input type="checkbox" checked={ackChecked} onChange={e => setAckChecked(e.target.checked)} className="mt-0.5 w-5 h-5 accent-[var(--accent-deep)]" />
+                            <span className="text-sm" style={{ color: 'var(--ink)' }}>أُقرّ بأنني أنجزت هذه المهمة على الوجه المطلوب.</span>
+                          </label>
+                        )}
+
+                        {methods.includes('file') && (
                       <div>
-                        <label className="label">ارفع ملفاً</label>
-                        <div
-                          onClick={() => fileRef.current?.click()}
-                          className="border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors"
-                          style={{ borderColor: subFile ? 'var(--blue)' : 'var(--line)', background: subFile ? '#EEF3FC' : 'var(--bg-soft)' }}
-                        >
-                          {subFile ? (
-                            <div>
-                              <p className="text-sm font-bold" style={{ color: 'var(--blue)' }}>{subFile.name}</p>
-                              <p className="text-xs mt-1 tabular-nums" style={{ color: 'var(--ink-soft)' }}>{(subFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                        <label className="label">ارفع ملفاً — يمكنك اختيار أكثر من صورة (لا يُقبل الفيديو)</label>
+                        {subImages.length > 0 ? (
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                              {subImages.map((img, idx) => (
+                                <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border" style={{ borderColor: 'var(--line)' }}>
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={img} alt={`صورة ${idx + 1}`} className="w-full h-full object-cover" />
+                                  <button
+                                    type="button"
+                                    onClick={() => setSubImages(prev => prev.filter((_, i) => i !== idx))}
+                                    className="absolute top-1 right-1 bg-white/90 text-red-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold shadow"
+                                    aria-label="حذف الصورة"
+                                  >×</button>
+                                </div>
+                              ))}
+                              <button
+                                type="button"
+                                onClick={() => fileRef.current?.click()}
+                                className="aspect-square rounded-xl border-2 border-dashed flex flex-col items-center justify-center text-xs font-bold transition-colors"
+                                style={{ borderColor: 'var(--line)', color: 'var(--ink-soft)', background: 'var(--bg-soft)' }}
+                              >
+                                <span className="text-xl leading-none mb-1">＋</span>
+                                إضافة
+                              </button>
                             </div>
-                          ) : (
-                            <>
-                              <p className="text-2xl mb-2">📁</p>
-                              <p className="text-sm" style={{ color: 'var(--ink-soft)' }}>اضغط لاختيار الملف</p>
-                            </>
-                          )}
-                        </div>
-                        <input ref={fileRef} type="file" className="hidden" accept="*/*" onChange={handleFileChange} />
+                            <p className="text-[11px]" style={{ color: 'var(--ink-soft)' }}>{subImages.length} صورة مُرفقة — تُضغط الصور تلقائياً.</p>
+                          </div>
+                        ) : (
+                          <div
+                            onClick={() => fileRef.current?.click()}
+                            className="border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors"
+                            style={{ borderColor: subFile ? 'var(--blue)' : 'var(--line)', background: subFile ? '#EEF3FC' : 'var(--bg-soft)' }}
+                          >
+                            {subFile ? (
+                              <div>
+                                <p className="text-sm font-bold" style={{ color: 'var(--blue)' }}>{subFile.name}</p>
+                                <p className="text-xs mt-1 tabular-nums" style={{ color: 'var(--ink-soft)' }}>{(subFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                              </div>
+                            ) : (
+                              <>
+                                <p className="text-2xl mb-2">📁</p>
+                                <p className="text-sm" style={{ color: 'var(--ink-soft)' }}>اضغط لاختيار الملف أو الصور</p>
+                              </>
+                            )}
+                          </div>
+                        )}
+                        <input ref={fileRef} type="file" className="hidden" accept="image/*,audio/*,.pdf,.doc,.docx,.txt" multiple onChange={handleFileChange} />
+                      </div>
+                        )}
                       </div>
                     );
                   })()}
@@ -581,11 +712,14 @@ export default function StudentTasks() {
                     <p className="err-msg">{subErr}</p>
                   )}
 
+                  <button type="submit" disabled={submitting} className="btn btn-primary w-full">
+                    {submitting ? 'جارٍ الإرسال…' : 'تسليم المهمة'}
+                  </button>
                   <div className="flex gap-3">
-                    <button type="submit" disabled={submitting} className="btn btn-primary flex-1">
-                      {submitting ? 'جارٍ الإرسال…' : 'تسليم المهمة'}
+                    <button type="button" onClick={() => setSelected(null)} className="btn btn-secondary flex-1">
+                      إغلاق
                     </button>
-                    <button type="button" disabled={actionBusy} onClick={() => cancelTaskReq(selected)} className="btn btn-secondary" style={{ color: 'var(--red)' }}>
+                    <button type="button" disabled={actionBusy} onClick={() => cancelTaskReq(selected)} className="btn flex-1" style={{ background: 'var(--red)', color: '#fff', borderColor: 'var(--red)' }}>
                       إلغاء المهمة
                     </button>
                   </div>
@@ -707,7 +841,7 @@ export default function StudentTasks() {
                               {open && (
                                 <div className="px-2.5 pb-2.5 text-[11px] fade-in" style={{ color: 'var(--ink-soft)' }}>
                                   <p>{sub.feedback ? `التعليق: ${sub.feedback}` : 'لا يوجد تعليق.'}</p>
-                                  <p className="mt-1"><span dir="ltr">{new Date(sub.submittedAt).toLocaleDateString('ar-SA')}</span> · {METHOD_LABELS[methodKey(item.task.submissionMethod)]}</p>
+                                  <p className="mt-1"><span dir="ltr">{new Date(sub.submittedAt).toLocaleDateString('ar-SA')}</span> · {parseMethods(item.task.submissionMethod).map(k => METHOD_LABELS[k]).join('، ')}</p>
                                 </div>
                               )}
                             </div>

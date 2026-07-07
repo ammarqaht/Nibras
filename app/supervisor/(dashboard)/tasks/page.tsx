@@ -83,11 +83,99 @@ const parseTaskImages = (urlStr: string | null): string[] => {
   return [urlStr];
 };
 
+// A submission's fileUrl may be a single data-url/link, a JSON array of images,
+// or a JSON envelope { text, link, files, ack } when the student used several
+// methods. Returns just the file/image data-urls it contains (if any).
+function extractSubmissionFiles(fileUrl: string): string[] {
+  if (!fileUrl || fileUrl === 'admin://manual-mark' || fileUrl === 'ack://confirmed') return [];
+  if (fileUrl.startsWith('text:') || fileUrl.startsWith('link:')) return [];
+  if (fileUrl.trim().startsWith('{')) {
+    try { const o = JSON.parse(fileUrl); return Array.isArray(o.files) ? o.files : []; } catch { return []; }
+  }
+  return parseTaskImages(fileUrl);
+}
+
+const isImageUrl = (u: string) => u.startsWith('data:image') || /\.(jpg|jpeg|png|gif|webp)$/i.test(u);
+
+// Renders a student submission of any shape (text / link / files / ack / combined).
+function SubmissionContent({ fileUrl }: { fileUrl: string }) {
+  if (fileUrl === 'admin://manual-mark') {
+    return <div className="text-[0.95rem] text-ink-700 font-medium italic text-center py-4 bg-white rounded-xl border border-ink-150">إقرار إنجاز يدوي من المشرف</div>;
+  }
+  let obj: any = null;
+  if (fileUrl.trim().startsWith('{')) { try { obj = JSON.parse(fileUrl); } catch { /* not an envelope */ } }
+  const text: string | undefined = obj?.text ?? (fileUrl.startsWith('text:') ? fileUrl.slice(5) : undefined);
+  const link: string | undefined = obj?.link ?? (fileUrl.startsWith('link:') ? fileUrl.slice(5) : undefined);
+  const ack: boolean = obj?.ack ?? (fileUrl === 'ack://confirmed');
+  const files = extractSubmissionFiles(fileUrl);
+  const hasAny = !!text || !!link || ack || files.length > 0;
+
+  return (
+    <div className="space-y-3">
+      {text && (
+        <div className="bg-white rounded-xl border border-ink-150 p-3 text-[0.9rem] text-ink-800 whitespace-pre-wrap shadow-sm">{text}</div>
+      )}
+      {link && (
+        <a href={link} target="_blank" rel="noopener noreferrer" className="text-nblue-700 bg-nblue-50 hover:bg-nblue-100 border border-nblue-200 text-[0.9rem] font-bold block text-center py-3 rounded-xl transition-all shadow-sm break-all">
+          🔗 فتح الرابط المرفق
+        </a>
+      )}
+      {ack && (
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl p-3 text-[0.9rem] font-bold text-center">✅ أقرّ الطالب بإنجاز المهمة.</div>
+      )}
+      {files.length > 0 && (
+        files.every(isImageUrl) ? (
+          files.length === 1 ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={files[0]} alt="إثبات التسليم" className="max-h-64 rounded-xl border border-ink-200 mx-auto shadow-sm" />
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {files.map((img, idx) => (
+                <a href={img} target="_blank" rel="noopener noreferrer" key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-ink-200 block hover:scale-[1.02] transition-transform shadow-sm">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={img} alt={`إثبات التسليم ${idx + 1}`} className="w-full h-full object-cover" />
+                </a>
+              ))}
+            </div>
+          )
+        ) : (
+          <div className="space-y-2">
+            {files.map((f, idx) => (
+              f.startsWith('data:audio') || /\.(mp3|wav|ogg|m4a|aac)$/i.test(f) ? (
+                <audio key={idx} controls src={f} className="w-full" />
+              ) : (
+                <a key={idx} href={f} target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:text-white hover:bg-brand-500 hover:border-brand-500 text-[0.9rem] font-bold block text-center py-3 bg-white rounded-xl border border-ink-200 transition-all shadow-sm">
+                  📄 فتح المرفق {files.length > 1 ? `(${idx + 1})` : ''}
+                </a>
+              )
+            ))}
+          </div>
+        )
+      )}
+      {!hasAny && (
+        <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:text-white hover:bg-brand-500 hover:border-brand-500 text-[0.9rem] font-bold block text-center py-3 bg-white rounded-xl border border-ink-200 transition-all shadow-sm">
+          📄 فتح المرفق
+        </a>
+      )}
+    </div>
+  );
+}
+
 
 // A submission only becomes gradable once the student actually uploads their
 // work (status 'pending'). 'claimed' = requested but not submitted yet,
 // 'expired' = the claim window passed without a submission.
 const SUBMITTED_STATUSES = ['pending', 'approved', 'rejected'];
+
+// Submission methods a task can offer (multi-select). Stored comma-joined in
+// Task.submissionMethod. Direct video upload was removed — video is shared via
+// the "رابط" method instead.
+const SUBMISSION_METHODS = [
+  { label: 'رفع ملف', hint: 'صور / صوت / مستند' },
+  { label: 'نص', hint: 'إجابة نصية' },
+  { label: 'رابط', hint: 'فيديو / يوتيوب / درايف' },
+  { label: 'إقرار بالإنجاز', hint: 'تأكيد الإنجاز فقط' },
+];
 
 function statusLabel(status: string) {
   if (status === 'approved') return 'مقبولة ✓';
@@ -158,14 +246,14 @@ export default function TasksPage() {
   // what they can see (the API enforces the assignment rule as well).
   const canGrade = useMemo(() => !!user, [user]);
 
-  const [activeTab, setActiveTab] = useState<'manage' | 'submissions' | 'log' | 'add'>('manage');
+  const [activeTab, setActiveTab] = useState<'manage' | 'submissions' | 'log' | 'stats' | 'add'>('manage');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get('tab');
-      if (tabParam === 'submissions' || tabParam === 'log' || tabParam === 'add' || tabParam === 'manage') {
+      if (tabParam === 'submissions' || tabParam === 'log' || tabParam === 'stats' || tabParam === 'add' || tabParam === 'manage') {
         setActiveTab(tabParam as any);
       }
     }
@@ -212,6 +300,13 @@ export default function TasksPage() {
   const [statsSearch, setStatsSearch] = useState('');
   const [statsFilter, setStatsFilter] = useState<'all' | 'submitted' | 'missing' | 'claimed'>('all');
 
+  // Preview a task exactly as the student sees it
+  const [previewTask, setPreviewTask] = useState<Task | null>(null);
+
+  // Statistics tab filters
+  const [statsTabSearch, setStatsTabSearch] = useState('');
+  const [statsTabTrack, setStatsTabTrack] = useState('');
+
   // Add task state
   const addFileRef = useRef<HTMLInputElement>(null);
   const [addTitle, setAddTitle] = useState('');
@@ -220,7 +315,7 @@ export default function TasksPage() {
   const [addCost, setAddCost] = useState('0');
   const [addStartDate, setAddStartDate] = useState('');
   const [addDeadline, setAddDeadline] = useState('');
-  const [addMethod, setAddMethod] = useState('رفع ملف');
+  const [addMethods, setAddMethods] = useState<string[]>(['رفع ملف']);
   const [addLateAfter, setAddLateAfter] = useState('');
   const [addTimeLimit, setAddTimeLimit] = useState('');
   const [addResourceLink, setAddResourceLink] = useState('');
@@ -231,6 +326,7 @@ export default function TasksPage() {
 
   const [addStages, setAddStages] = useState<string[]>([]);
   const [editStages, setEditStages] = useState<string[]>([]);
+  const [editMethods, setEditMethods] = useState<string[]>([]);
   const [editTaskImages, setEditTaskImages] = useState<string[]>([]);
 
   // Tracks management states
@@ -285,6 +381,16 @@ export default function TasksPage() {
       } else {
         setEditStages(editTask.stage.split(',').map(s => s.trim()));
       }
+      // Map the stored method(s) onto the known labels; fall back to file upload.
+      const rawMethods = (editTask.submissionMethod || 'رفع ملف')
+        .split(',').map(s => s.trim()).filter(Boolean)
+        .map(m => (m === 'file' || m === 'image' || m === 'video' || m === 'audio' || m === 'any') ? 'رفع ملف'
+          : m === 'text' ? 'نص'
+          : m === 'link' ? 'رابط'
+          : m === 'ack' ? 'إقرار بالإنجاز' : m);
+      const known = SUBMISSION_METHODS.map(x => x.label);
+      const mapped = Array.from(new Set(rawMethods.filter(m => known.includes(m))));
+      setEditMethods(mapped.length ? mapped : ['رفع ملف']);
       setEditTaskImages(parseTaskImages(editTask.imageUrl));
     }
   }, [editTask]);
@@ -353,6 +459,7 @@ export default function TasksPage() {
     e.preventDefault();
     if (!addTitle.trim() || !addDesc.trim() || !addDeadline) return pushToast('error', 'يرجى إدخال جميع الحقول الإلزامية');
     if (addStages.length === 0) return pushToast('error', 'يرجى اختيار مرحلة مستهدفة واحدة على الأقل');
+    if (addMethods.length === 0) return pushToast('error', 'يرجى اختيار طريقة تسليم واحدة على الأقل');
 
     setAddBusy(true);
     try {
@@ -365,7 +472,7 @@ export default function TasksPage() {
           maxPoints: parseInt(addPoints, 10),
           startDate: addStartDate || null,
           dueDate: addDeadline,
-          submissionMethod: addMethod,
+          submissionMethod: addMethods.join(', '),
           lateAfterHours: addLateAfter ? parseInt(addLateAfter, 10) * 24 : null,
           timeLimitHours: addTimeLimit ? parseInt(addTimeLimit, 10) * 24 : null,
           assignedAdmins: addAdmins,
@@ -383,7 +490,7 @@ export default function TasksPage() {
       if (!res.ok) throw new Error(data.error || 'فشل إضافة المهمة');
 
       pushToast('success', 'تم نشر المهمة بنجاح ✓');
-      setAddTitle(''); setAddDesc(''); setAddPoints('10'); setAddCost('0'); setAddStartDate(''); setAddDeadline(''); setAddMethod('رفع ملف'); setAddLateAfter(''); setAddTimeLimit(''); setAddResourceLink(''); setAddImages([]); setAddAdmins([]); setAddTrack('عام'); setAddStages([]);
+      setAddTitle(''); setAddDesc(''); setAddPoints('10'); setAddCost('0'); setAddStartDate(''); setAddDeadline(''); setAddMethods(['رفع ملف']); setAddLateAfter(''); setAddTimeLimit(''); setAddResourceLink(''); setAddImages([]); setAddAdmins([]); setAddTrack('عام'); setAddStages([]);
       await loadData();
       setActiveTab('manage');
     } catch (err: any) {
@@ -459,6 +566,7 @@ export default function TasksPage() {
     e.preventDefault();
     if (!editTask) return;
     if (editStages.length === 0) return pushToast('error', 'يرجى اختيار مرحلة مستهدفة واحدة على الأقل');
+    if (editMethods.length === 0) return pushToast('error', 'يرجى اختيار طريقة تسليم واحدة على الأقل');
     setEditBusy(true);
     try {
       const res = await fetch(`/api/supervisor/tasks/${editTask.id}`, {
@@ -472,7 +580,7 @@ export default function TasksPage() {
           dueDate: editTask.dueDate,
           track: editTask.track?.trim() || 'عام',
           stage: editStages.join(', '),
-          submissionMethod: editTask.submissionMethod,
+          submissionMethod: editMethods.join(', '),
           timeLimitHours: editTask.durationHours,
           lateAfterHours: editTask.lateAfterHours,
           assignedAdmins: editTask.assignedAdmins,
@@ -599,7 +707,7 @@ export default function TasksPage() {
   }, [statsTask, students, submissions, statsSearch, statsFilter]);
 
   const statsCounts = useMemo(() => {
-    if (!statsTask) return { total: 0, submitted: 0, missing: 0, pending: 0, claimed: 0 };
+    if (!statsTask) return { total: 0, submitted: 0, missing: 0, pending: 0, claimed: 0, approved: 0, rejected: 0 };
     const scopedStudents = scopedStudentsFor(statsTask);
     const scopedIds = new Set(scopedStudents.map(s => s.id));
     const scopedSubs = submissions.filter(s => s.taskId === statsTask.id && scopedIds.has(s.registrationId));
@@ -609,11 +717,74 @@ export default function TasksPage() {
     const total = scopedStudents.length;
     const submitted = scopedStudents.filter(s => submittedIds.has(s.id)).length;
     const pending = taskSubmissions.filter(s => s.status === 'pending').length;
+    // Accepted by the supervisor (grade approved) vs returned/rejected.
+    const approved = taskSubmissions.filter(s => s.status === 'approved').length;
+    const rejected = taskSubmissions.filter(s => s.status === 'rejected').length;
     // Students who requested/claimed the task but have not submitted yet.
     const claimed = scopedSubs.filter(s => s.status === 'claimed').length;
     const missing = total - submitted;
-    return { total, submitted, missing, pending, claimed };
+    return { total, submitted, missing, pending, claimed, approved, rejected };
   }, [statsTask, students, submissions]);
+
+  // Reusable per-task breakdown (used by the statistics tab)
+  function computeTaskStats(task: Task) {
+    const scopedStudents = scopedStudentsFor(task);
+    const scopedIds = new Set(scopedStudents.map(s => s.id));
+    const scopedSubs = submissions.filter(s => s.taskId === task.id && scopedIds.has(s.registrationId));
+    const real = scopedSubs.filter(s => SUBMITTED_STATUSES.includes(s.status));
+    const submittedIds = new Set(real.map(s => s.registrationId));
+    const total = scopedStudents.length;
+    const submitted = submittedIds.size;
+    const pending = real.filter(s => s.status === 'pending').length;
+    const approved = real.filter(s => s.status === 'approved').length;
+    const rejected = real.filter(s => s.status === 'rejected').length;
+    const claimed = scopedSubs.filter(s => s.status === 'claimed').length;
+    const missing = total - submitted;
+    return { total, submitted, pending, approved, rejected, claimed, missing };
+  }
+
+  // Statistics tab: per-task rows (with its own search/track filter), an overall
+  // aggregate, and a per-stage breakdown of submission activity.
+  const taskStatsRows = useMemo(() => {
+    return tasks
+      .filter(t => {
+        const matchQ = !statsTabSearch.trim() || t.title.toLowerCase().includes(statsTabSearch.trim().toLowerCase());
+        const matchTrack = !statsTabTrack || t.track === statsTabTrack;
+        return matchQ && matchTrack;
+      })
+      .map(t => ({ task: t, stats: computeTaskStats(t) }));
+  }, [tasks, students, submissions, statsTabSearch, statsTabTrack]);
+
+  const overallStats = useMemo(() => {
+    return taskStatsRows.reduce(
+      (acc, { stats }) => ({
+        tasks: acc.tasks + 1,
+        claimed: acc.claimed + stats.claimed,
+        pending: acc.pending + stats.pending,
+        approved: acc.approved + stats.approved,
+        rejected: acc.rejected + stats.rejected,
+        missing: acc.missing + stats.missing,
+        total: acc.total + stats.total,
+      }),
+      { tasks: 0, claimed: 0, pending: 0, approved: 0, rejected: 0, missing: 0, total: 0 }
+    );
+  }, [taskStatsRows]);
+
+  const stageStats = useMemo(() => {
+    const stages = ['ابتدائي', 'متوسط', 'ثانوي'];
+    const stageOf = new Map(students.map(s => [s.id, s.stage]));
+    const map: Record<string, { claimed: number; pending: number; approved: number; rejected: number }> =
+      Object.fromEntries(stages.map(st => [st, { claimed: 0, pending: 0, approved: 0, rejected: 0 }]));
+    for (const sub of submissions) {
+      const st = stageOf.get(sub.registrationId);
+      if (!st || !map[st]) continue;
+      if (sub.status === 'claimed') map[st].claimed++;
+      else if (sub.status === 'pending') map[st].pending++;
+      else if (sub.status === 'approved') map[st].approved++;
+      else if (sub.status === 'rejected') map[st].rejected++;
+    }
+    return stages.map(st => ({ stage: st, ...map[st] }));
+  }, [students, submissions]);
 
   async function handleImagePick(e: React.ChangeEvent<HTMLInputElement>, isEdit = false) {
     const files = e.target.files;
@@ -677,6 +848,14 @@ export default function TasksPage() {
           }`}
         >
           <span>سجل التقييمات</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('stats')}
+          className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-2 py-3 px-5 rounded-xl text-sm font-bold transition-all shrink-0 ${
+            activeTab === 'stats' ? 'bg-brand text-white shadow-brand' : 'text-ink-600 hover:bg-cream-100 hover:text-ink-900'
+          }`}
+        >
+          <span>الإحصائيات</span>
         </button>
         {isScientific && (
           <button
@@ -846,6 +1025,12 @@ export default function TasksPage() {
 
                       {/* Actions row */}
                       <div className="flex flex-wrap gap-2 p-3 border-t border-ink-100 bg-cream-50/40">
+                        <button
+                          className="border border-emerald-500/30 text-emerald-700 bg-emerald-50/60 hover:bg-emerald-100/60 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-1"
+                          onClick={() => setPreviewTask(task)}
+                        >
+                          👁️ عرض
+                        </button>
                         {isScientific && (
                           <>
                             <button
@@ -1022,6 +1207,149 @@ export default function TasksPage() {
             </div>
           )}
 
+          {/* TAB 3B: STATISTICS */}
+          {activeTab === 'stats' && (
+            <div className="space-y-6 fade-in">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-full bg-nblue-50 flex items-center justify-center text-nblue-600 text-2xl border border-nblue-100 shadow-sm">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                </div>
+                <div>
+                  <h1 className="text-[1.75rem] font-bold text-ink-900">إحصائيات المهام</h1>
+                  <p className="text-[0.9rem] text-ink-500 mt-1">نظرة شاملة على تفاعل الطلاب مع المهام — إجمالاً، حسب المرحلة، ولكل مهمة.</p>
+                </div>
+              </div>
+
+              {/* Overall aggregate */}
+              <div>
+                <div className="text-sm font-bold text-ink-700 mb-2 px-1">الإجمالي (كل المهام)</div>
+                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+                  <div className="card p-4 flex flex-col items-center justify-center text-center shadow-soft">
+                    <div className="text-3xl font-extrabold text-ink-800">{overallStats.tasks}</div>
+                    <div className="text-[0.8rem] font-bold text-ink-500 mt-1">عدد المهام</div>
+                  </div>
+                  <div className="card p-4 flex flex-col items-center justify-center text-center shadow-soft">
+                    <div className="text-3xl font-extrabold text-amber-600">{overallStats.claimed}</div>
+                    <div className="text-[0.8rem] font-bold text-ink-500 mt-1">طلبوا المهمة</div>
+                  </div>
+                  <div className="card p-4 flex flex-col items-center justify-center text-center shadow-soft">
+                    <div className="text-3xl font-extrabold text-brand-600">{overallStats.pending}</div>
+                    <div className="text-[0.8rem] font-bold text-ink-500 mt-1">بانتظار المراجعة</div>
+                  </div>
+                  <div className="card p-4 flex flex-col items-center justify-center text-center shadow-soft">
+                    <div className="text-3xl font-extrabold text-emerald-600">{overallStats.approved}</div>
+                    <div className="text-[0.8rem] font-bold text-ink-500 mt-1">تم اعتماد التسليم</div>
+                  </div>
+                  <div className="card p-4 flex flex-col items-center justify-center text-center shadow-soft">
+                    <div className="text-3xl font-extrabold text-nred-600">{overallStats.rejected}</div>
+                    <div className="text-[0.8rem] font-bold text-ink-500 mt-1">مردودة</div>
+                  </div>
+                  <div className="card p-4 flex flex-col items-center justify-center text-center shadow-soft">
+                    <div className="text-3xl font-extrabold text-ink-800">{overallStats.total}</div>
+                    <div className="text-[0.8rem] font-bold text-ink-500 mt-1">إجمالي المستهدفين</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Per-stage breakdown */}
+              <div>
+                <div className="text-sm font-bold text-ink-700 mb-2 px-1">حسب المرحلة</div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {stageStats.map(row => (
+                    <div key={row.stage} className="card p-4 shadow-soft border border-ink-150">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="font-extrabold text-ink-900">{row.stage}</span>
+                        <span className="text-[0.7rem] font-bold text-ink-400">إجمالي التفاعل: {row.claimed + row.pending + row.approved + row.rejected}</span>
+                      </div>
+                      <div className="grid grid-cols-4 gap-1.5 text-center">
+                        <div className="bg-amber-50 rounded-lg py-2 border border-amber-100">
+                          <div className="text-base font-extrabold text-amber-600">{row.claimed}</div>
+                          <div className="text-[0.6rem] text-amber-700 font-bold">طلبوا</div>
+                        </div>
+                        <div className="bg-brand-50 rounded-lg py-2 border border-brand-100">
+                          <div className="text-base font-extrabold text-brand-600">{row.pending}</div>
+                          <div className="text-[0.6rem] text-brand-700 font-bold">بالانتظار</div>
+                        </div>
+                        <div className="bg-emerald-50 rounded-lg py-2 border border-emerald-100">
+                          <div className="text-base font-extrabold text-emerald-600">{row.approved}</div>
+                          <div className="text-[0.6rem] text-emerald-700 font-bold">معتمدة</div>
+                        </div>
+                        <div className="bg-nred-50 rounded-lg py-2 border border-nred-100">
+                          <div className="text-base font-extrabold text-nred-600">{row.rejected}</div>
+                          <div className="text-[0.6rem] text-nred-700 font-bold">مردودة</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Per-task table */}
+              <div>
+                <div className="text-sm font-bold text-ink-700 mb-2 px-1">تفاصيل كل مهمة</div>
+                <div className="bg-white rounded-2xl p-4 flex flex-col md:flex-row items-center gap-3 border border-ink-150 shadow-sm mb-3">
+                  <div className="relative flex-1 w-full">
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-ink-400">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    </span>
+                    <input type="text" placeholder="ابحث باسم المهمة..." className="field pl-4 pr-11 py-2.5 text-[0.9rem] w-full rounded-xl bg-ink-50/30 border-transparent focus:bg-white" value={statsTabSearch} onChange={e => setStatsTabSearch(e.target.value)} />
+                  </div>
+                  <select className="field py-2.5 px-3 text-[0.9rem] flex-1 md:w-48 rounded-xl bg-ink-50/30 border-transparent focus:bg-white" value={statsTabTrack} onChange={e => setStatsTabTrack(e.target.value)}>
+                    <option value="">كل المسارات</option>
+                    {tracks.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
+                  </select>
+                </div>
+
+                {taskStatsRows.length === 0 ? (
+                  <div className="card p-12 text-center text-ink-400 border border-ink-150 shadow-soft">لا توجد مهام مطابقة.</div>
+                ) : (
+                  <div className="overflow-x-auto rounded-2xl border border-ink-150 shadow-soft bg-white">
+                    <table className="w-full text-[0.82rem] min-w-[640px]">
+                      <thead>
+                        <tr className="bg-ink-50/60 text-ink-500 text-[0.72rem]">
+                          <th className="text-right font-bold py-3 px-4">المهمة</th>
+                          <th className="text-center font-bold py-3 px-2">المرحلة</th>
+                          <th className="text-center font-bold py-3 px-2">طلبوا</th>
+                          <th className="text-center font-bold py-3 px-2">بالانتظار</th>
+                          <th className="text-center font-bold py-3 px-2">معتمدة</th>
+                          <th className="text-center font-bold py-3 px-2">مردودة</th>
+                          <th className="text-center font-bold py-3 px-2">لم يسلّموا</th>
+                          <th className="text-center font-bold py-3 px-2">المستهدفون</th>
+                          <th className="py-3 px-2"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-ink-100">
+                        {taskStatsRows.map(({ task, stats }) => (
+                          <tr key={task.id} className="hover:bg-cream-100/40 transition-colors">
+                            <td className="py-3 px-4">
+                              <div className="font-bold text-ink-900 truncate max-w-[220px]">{task.title}</div>
+                              <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[0.62rem] font-bold ${getTrackPillClass(task.track)}`}>{task.track || 'عام'}</span>
+                            </td>
+                            <td className="text-center py-3 px-2 text-ink-500 text-[0.72rem]">{task.stage || 'الكل'}</td>
+                            <td className="text-center py-3 px-2 font-extrabold text-amber-600">{stats.claimed}</td>
+                            <td className="text-center py-3 px-2 font-extrabold text-brand-600">{stats.pending}</td>
+                            <td className="text-center py-3 px-2 font-extrabold text-emerald-600">{stats.approved}</td>
+                            <td className="text-center py-3 px-2 font-extrabold text-nred-600">{stats.rejected}</td>
+                            <td className="text-center py-3 px-2 font-extrabold text-ink-400">{stats.missing}</td>
+                            <td className="text-center py-3 px-2 font-extrabold text-ink-800">{stats.total}</td>
+                            <td className="text-center py-3 px-2">
+                              <button
+                                onClick={() => { setStatsTask(task); setStatsSearch(''); setStatsFilter('all'); }}
+                                className="border border-nblue-400/30 text-nblue-700 bg-nblue-50/60 hover:bg-nblue-100/60 px-3 py-1.5 rounded-lg text-[0.7rem] font-bold transition-colors whitespace-nowrap"
+                              >
+                                التفاصيل
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* TAB 4: ADD TASK */}
           {activeTab === 'add' && isScientific && (
             <div className="max-w-4xl mx-auto fade-in space-y-6">
@@ -1092,13 +1420,24 @@ export default function TasksPage() {
                     <label className="label mb-1.5 font-bold text-ink-800">تكلفة شراء المهمة (💰 نقاط)</label>
                     <input type="number" className="field py-3 rounded-xl bg-ink-50/20 text-center font-extrabold text-amber-600 text-lg w-full" min={0} value={addCost} onChange={e => setAddCost(e.target.value.replace(/\D/g, ''))} />
                   </div>
-                  <div>
-                    <label className="label mb-1.5 font-bold text-ink-800">طريقة التسليم <span className="req">*</span></label>
-                    <select className="field py-3 rounded-xl bg-ink-50/20" value={addMethod} onChange={e => setAddMethod(e.target.value)}>
-                      <option value="رفع ملف">رفع ملف (صورة / مستند / فيديو)</option>
-                      <option value="نص">إجابة نصية</option>
-                      <option value="إقرار بالإنجاز">إقرار بالإنجاز فقط</option>
-                    </select>
+                  <div className="md:col-span-2">
+                    <label className="label mb-1.5 font-bold text-ink-800">طرق التسليم (يمكن اختيار أكثر من طريقة) <span className="req">*</span></label>
+                    <div className="flex flex-wrap gap-2">
+                      {SUBMISSION_METHODS.map(m => {
+                        const active = addMethods.includes(m.label);
+                        return (
+                          <button
+                            key={m.label}
+                            type="button"
+                            onClick={() => setAddMethods(prev => prev.includes(m.label) ? prev.filter(x => x !== m.label) : [...prev, m.label])}
+                            className={`choice text-xs font-bold px-4 py-2 rounded-xl flex flex-col items-center gap-0.5 ${active ? 'is-active' : ''}`}
+                          >
+                            <span>{m.label}</span>
+                            <span className="text-[0.62rem] font-normal opacity-70">{m.hint}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                   <div>
                     <label className="label mb-1.5 font-bold text-ink-800">مدة المهمة (أيام — بعدها متأخر)</label>
@@ -1177,8 +1516,8 @@ export default function TasksPage() {
 
       {/* MODAL 1: EVALUATE SUBMISSION */}
       {evalSub && (
-        <div className="modal-backdrop flex items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto" onClick={() => setEvalSub(null)}>
-          <div className="modal-panel w-[92vw] sm:w-full sm:max-w-xl rounded-2xl max-h-[85vh] flex flex-col shadow-elevated" onClick={e => e.stopPropagation()}>
+        <div className="modal-backdrop flex items-start justify-center px-3 sm:px-4 pb-4 pt-[76px] sm:pt-[88px] z-50 overflow-y-auto" onClick={() => setEvalSub(null)}>
+          <div className="modal-panel w-[92vw] sm:w-full sm:max-w-xl rounded-2xl max-h-[calc(100dvh-96px)] flex flex-col shadow-elevated" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 sm:p-5 border-b border-ink-150 bg-ink-50/50 rounded-t-2xl shrink-0">
               <h3 className="text-lg sm:text-xl font-extrabold text-ink-900">مراجعة وتقييم المهمة</h3>
               <button className="text-3xl text-ink-400 hover:text-ink-900 transition-colors leading-none" onClick={() => setEvalSub(null)}>×</button>
@@ -1194,19 +1533,21 @@ export default function TasksPage() {
                 </div>
               </div>
 
+              {(() => {
+                const taskDesc = tasks.find(t => t.id === evalSub.taskId)?.description;
+                if (!taskDesc) return null;
+                return (
+                  <div className="bg-white p-4 rounded-2xl border border-ink-150 shadow-sm">
+                    <div className="text-[0.8rem] text-ink-500 font-bold mb-1.5">وصف المهمة:</div>
+                    <p className="text-[0.9rem] text-ink-800 leading-relaxed whitespace-pre-wrap">{taskDesc}</p>
+                  </div>
+                );
+              })()}
+
               {evalSub.fileUrl && (
                 <div className="bg-cream-100/60 p-5 rounded-2xl border border-ink-150">
                   <div className="text-[0.85rem] text-ink-500 font-bold mb-3">محتوى التسليم المرفق:</div>
-                  {evalSub.fileUrl.startsWith('data:image') || evalSub.fileUrl.startsWith('http') && evalSub.fileUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={evalSub.fileUrl} alt="إثبات التسليم" className="max-h-64 rounded-xl border border-ink-200 mx-auto shadow-sm" />
-                  ) : evalSub.fileUrl === 'admin://manual-mark' ? (
-                    <div className="text-[0.95rem] text-ink-700 font-medium italic text-center py-4 bg-white rounded-xl border border-ink-150">إقرار إنجاز يدوي من المشرف</div>
-                  ) : (
-                    <a href={evalSub.fileUrl} target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:text-white hover:bg-brand-500 hover:border-brand-500 text-[0.95rem] font-bold block text-center py-4 bg-white rounded-xl border border-ink-200 transition-all shadow-sm">
-                      📄 فتح المستند المرفق في نافذة جديدة
-                    </a>
-                  )}
+                  <SubmissionContent fileUrl={evalSub.fileUrl} />
                 </div>
               )}
 
@@ -1319,13 +1660,24 @@ export default function TasksPage() {
                     <label className="label font-bold text-ink-800 mb-1.5">تاريخ إغلاق المهمة</label>
                     <input type="date" className="field py-3 rounded-xl bg-ink-50/30 font-mono" required value={editTask.dueDate.split('T')[0]} onChange={e => setEditTask({ ...editTask, dueDate: e.target.value })} />
                   </div>
-                  <div>
-                    <label className="label font-bold text-ink-800 mb-1.5">طريقة التسليم</label>
-                    <select className="field py-3 rounded-xl bg-ink-50/30" value={editTask.submissionMethod || 'رفع ملف'} onChange={e => setEditTask({ ...editTask, submissionMethod: e.target.value })}>
-                      <option value="رفع ملف">رفع ملف (صورة / مستند / فيديو)</option>
-                      <option value="نص">إجابة نصية</option>
-                      <option value="إقرار بالإنجاز">إقرار بالإنجاز فقط</option>
-                    </select>
+                  <div className="md:col-span-2">
+                    <label className="label font-bold text-ink-800 mb-1.5">طرق التسليم (يمكن اختيار أكثر من طريقة) <span className="req">*</span></label>
+                    <div className="flex flex-wrap gap-2">
+                      {SUBMISSION_METHODS.map(m => {
+                        const active = editMethods.includes(m.label);
+                        return (
+                          <button
+                            key={m.label}
+                            type="button"
+                            onClick={() => setEditMethods(prev => prev.includes(m.label) ? prev.filter(x => x !== m.label) : [...prev, m.label])}
+                            className={`choice text-xs font-bold px-4 py-2 rounded-xl flex flex-col items-center gap-0.5 ${active ? 'is-active' : ''}`}
+                          >
+                            <span>{m.label}</span>
+                            <span className="text-[0.62rem] font-normal opacity-70">{m.hint}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                   <div>
                     <label className="label font-bold text-ink-800 mb-1.5">مدة المهمة (أيام — بعدها متأخر)</label>
@@ -1543,19 +1895,19 @@ export default function TasksPage() {
               <button className="text-3xl text-ink-400 hover:text-ink-900 transition-colors leading-none" onClick={() => setStatsTask(null)}>×</button>
             </div>
             <div className="p-3.5 sm:p-4 space-y-3.5 flex-1 overflow-y-auto scroll-soft">
-              {/* Stats Strip — awaiting review, submitted, requested (claimed), not submitted, total */}
+              {/* Stats Strip — requested (claimed), awaiting review, accepted, not submitted, total */}
               <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 text-center">
+                <div className="bg-amber-50 p-2.5 rounded-xl border border-amber-100 shadow-sm">
+                  <div className="text-xl font-extrabold text-amber-600">{statsCounts.claimed}</div>
+                  <div className="text-[0.66rem] text-amber-700 font-bold mt-0.5">طلبوا المهمة</div>
+                </div>
                 <div className="bg-brand-50 p-2.5 rounded-xl border border-brand-100 shadow-sm">
                   <div className="text-xl font-extrabold text-brand-600">{statsCounts.pending}</div>
                   <div className="text-[0.66rem] text-brand-700 font-bold mt-0.5">بانتظار المراجعة</div>
                 </div>
                 <div className="bg-emerald-50 p-2.5 rounded-xl border border-emerald-100 shadow-sm">
-                  <div className="text-xl font-extrabold text-emerald-600">{statsCounts.submitted}</div>
-                  <div className="text-[0.66rem] text-emerald-700 font-bold mt-0.5">تم التسليم</div>
-                </div>
-                <div className="bg-amber-50 p-2.5 rounded-xl border border-amber-100 shadow-sm">
-                  <div className="text-xl font-extrabold text-amber-600">{statsCounts.claimed}</div>
-                  <div className="text-[0.66rem] text-amber-700 font-bold mt-0.5">طلبوا المهمة</div>
+                  <div className="text-xl font-extrabold text-emerald-600">{statsCounts.approved}</div>
+                  <div className="text-[0.66rem] text-emerald-700 font-bold mt-0.5">تم اعتماد التسليم</div>
                 </div>
                 <div className="bg-nred-50 p-2.5 rounded-xl border border-nred-100 shadow-sm">
                   <div className="text-xl font-extrabold text-nred-600">{statsCounts.missing}</div>
@@ -1621,6 +1973,85 @@ export default function TasksPage() {
             </div>
             <div className="flex justify-end p-4 sm:p-5 border-t border-ink-150 bg-ink-50/50 rounded-b-2xl shrink-0">
               <button onClick={() => setStatsTask(null)} className="btn bg-brand-500 hover:bg-brand-600 text-white text-[0.95rem] font-bold rounded-xl py-3 px-8 shadow-brand">إغلاق</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4B: TASK PREVIEW (as the student sees it) */}
+      {previewTask && (
+        <div className="modal-backdrop flex items-start justify-center px-3 sm:px-4 pb-4 pt-[76px] sm:pt-[88px] z-50 overflow-y-auto" onClick={() => setPreviewTask(null)}>
+          <div className="modal-panel w-[92vw] sm:w-full sm:max-w-lg rounded-2xl max-h-[calc(100dvh-96px)] flex flex-col shadow-elevated" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-3.5 sm:p-4 border-b border-ink-150 bg-ink-50/50 rounded-t-2xl shrink-0">
+              <div>
+                <h3 className="text-base sm:text-lg font-extrabold text-ink-900">معاينة المهمة كما تظهر للطالب</h3>
+                <div className="text-[0.78rem] font-bold text-ink-400 mt-0.5">هذه معاينة للعرض فقط.</div>
+              </div>
+              <button className="text-3xl text-ink-400 hover:text-ink-900 transition-colors leading-none" onClick={() => setPreviewTask(null)}>×</button>
+            </div>
+            <div className="flex-1 overflow-y-auto scroll-soft">
+              {/* Student-style header */}
+              <div className="p-5 border-b border-ink-150">
+                <h2 className="text-xl font-bold text-ink-900">{previewTask.title}</h2>
+                {previewTask.track && (
+                  <span className="text-xs px-2 py-0.5 rounded-full mt-1.5 inline-block bg-brand-50 text-brand-700">{previewTask.track}</span>
+                )}
+              </div>
+
+              <div className="p-5 space-y-4">
+                <p className="text-sm leading-relaxed text-ink-800 whitespace-pre-wrap">{previewTask.description}</p>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-xl p-3 text-center" style={{ background: '#EAF0FB' }}>
+                    <div className="text-lg mb-0.5">📅</div>
+                    <div className="text-[0.95rem] font-extrabold" style={{ color: '#103F91' }} dir="ltr">{previewTask.dueDate.split('T')[0]}</div>
+                    <div className="text-[0.66rem] font-bold mt-0.5" style={{ color: '#103F91' }}>الموعد النهائي</div>
+                  </div>
+                  <div className="rounded-xl p-3 text-center" style={{ background: '#FEF3C7' }}>
+                    <div className="text-lg mb-0.5">💰</div>
+                    <div className="text-[0.95rem] font-extrabold" style={{ color: '#854D0E' }}>{previewTask.cost ?? 0}</div>
+                    <div className="text-[0.66rem] font-bold mt-0.5" style={{ color: '#854D0E' }}>مبلغ الطلب</div>
+                  </div>
+                  <div className="rounded-xl p-3 text-center" style={{ background: '#E7F6EC' }}>
+                    <div className="text-lg mb-0.5">🏆</div>
+                    <div className="text-[0.95rem] font-extrabold" style={{ color: '#1B7A43' }}>{previewTask.maxPoints}</div>
+                    <div className="text-[0.66rem] font-bold mt-0.5" style={{ color: '#1B7A43' }}>النقاط القصوى</div>
+                  </div>
+                </div>
+
+                {(() => {
+                  const imgs = parseTaskImages(previewTask.imageUrl);
+                  if (imgs.length === 0) return null;
+                  return (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {imgs.map((img, idx) => (
+                        <a href={img} target="_blank" rel="noopener noreferrer" key={idx} className="relative aspect-video rounded-xl overflow-hidden border border-ink-150 block hover:scale-[1.02] transition-transform">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={img} alt={`صورة المهمة ${idx + 1}`} className="w-full h-full object-cover" />
+                        </a>
+                      ))}
+                    </div>
+                  );
+                })()}
+
+                {previewTask.resourceLink && (
+                  <a href={previewTask.resourceLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm rounded-xl p-3" style={{ color: 'var(--blue, #1D4ED8)', background: '#EEF3FC' }}>
+                    🔗 رابط المهمة / المرجع
+                  </a>
+                )}
+
+                <div className="border-t border-ink-150 pt-4">
+                  <div className="rounded-xl p-4 bg-cream-50">
+                    <p className="text-sm font-bold mb-1 text-ink-900">اطلب المهمة للبدء</p>
+                    <p className="text-xs leading-relaxed text-ink-500">
+                      {previewTask.cost > 0 ? `سيُخصم ${previewTask.cost} نقطة من رصيد الطالب عند الطلب، وتُعاد كاملةً عند قبول التسليم.` : 'لا تُخصم نقاط لطلب هذه المهمة.'}
+                    </p>
+                  </div>
+                  <button type="button" disabled className="btn bg-brand-500 text-white w-full py-3 rounded-xl font-bold mt-3 opacity-60 cursor-not-allowed">
+                    طلب المهمة {previewTask.cost > 0 ? `(${previewTask.cost} نقطة)` : ''}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1878,16 +2309,21 @@ function SubmissionCard({
 
         {/* Left Section: File Link & Main Action Button */}
         <div className="flex items-center gap-2 justify-end self-end lg:self-auto shrink-0">
-          {sub.fileUrl && sub.fileUrl !== 'admin://manual-mark' && (
-            <a 
-              href={sub.fileUrl} 
-              target="_blank" 
-              rel="noopener noreferrer" 
-              className="text-brand bg-brand-50 hover:bg-brand-100 border border-brand-200/50 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer"
-            >
-              📄 الملف
-            </a>
-          )}
+          {(() => {
+            const files = extractSubmissionFiles(sub.fileUrl);
+            if (files.length === 0) return null;
+            const label = files.length > 1 ? `📄 الملفات (${files.length})` : '📄 الملف';
+            return (
+              <a
+                href={files[0]}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-brand bg-brand-50 hover:bg-brand-100 border border-brand-200/50 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer"
+              >
+                {label}
+              </a>
+            );
+          })()}
           
           {isPending && onEvaluate && (
             <button onClick={() => onEvaluate(sub)} className="btn bg-brand-500 hover:bg-brand-600 text-white font-bold py-1.5 px-4 rounded-lg text-xs shadow-brand transition-colors whitespace-nowrap cursor-pointer">
