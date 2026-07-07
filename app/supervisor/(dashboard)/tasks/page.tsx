@@ -532,6 +532,12 @@ export default function TasksPage() {
         ? `التسليم متأخر — يجب أن تكون الدرجة بين 0 و ${maxAllowed}`
         : `يجب أن تكون الدرجة بين 0 و ${maxAllowed}`);
     }
+    // A rejection must carry a reason — the student needs to know what to fix
+    // before resubmitting. The server enforces this too; guarding here avoids a
+    // silent failure that would leave the submission stuck "بانتظار المراجعة".
+    if (status === 'rejected' && !evalComment.trim()) {
+      return pushToast('error', 'يجب كتابة سبب الرد ليعرف الطالب ما الذي يصحّحه قبل إعادة التسليم.');
+    }
 
     setEvalBusy(true);
     try {
@@ -1627,8 +1633,8 @@ export default function TasksPage() {
               </div>
 
               <div>
-                <label className="label font-bold text-ink-800 mb-2">تعليق أو توجيه للطالب (اختياري)</label>
-                <textarea className="field py-3 rounded-xl bg-ink-50/30" rows={2} placeholder="مثال: ممتاز، استمر في هذا التميز!" value={evalComment} onChange={e => setEvalComment(e.target.value)} />
+                <label className="label font-bold text-ink-800 mb-2">تعليق أو توجيه للطالب <span className="text-ink-400 font-medium">(اختياري عند القبول، ومطلوب عند الرد)</span></label>
+                <textarea className="field py-3 rounded-xl bg-ink-50/30" rows={2} placeholder="مثال عند الرد: الحل ناقص، أعد حل الفقرة الثانية." value={evalComment} onChange={e => setEvalComment(e.target.value)} />
               </div>
             </div>
             <div className="flex flex-col sm:flex-row justify-end gap-3 p-4 sm:p-5 border-t border-ink-150 bg-ink-50/50 rounded-b-2xl shrink-0">
