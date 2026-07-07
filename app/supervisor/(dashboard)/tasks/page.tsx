@@ -1239,11 +1239,11 @@ export default function TasksPage() {
                   </div>
                   <div className="card p-4 flex flex-col items-center justify-center text-center shadow-soft">
                     <div className="text-3xl font-extrabold text-brand-600">{overallStats.pending}</div>
-                    <div className="text-[0.8rem] font-bold text-ink-500 mt-1">بانتظار المراجعة</div>
+                    <div className="text-[0.8rem] font-bold text-ink-500 mt-1">سُلّمت — بانتظار التصحيح</div>
                   </div>
                   <div className="card p-4 flex flex-col items-center justify-center text-center shadow-soft">
                     <div className="text-3xl font-extrabold text-emerald-600">{overallStats.approved}</div>
-                    <div className="text-[0.8rem] font-bold text-ink-500 mt-1">تم اعتماد التسليم</div>
+                    <div className="text-[0.8rem] font-bold text-ink-500 mt-1">مقبولة ومعتمدة</div>
                   </div>
                   <div className="card p-4 flex flex-col items-center justify-center text-center shadow-soft">
                     <div className="text-3xl font-extrabold text-nred-600">{overallStats.rejected}</div>
@@ -1957,11 +1957,11 @@ export default function TasksPage() {
                 </div>
                 <div className="bg-brand-50 p-2.5 rounded-xl border border-brand-100 shadow-sm">
                   <div className="text-xl font-extrabold text-brand-600">{statsCounts.pending}</div>
-                  <div className="text-[0.66rem] text-brand-700 font-bold mt-0.5">بانتظار المراجعة</div>
+                  <div className="text-[0.66rem] text-brand-700 font-bold mt-0.5">بانتظار التصحيح</div>
                 </div>
                 <div className="bg-emerald-50 p-2.5 rounded-xl border border-emerald-100 shadow-sm">
                   <div className="text-xl font-extrabold text-emerald-600">{statsCounts.approved}</div>
-                  <div className="text-[0.66rem] text-emerald-700 font-bold mt-0.5">تم اعتماد التسليم</div>
+                  <div className="text-[0.66rem] text-emerald-700 font-bold mt-0.5">مقبولة ومعتمدة</div>
                 </div>
                 <div className="bg-nred-50 p-2.5 rounded-xl border border-nred-100 shadow-sm">
                   <div className="text-xl font-extrabold text-nred-600">{statsCounts.missing}</div>
