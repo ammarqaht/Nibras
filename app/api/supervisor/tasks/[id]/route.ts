@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { updateTask, deleteTask } from '@/lib/services';
+import { uploadDataUrl } from '@/lib/blob';
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -23,7 +24,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (body.isActive !== undefined) patch.isActive = Boolean(body.isActive);
     if (body.submissionMethod !== undefined) patch.submissionMethod = body.submissionMethod;
     if (body.cost !== undefined) patch.cost = body.cost ? parseInt(body.cost, 10) : 0;
-    if (body.imageUrl !== undefined) patch.imageUrl = body.imageUrl;
+    if (body.imageUrl !== undefined) patch.imageUrl = await uploadDataUrl(body.imageUrl, 'tasks');
     if (body.resourceLink !== undefined) patch.resourceLink = body.resourceLink;
     if (body.visibility !== undefined) patch.visibility = body.visibility;
     if (body.visibleToIds !== undefined) patch.visibleToIds = Array.isArray(body.visibleToIds) ? body.visibleToIds.map(Number) : [];

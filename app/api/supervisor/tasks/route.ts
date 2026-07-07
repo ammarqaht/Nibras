@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { getTasks, createTask } from '@/lib/services';
+import { uploadDataUrl } from '@/lib/blob';
 
 export async function GET(req: NextRequest) {
   try {
@@ -75,7 +76,7 @@ export async function POST(req: NextRequest) {
       durationHours: timeLimitHours ? parseInt(timeLimitHours, 10) : null,
       lateAfterHours: lateAfterHours ? parseInt(lateAfterHours, 10) : null,
       assignedAdmins: Array.isArray(assignedAdmins) ? assignedAdmins.map(String) : [],
-      imageUrl: imageUrl || null,
+      imageUrl: await uploadDataUrl(imageUrl, 'tasks'),
       resourceLink: resourceLink || null,
       visibility: visibility || 'all',
       visibleToIds: Array.isArray(visibleToIds) ? visibleToIds.map(Number) : [],

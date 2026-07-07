@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createRegistration } from '@/lib/membership';
+import { uploadDataUrl } from '@/lib/blob';
 import { stages } from '@/content';
 
 export const runtime = 'nodejs';
@@ -52,13 +53,16 @@ export async function POST(req: Request) {
   }
 
   const paymentType = String(body.paymentType ?? 'later').trim();
-  const paymentReceipt = typeof body.paymentReceipt === 'string' ? body.paymentReceipt : null;
+  const paymentReceiptRaw = typeof body.paymentReceipt === 'string' ? body.paymentReceipt : null;
 
-  if (paymentType === 'now' && !paymentReceipt) {
+  if (paymentType === 'now' && !paymentReceiptRaw) {
     return NextResponse.json({ error: 'يرجى رفع صورة إيصال التحويل البنكي' }, { status: 400 });
   }
 
   try {
+    // Store the receipt as a Blob file (keeps the DB row light); falls back to
+    // the raw value if Blob isn't configured.
+    const paymentReceipt = await uploadDataUrl(paymentReceiptRaw, 'receipts');
     const result = await createRegistration({
       studentName,
       nationalId,

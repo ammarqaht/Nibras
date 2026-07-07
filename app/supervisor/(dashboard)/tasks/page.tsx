@@ -99,6 +99,9 @@ const isImageUrl = (u: string) => u.startsWith('data:image') || /\.(jpg|jpeg|png
 
 // Renders a student submission of any shape (text / link / files / ack / combined).
 function SubmissionContent({ fileUrl }: { fileUrl: string }) {
+  // Full-resolution preview loads only when the reviewer taps a thumbnail.
+  const [zoom, setZoom] = useState<string | null>(null);
+
   if (fileUrl === 'admin://manual-mark') {
     return <div className="text-[0.95rem] text-ink-700 font-medium italic text-center py-4 bg-white rounded-xl border border-ink-150">إقرار إنجاز يدوي من المشرف</div>;
   }
@@ -125,19 +128,16 @@ function SubmissionContent({ fileUrl }: { fileUrl: string }) {
       )}
       {files.length > 0 && (
         files.every(isImageUrl) ? (
-          files.length === 1 ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={files[0]} alt="إثبات التسليم" className="max-h-64 rounded-xl border border-ink-200 mx-auto shadow-sm" />
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {files.map((img, idx) => (
-                <a href={img} target="_blank" rel="noopener noreferrer" key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-ink-200 block hover:scale-[1.02] transition-transform shadow-sm">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={img} alt={`إثبات التسليم ${idx + 1}`} className="w-full h-full object-cover" />
-                </a>
-              ))}
-            </div>
-          )
+          // Light thumbnails (lazy-loaded); tap any one to open the full image.
+          <div className={files.length === 1 ? '' : 'grid grid-cols-2 sm:grid-cols-3 gap-2'}>
+            {files.map((img, idx) => (
+              <button type="button" onClick={() => setZoom(img)} key={idx} className={`group relative overflow-hidden border border-ink-200 rounded-xl block shadow-sm hover:scale-[1.02] transition-transform focus:outline-none focus:ring-2 focus:ring-brand-300 ${files.length === 1 ? 'mx-auto max-h-48' : 'aspect-square'}`} title="اضغط لعرض الصورة كاملة">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={img} alt={`إثبات التسليم ${idx + 1}`} loading="lazy" decoding="async" className={files.length === 1 ? 'max-h-48 object-cover' : 'w-full h-full object-cover'} />
+                <span className="absolute inset-0 flex items-center justify-center bg-ink-900/15 group-hover:bg-ink-900/0 transition-colors text-white text-[0.7rem] font-bold opacity-0 group-hover:opacity-100">🔍</span>
+              </button>
+            ))}
+          </div>
         ) : (
           <div className="space-y-2">
             {files.map((f, idx) => (
@@ -156,6 +156,16 @@ function SubmissionContent({ fileUrl }: { fileUrl: string }) {
         <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:text-white hover:bg-brand-500 hover:border-brand-500 text-[0.9rem] font-bold block text-center py-3 bg-white rounded-xl border border-ink-200 transition-all shadow-sm">
           📄 فتح المرفق
         </a>
+      )}
+
+      {/* Full-screen preview — only mounted (and its bytes loaded) on click */}
+      {zoom && (
+        <div className="fixed inset-0 z-[60] bg-ink-900/90 flex items-center justify-center p-4" onClick={() => setZoom(null)}>
+          <button type="button" className="absolute top-4 right-4 text-white/90 hover:text-white text-4xl font-bold leading-none" onClick={() => setZoom(null)} aria-label="إغلاق">×</button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={zoom} alt="عرض التسليم" className="max-w-full max-h-full object-contain rounded-xl shadow-2xl" onClick={(e) => e.stopPropagation()} />
+          <a href={zoom} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="absolute bottom-5 left-1/2 -translate-x-1/2 bg-white/90 hover:bg-white text-ink-900 text-sm font-bold px-5 py-2.5 rounded-xl shadow-lg">فتح في نافذة جديدة ↗</a>
+        </div>
       )}
     </div>
   );

@@ -4,6 +4,7 @@ import {
   getSubmissions, claimTask, submitClaim, cancelClaim,
   createNotification, getAllSupervisors, getTasks,
 } from '@/lib/services';
+import { uploadDataUrl } from '@/lib/blob';
 
 export async function POST(req: NextRequest) {
   const session = getStudentSession(req);
@@ -35,7 +36,8 @@ export async function POST(req: NextRequest) {
     if (!fileUrl) {
       return NextResponse.json({ error: 'بيانات ناقصة' }, { status: 400 });
     }
-    const { submission, error } = await submitClaim(session.id, taskId, fileUrl);
+    const storedFileUrl = await uploadDataUrl(fileUrl, 'submissions');
+    const { submission, error } = await submitClaim(session.id, taskId, storedFileUrl || fileUrl);
     if (error || !submission) {
       return NextResponse.json({ error: error || 'فشل التسليم' }, { status: 400 });
     }

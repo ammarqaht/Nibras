@@ -7,6 +7,7 @@ import {
   deleteAnnouncement,
   getSupervisorByEmail
 } from '@/lib/services';
+import { uploadDataUrl, uploadManyDataUrls } from '@/lib/blob';
 
 export async function GET(req: NextRequest) {
   try {
@@ -47,7 +48,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'البيانات غير كاملة (العنوان والمحتوى والجمهور مطلوبان)' }, { status: 400 });
     }
 
-    const announcement = await createAnnouncement(title, contentText, audience, imageUrl, images, expiresAt || null);
+    const uploadedImageUrl = await uploadDataUrl(imageUrl, 'announcements');
+    const uploadedImages = await uploadManyDataUrls(images, 'announcements');
+    const announcement = await createAnnouncement(title, contentText, audience, uploadedImageUrl, uploadedImages, expiresAt || null);
     return NextResponse.json({ success: true, announcement });
   } catch (error) {
     console.error('announcements POST error', error);
@@ -83,8 +86,10 @@ export async function PUT(req: NextRequest) {
       title: body.title,
       body: body.body,
       audience: body.audience,
-      imageUrl: body.imageUrl,
-      images: body.images,
+      // Only re-upload/overwrite the images when the client actually sent them,
+      // so an edit that leaves them out doesn't wipe existing images.
+      imageUrl: body.imageUrl !== undefined ? await uploadDataUrl(body.imageUrl, 'announcements') : undefined,
+      images: body.images !== undefined ? await uploadManyDataUrls(body.images, 'announcements') : undefined,
       expiresAt: body.expiresAt !== undefined ? (body.expiresAt || null) : undefined
     });
 

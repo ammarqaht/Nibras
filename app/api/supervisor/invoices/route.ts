@@ -8,6 +8,7 @@ import {
   getSupervisorByEmail,
   type InvoiceItem
 } from '@/lib/services';
+import { uploadDataUrl } from '@/lib/blob';
 import { supervisorDepartments } from '@/lib/finance';
 
 export const runtime = 'nodejs';
@@ -106,7 +107,7 @@ export async function POST(req: NextRequest) {
       tax: body.tax != null && body.tax !== '' ? Number(body.tax) : null,
       total,
       currency: body.currency || 'SAR',
-      imageData: typeof body.imageData === 'string' ? body.imageData : null,
+      imageData: await uploadDataUrl(typeof body.imageData === 'string' ? body.imageData : null, 'invoices'),
       entryMode: body.entryMode === 'photo' ? 'photo' : 'manual',
       aiExtracted: body.aiExtracted === true,
       aiConfidence: body.aiConfidence != null ? Number(body.aiConfidence) : null

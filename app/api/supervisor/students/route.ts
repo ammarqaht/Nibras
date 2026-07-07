@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { getStudents, updateStudent, getSupervisorByEmail, createStudentManually, deleteStudent, getGroups, getAccessibleGroupIds, FULL_STUDENT_DATA_ROLES, GLOBAL_ROLES } from '@/lib/services';
+import { uploadDataUrl } from '@/lib/blob';
 
 export async function GET(req: NextRequest) {
   try {
@@ -174,7 +175,10 @@ export async function PUT(req: NextRequest) {
       groupId: body.groupId !== undefined ? (body.groupId === null ? null : parseInt(body.groupId, 10)) : undefined,
       registrationStatus,
       paymentType: body.paymentType,
-      paymentReceipt: body.paymentReceipt
+      // Only touch the receipt when the client sent one; upload it to Blob first.
+      paymentReceipt: body.paymentReceipt !== undefined
+        ? await uploadDataUrl(body.paymentReceipt, 'receipts')
+        : undefined
     });
 
     return NextResponse.json({ success: true, student: updated });
