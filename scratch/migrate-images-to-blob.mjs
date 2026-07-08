@@ -47,7 +47,7 @@ async function uploadDataUrl(value, prefix) {
 
 // Migrate a single-value column: table."col" holding one data-URL.
 async function migrateColumn(table, col, prefix) {
-  const rows = await sql(
+  const rows = await sql.query(
     `SELECT id, "${col}" AS val FROM "${table}" WHERE "${col}" LIKE 'data:%'`
   );
   console.log(`\n▶ ${table}.${col}: ${rows.length} row(s) to migrate`);
@@ -55,7 +55,7 @@ async function migrateColumn(table, col, prefix) {
   for (const row of rows) {
     try {
       const url = await uploadDataUrl(row.val, prefix);
-      await sql(`UPDATE "${table}" SET "${col}" = $1 WHERE id = $2`, [url, row.id]);
+      await sql.query(`UPDATE "${table}" SET "${col}" = $1 WHERE id = $2`, [url, row.id]);
       ok++;
       process.stdout.write('.');
     } catch (e) {
@@ -68,7 +68,7 @@ async function migrateColumn(table, col, prefix) {
 
 // Migrate a JSON-array column: table."col" holding a JSON array of data-URLs.
 async function migrateArrayColumn(table, col, prefix) {
-  const rows = await sql(
+  const rows = await sql.query(
     `SELECT id, "${col}" AS val FROM "${table}" WHERE "${col}" LIKE '%data:%'`
   );
   console.log(`\n▶ ${table}.${col} (array): ${rows.length} row(s) to migrate`);
@@ -81,7 +81,7 @@ async function migrateArrayColumn(table, col, prefix) {
       const urls = [];
       for (const it of items) urls.push(await uploadDataUrl(it, prefix));
       const clean = urls.filter(Boolean);
-      await sql(`UPDATE "${table}" SET "${col}" = $1 WHERE id = $2`,
+      await sql.query(`UPDATE "${table}" SET "${col}" = $1 WHERE id = $2`,
         [clean.length ? JSON.stringify(clean) : null, row.id]);
       ok++;
       process.stdout.write('.');

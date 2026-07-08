@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
 
     const supervisors = await getAllSupervisors();
     const currentUser = supervisors.find(s => s.id === session.id);
-    if (!currentUser || currentUser.role !== 'admin') {
+    if (!currentUser || !currentUser.role.split(',').map(r => r.trim()).includes('admin')) {
       return NextResponse.json({ error: 'صلاحيات غير كافية' }, { status: 403 });
     }
 
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
     const supervisors = await getAllSupervisors();
     const currentUser = supervisors.find(s => s.id === session.id);
-    if (!currentUser || currentUser.role !== 'admin') {
+    if (!currentUser || !currentUser.role.split(',').map(r => r.trim()).includes('admin')) {
       return NextResponse.json({ error: 'صلاحيات غير كافية' }, { status: 403 });
     }
 

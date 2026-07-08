@@ -64,6 +64,9 @@ model Attendance {
   status         String // 'present' | 'absent' | 'late'
   recordedBy     String?
   createdAt      DateTime @default(now())
+
+  @@index([registrationId])
+  @@index([date])
 }
 
 model Point {
@@ -76,6 +79,9 @@ model Point {
   batchId        String? // groups records created in one collective/group registration
   recordedBy     String?
   createdAt      DateTime @default(now())
+
+  @@index([registrationId])
+  @@index([category])
 }
 
 model Announcement {

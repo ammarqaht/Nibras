@@ -806,6 +806,26 @@ export async function deleteAttendancePointsByDate(registrationId: number, date:
 // spendable balance, the store) so they must never be auto-deleted — doing so
 // silently shrinks totals and makes the supervisor view disagree with the
 // student view (which reads the same records via getStudentPoints).
+// Removes the points previously awarded for completing a task (matched by the
+// deterministic award reason). Used so re-grading/rejecting an already-approved
+// submission doesn't leave stale points or award them twice.
+export async function deleteTaskAwardPoints(registrationId: number, taskTitle: string | null | undefined): Promise<void> {
+  if (!taskTitle) return;
+  const reason = `إنجاز مهمة: ${taskTitle}`;
+  if (hasDatabase) {
+    const prisma = getPrisma()!;
+    await (prisma as any).point.deleteMany({
+      where: { registrationId, category: 'tasks', reason },
+    });
+  } else {
+    const list = await readJsonFile<PointInfo[]>(FILE_POINTS, []);
+    await writeJsonFile(
+      FILE_POINTS,
+      list.filter(p => !(p.registrationId === registrationId && p.category === 'tasks' && p.reason === reason))
+    );
+  }
+}
+
 export async function getPoints(): Promise<PointInfo[]> {
   if (hasDatabase) {
     const prisma = getPrisma()!;
@@ -3041,7 +3061,7 @@ function mapSportBehavior(r: any): SportBehaviorInfo {
 export async function getSportLeagues(stage?: string): Promise<SportLeagueInfo[]> {
   if (hasDatabase) {
     const prisma = getPrisma()!;
-    const list = await (prisma as any).sportLeague.findMany({
+    const list = await prisma.sportLeague.findMany({
       where: stage ? { stage } : undefined,
       orderBy: { createdAt: 'desc' },
     });
@@ -3056,7 +3076,7 @@ export async function getSportLeagues(stage?: string): Promise<SportLeagueInfo[]
 export async function getSportLeagueById(id: number): Promise<SportLeagueInfo | null> {
   if (hasDatabase) {
     const prisma = getPrisma()!;
-    const r = await (prisma as any).sportLeague.findUnique({ where: { id } });
+    const r = await prisma.sportLeague.findUnique({ where: { id } });
     return r ? mapSportLeague(r) : null;
   } else {
     const list = await readJsonFile<any[]>(FILE_SPORT_LEAGUES, []);
@@ -3071,7 +3091,7 @@ export async function createSportLeague(data: {
 }): Promise<SportLeagueInfo> {
   if (hasDatabase) {
     const prisma = getPrisma()!;
-    const r = await (prisma as any).sportLeague.create({ data: { ...data, status: 'setup' } });
+    const r = await prisma.sportLeague.create({ data: { ...data, status: 'setup' } });
     return mapSportLeague(r);
   } else {
     const list = await readJsonFile<any[]>(FILE_SPORT_LEAGUES, []);
@@ -3092,7 +3112,7 @@ export async function updateSportLeague(id: number, patch: Partial<{
   if (hasDatabase) {
     const prisma = getPrisma()!;
     try {
-      const r = await (prisma as any).sportLeague.update({ where: { id }, data: patch });
+      const r = await prisma.sportLeague.update({ where: { id }, data: patch });
       return mapSportLeague(r);
     } catch { return null; }
   } else {
@@ -3109,14 +3129,14 @@ export async function deleteSportLeague(id: number): Promise<boolean> {
   if (hasDatabase) {
     const prisma = getPrisma()!;
     try {
-      const matches = await (prisma as any).sportMatch.findMany({ where: { leagueId: id } });
+      const matches = await prisma.sportMatch.findMany({ where: { leagueId: id } });
       for (const m of matches) {
-        await (prisma as any).sportGoal.deleteMany({ where: { matchId: m.id } });
-        await (prisma as any).sportCard.deleteMany({ where: { matchId: m.id } });
+        await prisma.sportGoal.deleteMany({ where: { matchId: m.id } });
+        await prisma.sportCard.deleteMany({ where: { matchId: m.id } });
       }
-      await (prisma as any).sportMatch.deleteMany({ where: { leagueId: id } });
-      await (prisma as any).sportBehavior.deleteMany({ where: { leagueId: id } });
-      await (prisma as any).sportLeague.delete({ where: { id } });
+      await prisma.sportMatch.deleteMany({ where: { leagueId: id } });
+      await prisma.sportBehavior.deleteMany({ where: { leagueId: id } });
+      await prisma.sportLeague.delete({ where: { id } });
       return true;
     } catch { return false; }
   } else {
@@ -3143,7 +3163,7 @@ export async function deleteSportLeague(id: number): Promise<boolean> {
 export async function getSportMatches(leagueId: number): Promise<SportMatchInfo[]> {
   if (hasDatabase) {
     const prisma = getPrisma()!;
-    const list = await (prisma as any).sportMatch.findMany({
+    const list = await prisma.sportMatch.findMany({
       where: { leagueId },
       orderBy: [{ matchday: 'asc' }, { id: 'asc' }],
     });
@@ -3160,7 +3180,7 @@ export async function getSportMatches(leagueId: number): Promise<SportMatchInfo[
 export async function getSportMatchById(id: number): Promise<SportMatchInfo | null> {
   if (hasDatabase) {
     const prisma = getPrisma()!;
-    const r = await (prisma as any).sportMatch.findUnique({ where: { id } });
+    const r = await prisma.sportMatch.findUnique({ where: { id } });
     return r ? mapSportMatch(r) : null;
   } else {
     const list = await readJsonFile<any[]>(FILE_SPORT_MATCHES, []);
@@ -3175,7 +3195,7 @@ export async function createSportMatch(data: {
 }): Promise<SportMatchInfo> {
   if (hasDatabase) {
     const prisma = getPrisma()!;
-    const r = await (prisma as any).sportMatch.create({
+    const r = await prisma.sportMatch.create({
       data: {
         ...data, homeScore: 0, awayScore: 0, status: 'scheduled',
         matchDate: data.matchDate ?? null, notes: data.notes ?? null
@@ -3204,7 +3224,7 @@ export async function updateSportMatch(id: number, patch: Partial<{
   if (hasDatabase) {
     const prisma = getPrisma()!;
     try {
-      const r = await (prisma as any).sportMatch.update({ where: { id }, data: patch });
+      const r = await prisma.sportMatch.update({ where: { id }, data: patch });
       return mapSportMatch(r);
     } catch { return null; }
   } else {
@@ -3221,9 +3241,9 @@ export async function deleteSportMatch(id: number): Promise<boolean> {
   if (hasDatabase) {
     const prisma = getPrisma()!;
     try {
-      await (prisma as any).sportGoal.deleteMany({ where: { matchId: id } });
-      await (prisma as any).sportCard.deleteMany({ where: { matchId: id } });
-      await (prisma as any).sportMatch.delete({ where: { id } });
+      await prisma.sportGoal.deleteMany({ where: { matchId: id } });
+      await prisma.sportCard.deleteMany({ where: { matchId: id } });
+      await prisma.sportMatch.delete({ where: { id } });
       return true;
     } catch { return false; }
   } else {
@@ -3245,7 +3265,7 @@ export async function deleteSportMatch(id: number): Promise<boolean> {
 export async function getSportGoals(matchId: number): Promise<SportGoalInfo[]> {
   if (hasDatabase) {
     const prisma = getPrisma()!;
-    const list = await (prisma as any).sportGoal.findMany({
+    const list = await prisma.sportGoal.findMany({
       where: { matchId }, orderBy: { createdAt: 'asc' },
     });
     return list.map(mapSportGoal);
@@ -3258,10 +3278,10 @@ export async function getSportGoals(matchId: number): Promise<SportGoalInfo[]> {
 export async function getSportGoalsByLeague(leagueId: number): Promise<SportGoalInfo[]> {
   if (hasDatabase) {
     const prisma = getPrisma()!;
-    const matches = await (prisma as any).sportMatch.findMany({ where: { leagueId }, select: { id: true } });
+    const matches = await prisma.sportMatch.findMany({ where: { leagueId }, select: { id: true } });
     const matchIds = matches.map((m: any) => m.id);
     if (!matchIds.length) return [];
-    const list = await (prisma as any).sportGoal.findMany({
+    const list = await prisma.sportGoal.findMany({
       where: { matchId: { in: matchIds } }, orderBy: { createdAt: 'asc' },
     });
     return list.map(mapSportGoal);
@@ -3278,7 +3298,7 @@ export async function addSportGoal(data: {
 }): Promise<SportGoalInfo> {
   if (hasDatabase) {
     const prisma = getPrisma()!;
-    const r = await (prisma as any).sportGoal.create({ data: { ...data, scorerId: data.scorerId ?? null } });
+    const r = await prisma.sportGoal.create({ data: { ...data, scorerId: data.scorerId ?? null } });
     return mapSportGoal(r);
   } else {
     const list = await readJsonFile<any[]>(FILE_SPORT_GOALS, []);
@@ -3295,7 +3315,7 @@ export async function addSportGoal(data: {
 export async function deleteSportGoal(id: number): Promise<boolean> {
   if (hasDatabase) {
     const prisma = getPrisma()!;
-    try { await (prisma as any).sportGoal.delete({ where: { id } }); return true; }
+    try { await prisma.sportGoal.delete({ where: { id } }); return true; }
     catch { return false; }
   } else {
     const list = await readJsonFile<any[]>(FILE_SPORT_GOALS, []);
@@ -3312,7 +3332,7 @@ export async function deleteSportGoal(id: number): Promise<boolean> {
 export async function getSportCards(filter: { matchId?: number; leagueId?: number }): Promise<SportCardInfo[]> {
   if (hasDatabase) {
     const prisma = getPrisma()!;
-    const list = await (prisma as any).sportCard.findMany({
+    const list = await prisma.sportCard.findMany({
       where: filter, orderBy: { createdAt: 'asc' },
     });
     return list.map(mapSportCard);
@@ -3330,7 +3350,7 @@ export async function addSportCard(data: {
 }): Promise<SportCardInfo> {
   if (hasDatabase) {
     const prisma = getPrisma()!;
-    const r = await (prisma as any).sportCard.create({ data: { ...data, suspensionServed: false } });
+    const r = await prisma.sportCard.create({ data: { ...data, suspensionServed: false } });
     return mapSportCard(r);
   } else {
     const list = await readJsonFile<any[]>(FILE_SPORT_CARDS, []);
@@ -3348,7 +3368,7 @@ export async function updateSportCard(id: number, patch: { suspensionServed?: bo
   if (hasDatabase) {
     const prisma = getPrisma()!;
     try {
-      const r = await (prisma as any).sportCard.update({ where: { id }, data: patch });
+      const r = await prisma.sportCard.update({ where: { id }, data: patch });
       return mapSportCard(r);
     } catch { return null; }
   } else {
@@ -3364,7 +3384,7 @@ export async function updateSportCard(id: number, patch: { suspensionServed?: bo
 export async function deleteSportCard(id: number): Promise<boolean> {
   if (hasDatabase) {
     const prisma = getPrisma()!;
-    try { await (prisma as any).sportCard.delete({ where: { id } }); return true; }
+    try { await prisma.sportCard.delete({ where: { id } }); return true; }
     catch { return false; }
   } else {
     const list = await readJsonFile<any[]>(FILE_SPORT_CARDS, []);
@@ -3381,7 +3401,7 @@ export async function deleteSportCard(id: number): Promise<boolean> {
 export async function getSportBehaviors(leagueId: number): Promise<SportBehaviorInfo[]> {
   if (hasDatabase) {
     const prisma = getPrisma()!;
-    const list = await (prisma as any).sportBehavior.findMany({
+    const list = await prisma.sportBehavior.findMany({
       where: { leagueId }, orderBy: { createdAt: 'desc' },
     });
     return list.map(mapSportBehavior);
@@ -3398,7 +3418,7 @@ export async function addSportBehavior(data: {
 }): Promise<SportBehaviorInfo> {
   if (hasDatabase) {
     const prisma = getPrisma()!;
-    const r = await (prisma as any).sportBehavior.create({
+    const r = await prisma.sportBehavior.create({
       data: { ...data, matchId: data.matchId ?? null },
     });
     return mapSportBehavior(r);
@@ -3417,7 +3437,7 @@ export async function addSportBehavior(data: {
 export async function deleteSportBehavior(id: number): Promise<boolean> {
   if (hasDatabase) {
     const prisma = getPrisma()!;
-    try { await (prisma as any).sportBehavior.delete({ where: { id } }); return true; }
+    try { await prisma.sportBehavior.delete({ where: { id } }); return true; }
     catch { return false; }
   } else {
     const list = await readJsonFile<any[]>(FILE_SPORT_BEHAVIORS, []);

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { updateSubmission, deleteSubmission, getSubmissionById, getTasks, createNotification } from '@/lib/services';
+import { updateSubmission, deleteSubmission, getSubmissionById, getTasks, createNotification, deleteTaskAwardPoints } from '@/lib/services';
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -61,9 +61,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const statusChanged = existing && body.status && body.status !== existing.status;
     const newStatus = body.status;
 
-    // Add points when approved
+    // Add points when approved. Clear any prior award for this task first so a
+    // re-grade or a reject→approve cycle can't stack points twice (idempotent).
     if (statusChanged && newStatus === 'approved') {
       const grade = patch.grade ?? 0;
+      try { await deleteTaskAwardPoints(updated.registrationId, updated.taskTitle); } catch { /* non-fatal */ }
       if (grade > 0) {
         try {
           await fetch(`${req.nextUrl.origin}/api/supervisor/points`, {
@@ -96,6 +98,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
     // Notify student about rejection
     if (statusChanged && newStatus === 'rejected') {
+      // If this submission had already been approved, remove the points it earned
+      // so a rejected task doesn't keep awarding points.
+      if (existing?.status === 'approved') {
+        try { await deleteTaskAwardPoints(updated.registrationId, updated.taskTitle); } catch { /* non-fatal */ }
+      }
       try {
         const note = body.feedback ? ` — ملاحظة: ${body.feedback}` : '';
         await createNotification({

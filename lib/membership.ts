@@ -44,16 +44,11 @@ export async function createRegistration(input: RegistrationInput): Promise<Regi
 
       // Try up to 5 times in case of concurrent registration race conditions
       for (let attempt = 0; attempt < 5; attempt++) {
-        const registrations = await prisma.registration.findMany({
-          select: { membershipNo: true },
-          orderBy: { membershipNo: 'asc' }
-        });
-
-        const usedNos = new Set(registrations.map(r => r.membershipNo));
-        let candidate = membership.base + 1;
-        while (usedNos.has(candidate)) {
-          candidate++;
-        }
+        // Next number = max existing + 1 (O(1) instead of scanning every row).
+        const agg = await prisma.registration.aggregate({ _max: { membershipNo: true } });
+        const maxNo = agg._max.membershipNo ?? membership.base;
+        // On a retry, step past the number that just collided.
+        let candidate = Math.max(maxNo, membership.base) + 1 + attempt;
 
         try {
           const created = await prisma.registration.create({

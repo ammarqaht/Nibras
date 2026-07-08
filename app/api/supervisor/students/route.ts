@@ -249,7 +249,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     const supervisor = await getSupervisorByEmail(session.email);
-    if (!supervisor || supervisor.role !== 'admin') {
+    if (!supervisor || !supervisor.role.split(',').map(r => r.trim()).includes('admin')) {
       return NextResponse.json({ error: 'غير مصرح لك بحذف الطلاب' }, { status: 403 });
     }
 

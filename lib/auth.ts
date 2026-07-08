@@ -1,7 +1,14 @@
 import { NextRequest } from 'next/server';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'nibras-supervisors-dashboard-secret-key-987654321';
-const STUDENT_SECRET = process.env.STUDENT_JWT_SECRET || 'nibras-students-portal-secret-key-123456789';
+// Secrets MUST come from the environment. No hardcoded fallback — a committed
+// secret lets anyone forge tokens for any user (including admin). If unset, the
+// signing/verifying below fails closed (throws on sign, returns null on verify).
+const JWT_SECRET = process.env.JWT_SECRET || '';
+const STUDENT_SECRET = process.env.STUDENT_JWT_SECRET || '';
+
+// Tokens expire after this many seconds (30 days). A leaked/old token stops
+// working after this window.
+const TOKEN_TTL_SECONDS = 60 * 60 * 24 * 30;
 
 export type UserSession = {
   id: number;
@@ -166,8 +173,10 @@ function hexToBase64Url(hex: string): string {
  * Signs a payload creating a standard signed JWT token using HMAC-SHA256.
  */
 export function signToken(payload: UserSession): string {
+  if (!JWT_SECRET) throw new Error('JWT_SECRET is not configured');
   const header = base64UrlEncode(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-  const body = base64UrlEncode(JSON.stringify(payload));
+  const exp = Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS;
+  const body = base64UrlEncode(JSON.stringify({ ...payload, exp }));
   const signature = hexToBase64Url(hmacSha256(JWT_SECRET, `${header}.${body}`));
   return `${header}.${body}.${signature}`;
 }
@@ -177,12 +186,15 @@ export function signToken(payload: UserSession): string {
  */
 export function verifyToken(token: string): UserSession | null {
   try {
+    if (!JWT_SECRET) return null;
     const parts = token.split('.');
     if (parts.length !== 3) return null;
     const [header, body, signature] = parts;
     const expectedSig = hexToBase64Url(hmacSha256(JWT_SECRET, `${header}.${body}`));
     if (signature !== expectedSig) return null;
-    return JSON.parse(base64UrlDecode(body)) as UserSession;
+    const decoded = JSON.parse(base64UrlDecode(body)) as UserSession & { exp?: number };
+    if (decoded.exp && Math.floor(Date.now() / 1000) > decoded.exp) return null; // expired
+    return decoded;
   } catch {
     return null;
   }
@@ -209,20 +221,25 @@ export type StudentSession = {
 };
 
 export function signStudentToken(payload: StudentSession): string {
+  if (!STUDENT_SECRET) throw new Error('STUDENT_JWT_SECRET is not configured');
   const header = base64UrlEncode(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-  const body = base64UrlEncode(JSON.stringify(payload));
+  const exp = Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS;
+  const body = base64UrlEncode(JSON.stringify({ ...payload, exp }));
   const signature = hexToBase64Url(hmacSha256(STUDENT_SECRET, `${header}.${body}`));
   return `${header}.${body}.${signature}`;
 }
 
 export function verifyStudentToken(token: string): StudentSession | null {
   try {
+    if (!STUDENT_SECRET) return null;
     const parts = token.split('.');
     if (parts.length !== 3) return null;
     const [header, body, signature] = parts;
     const expectedSig = hexToBase64Url(hmacSha256(STUDENT_SECRET, `${header}.${body}`));
     if (signature !== expectedSig) return null;
-    return JSON.parse(base64UrlDecode(body)) as StudentSession;
+    const decoded = JSON.parse(base64UrlDecode(body)) as StudentSession & { exp?: number };
+    if (decoded.exp && Math.floor(Date.now() / 1000) > decoded.exp) return null; // expired
+    return decoded;
   } catch {
     return null;
   }

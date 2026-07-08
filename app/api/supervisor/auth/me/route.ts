@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
       }
     } catch {}
 
-    const isGlobalAdmin = currentUser.role === 'admin';
+    const isGlobalAdmin = currentUser.role.split(',').map(r => r.trim()).includes('admin');
     
     // Base permissions from roles
     const rolesList = currentUser.role.split(',').map(r => r.trim()).filter(Boolean);
