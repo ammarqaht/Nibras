@@ -225,16 +225,21 @@ export async function GET(req: NextRequest) {
       const approvedList = students.filter((s: any) => s.registrationStatus === 'approved');
       let consecutiveAbsentCount = 0;
       for (const student of approvedList) {
-        const absentDates = attendance
-          .filter((a: any) => a.registrationId === student.id && a.status === 'absent' && last30.includes(a.date))
-          .map((a: any) => a.date).sort();
-        let streak = 1, maxStreak = 0;
-        for (let i = 1; i < absentDates.length; i++) {
-          const diff = (new Date(absentDates[i]).getTime() - new Date(absentDates[i - 1]).getTime()) / 86400000;
-          if (diff === 1) { streak++; maxStreak = Math.max(maxStreak, streak); }
-          else streak = 1;
+        // Current trailing run of absences: any attendance resets it to zero, so
+        // students who came back are no longer counted.
+        const recs = attendance
+          .filter((a: any) => a.registrationId === student.id && last30.includes(a.date))
+          .map((a: any) => ({ date: a.date, status: a.status }))
+          .sort((a: any, b: any) => b.date.localeCompare(a.date));
+        if (recs.length === 0 || recs[0].status !== 'absent') continue;
+        let streak = 1;
+        for (let i = 1; i < recs.length; i++) {
+          if (recs[i].status !== 'absent') break;
+          const diff = (new Date(recs[i - 1].date).getTime() - new Date(recs[i].date).getTime()) / 86400000;
+          if (diff === 1) streak++;
+          else break;
         }
-        if (maxStreak >= 2) consecutiveAbsentCount++;
+        if (streak >= 2) consecutiveAbsentCount++;
       }
       attendanceStats = { avg7DayAttendance, consecutiveAbsentCount };
     }

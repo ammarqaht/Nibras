@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { randomUUID } from 'crypto';
-import { getPoints, addPointsRecord, deletePointRecord, deletePointBatch, getSupervisorByEmail, GROUP_POINTS_ROLES } from '@/lib/services';
+import { getPoints, addPointsRecord, deletePointRecord, deletePointBatch, getSupervisorByEmail, getSetting, GROUP_POINTS_ROLES } from '@/lib/services';
 
 export async function GET(req: NextRequest) {
   try {
@@ -84,6 +84,25 @@ export async function POST(req: NextRequest) {
       return Math.max(0, individual + collective + deduction);
     }
 
+    // For an individual deduction, the chosen category may be flagged
+    // (fromIndividual) so the deduction is subtracted from the student's
+    // individual score as well as the balance. Otherwise a deduction is
+    // recorded as pointType 'deduction' (balance only).
+    async function resolveIndividualDeductType(): Promise<'individual' | 'deduction'> {
+      if (!isDeduction) return 'individual';
+      try {
+        const raw = await getSetting('points_student_deduct_categories');
+        if (!raw) return 'deduction';
+        const arr = JSON.parse(raw);
+        const cat = Array.isArray(arr)
+          ? arr.find((c: any) => String(c?.key) === String(category))
+          : null;
+        return cat?.fromIndividual ? 'individual' : 'deduction';
+      } catch {
+        return 'deduction';
+      }
+    }
+
     // Multi-student individual points
     if (registrationIds && Array.isArray(registrationIds) && registrationIds.length > 0) {
       if (isDeduction) {
@@ -99,11 +118,12 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: 'رصيد بعض الطلاب غير كافٍ لإتمام الخصم' }, { status: 400 });
         }
       }
+      const individualType = await resolveIndividualDeductType();
       const records = [];
       for (const rId of registrationIds) {
         const id = parseInt(String(rId), 10);
         if (isNaN(id)) continue;
-        const pointType = isDeduction ? 'deduction' : 'individual';
+        const pointType = individualType;
         const rec = await addPointsRecord({
           registrationId: id,
           delta: dVal,
@@ -176,7 +196,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      const pointType = isDeduction ? 'deduction' : 'individual';
+      const pointType = await resolveIndividualDeductType();
 
       const record = await addPointsRecord({
         registrationId: rId,

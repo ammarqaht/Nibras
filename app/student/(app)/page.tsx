@@ -11,7 +11,7 @@ type TaskPeek = {
   task: { id: string; title: string; description: string; maxPoints: number; dueDate: string; track: string | null };
   submission: { id: string; status: string; grade: number | null; feedback: string | null; fileUrl: string; submittedAt: string } | null;
 };
-type PointRec = { id: number; delta: number; reason: string; category: string; pointType: string; recordedBy: string | null; createdAt: string };
+type PointRec = { id: number; delta: number; reason: string; category: string; categoryLabel?: string; pointType: string; recordedBy: string | null; createdAt: string };
 
 // Prefix supervisor names with "أ." (skip the system actor)
 function withTitle(name: string | null | undefined) {
@@ -219,6 +219,9 @@ export default function StudentHome() {
   const indivOther = (user?.individual ?? 0) - indivAttendance - indivTasks;
   const ledger = [...points].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
   const ledgerCats = Array.from(new Set(points.map(p => p.category)));
+  // key → Arabic label, sourced from the server-resolved categoryLabel.
+  const catLabel = (key: string) =>
+    points.find(p => p.category === key)?.categoryLabel || CATEGORY_LABELS[key] || key;
   const filteredLedger = ledger.filter(p =>
     (ledgerFilter === 'all' || (ledgerFilter === 'plus' ? p.delta >= 0 : p.delta < 0)) &&
     (!ledgerCat || p.category === ledgerCat)
@@ -599,7 +602,7 @@ export default function StudentHome() {
               </select>
               <select className="field py-1.5 px-3 text-sm flex-1" value={ledgerCat} onChange={e => setLedgerCat(e.target.value)}>
                 <option value="">كل التصنيفات</option>
-                {ledgerCats.map(c => <option key={c} value={c}>{CATEGORY_LABELS[c] || c}</option>)}
+                {ledgerCats.map(c => <option key={c} value={c}>{catLabel(c)}</option>)}
               </select>
             </div>
             <div className="overflow-y-auto scroll-soft flex-1">
@@ -721,7 +724,7 @@ function LedgerRow({ p }: { p: PointRec }) {
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate" style={{ color: 'var(--ink)' }}>{p.reason}</p>
         <p className="text-[11px] mt-0.5" style={{ color: 'var(--ink-soft)' }}>
-          {CATEGORY_LABELS[p.category] || p.category} · <span dir="ltr">{new Date(p.createdAt).toLocaleDateString('ar-SA')}</span>{by ? ` · ${by}` : ''}
+          {p.categoryLabel || CATEGORY_LABELS[p.category] || p.category} · <span dir="ltr">{new Date(p.createdAt).toLocaleDateString('ar-SA')}</span>{by ? ` · ${by}` : ''}
         </p>
       </div>
     </li>

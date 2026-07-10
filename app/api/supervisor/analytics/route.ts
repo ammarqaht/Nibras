@@ -172,40 +172,38 @@ export async function GET(req: NextRequest) {
       return { stage, avg: totalAll > 0 ? Math.round(totalPresent / totalAll * 100) : 0 };
     });
 
-    // Students who attended today (exclude from consecutive absent list)
-    const attendedTodayIds = new Set(
-      attendance.filter((a: any) => a.date === today && (a.status === 'present' || a.status === 'late' || a.status === 'excused'))
-        .map((a: any) => a.registrationId)
-    );
-
-    // Students with 2+ consecutive absences (last 30 days), excluding those who attended today
+    // Students whose CURRENT run of attendance is 2+ consecutive absences.
+    // The streak is measured from the most recent record backwards: the moment
+    // a student attends (present / late / excused) the streak resets to zero, so
+    // a student who was absent then came back no longer appears in this list.
     const last30Start = dateNDaysAgo(29);
     const recentAttendance = attendance.filter((a: any) => a.date >= last30Start);
-    const absentByStudent: Record<number, string[]> = {};
+    // All records per student (any status), so attendance can break the streak.
+    const recordsByStudent: Record<number, { date: string; status: string }[]> = {};
     for (const a of recentAttendance) {
-      if (a.status === 'absent') {
-        if (!absentByStudent[a.registrationId]) absentByStudent[a.registrationId] = [];
-        absentByStudent[a.registrationId].push(a.date);
-      }
+      if (!recordsByStudent[a.registrationId]) recordsByStudent[a.registrationId] = [];
+      recordsByStudent[a.registrationId].push({ date: a.date, status: a.status });
     }
     const consecutiveAbsentStudents: { id: number; name: string; stage: string; grade: string; membershipNo: number; maxStreak: number; lastStreak: string }[] = [];
-    for (const [sidStr, dates] of Object.entries(absentByStudent)) {
+    for (const [sidStr, recs] of Object.entries(recordsByStudent)) {
       const sid = parseInt(sidStr);
-      if (attendedTodayIds.has(sid)) continue;
-      const sorted = [...dates].sort();
-      let streak = 1, maxStreak = 1, streakEndDate = sorted[0];
+      // Most recent record first.
+      const sorted = [...recs].sort((a, b) => b.date.localeCompare(a.date));
+      // If the latest record is anything but an absence, the streak is broken.
+      if (sorted[0].status !== 'absent') continue;
+      let streak = 1;
+      const streakEndDate = sorted[0].date;
       for (let i = 1; i < sorted.length; i++) {
-        const prev = new Date(sorted[i - 1]), curr = new Date(sorted[i]);
-        if ((curr.getTime() - prev.getTime()) / 86400000 === 1) {
-          streak++;
-          if (streak > maxStreak) { maxStreak = streak; streakEndDate = sorted[i]; }
-        } else { streak = 1; }
+        if (sorted[i].status !== 'absent') break; // attended → streak ends here
+        const diff = (new Date(sorted[i - 1].date).getTime() - new Date(sorted[i].date).getTime()) / 86400000;
+        if (diff === 1) streak++;
+        else break; // non-adjacent day → stop the current run
       }
-      if (maxStreak >= 2) {
+      if (streak >= 2) {
         const st = studentMap[sid];
         if (st) consecutiveAbsentStudents.push({
           id: sid, name: st.studentName, stage: st.stage, grade: st.grade,
-          membershipNo: st.membershipNo, maxStreak, lastStreak: streakEndDate,
+          membershipNo: st.membershipNo, maxStreak: streak, lastStreak: streakEndDate,
         });
       }
     }

@@ -627,4 +627,26 @@ body:has(.modal-backdrop) {
   height: 100vh !important;
 }
 
+/* Student popups: keep BOTH the top and bottom bars visible and fit the popup
+   into the clear space between them, so there is never any overlap. The popup is
+   centered in that gap and its height is capped to the available space. */
+:root {
+  --student-topbar-h: 3.5rem;                                   /* mobile header (h-14) */
+  --student-bottomnav-h: calc(4rem + env(safe-area-inset-bottom, 0px)); /* bottom nav (h-16) */
+}
+@media (min-width: 768px) {
+  :root {
+    --student-topbar-h: 4rem;        /* desktop header (h-16) */
+    --student-bottomnav-h: 0px;      /* no bottom nav on desktop */
+  }
+}
+.student-body .modal-backdrop {
+  align-items: center !important;
+  padding-top: calc(var(--student-topbar-h) + 0.75rem) !important;
+  padding-bottom: calc(var(--student-bottomnav-h) + 0.75rem) !important;
+}
+.student-body .modal-panel {
+  max-height: calc(100vh - var(--student-topbar-h) - var(--student-bottomnav-h) - 1.5rem) !important;
+}
+
 

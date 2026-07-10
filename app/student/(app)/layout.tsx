@@ -81,7 +81,7 @@ export default function StudentAppLayout({ children }: { children: React.ReactNo
       <div className="student-body min-h-screen flex flex-col" style={{ background: 'var(--bg)' }}>
         {/* Desktop header */}
         <header
-          className="hidden md:block sticky top-0 z-30"
+          className="student-topbar hidden md:block sticky top-0 z-30"
           style={{
             background: 'rgba(250,250,247,0.85)',
             backdropFilter: 'saturate(180%) blur(14px)',
@@ -136,7 +136,7 @@ export default function StudentAppLayout({ children }: { children: React.ReactNo
 
         {/* Mobile top bar */}
         <header
-          className="md:hidden sticky top-0 z-30"
+          className="student-topbar md:hidden sticky top-0 z-30"
           style={{
             background: 'rgba(250,250,247,0.85)',
             backdropFilter: 'saturate(180%) blur(12px)',

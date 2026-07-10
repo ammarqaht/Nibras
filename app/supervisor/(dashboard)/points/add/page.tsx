@@ -21,7 +21,7 @@ const GROUP_POINTS_ROLES = [
   'scientific_supervisor', 'social_supervisor', 'stage_supervisor',
 ];
 
-type Cat = { key: string; label: string };
+type Cat = { key: string; label: string; fromIndividual?: boolean };
 
 // Fallbacks used only until the saved categories load (or if the fetch fails).
 const DEFAULT_STUDENT_ADD: Cat[] = [
@@ -445,11 +445,19 @@ export default function AddPointsPage() {
             />
           </div>
 
-          {sign === -1 && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 space-y-1">
-              <p>🛒 **خصم نقاط**: سيتم خصم النقاط من **الرصيد القابل للشراء** فقط. لن يتأثر إجمالي نقاط الطالب أو ترتيبه في لوحة الصدارة.</p>
-            </div>
-          )}
+          {sign === -1 && (() => {
+            const scoped = mode === 'individual'
+              && !!studentDeductCats.find(c => c.key === category)?.fromIndividual;
+            return (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 space-y-1">
+                {scoped ? (
+                  <p>⚠️ <strong>خصم من النقاط الفردية</strong>: هذا التصنيف يخصم من <strong>النقاط الفردية والرصيد معاً</strong>، وسيؤثر على ترتيب الطالب في لوحة الصدارة.</p>
+                ) : (
+                  <p>🛒 <strong>خصم من الرصيد</strong>: سيتم خصم النقاط من <strong>الرصيد القابل للشراء</strong> فقط. لن يتأثر إجمالي نقاط الطالب أو ترتيبه في لوحة الصدارة.</p>
+                )}
+              </div>
+            );
+          })()}
 
           <button type="submit" disabled={busy || loading} className="btn btn-primary w-full">
             {busy ? '...' : mode === 'individual' && selectedIds.length > 1

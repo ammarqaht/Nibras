@@ -164,15 +164,23 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
  * collective = group committee additions (مسابقة / رياضي / اجتماعي / علمي)
  * deduction  = deducted from balance only (never counts toward ranking)
  * balance    = max(0, individual + collective + deduction)
- * rankScore  = individual + collective (leaderboard ranking)
+ * rankScore  = individual + collective (total achievement)
+ *
+ * The record's own pointType is authoritative. A negative record with
+ * pointType 'individual' is a scoped deduction (خصم من الفردية والرصيد): it
+ * lowers both the individual score and the balance. A negative record with
+ * pointType 'deduction' lowers the balance only. Records missing a pointType
+ * (legacy) fall back to the reason/sign heuristic.
  */
 export function calcPointSummary(points: PointInfo[]): {
   individual: number; collective: number; deduction: number; balance: number; rankScore: number;
 } {
   let individual = 0, collective = 0, deduction = 0;
   for (const p of points) {
-    const t = p.delta < 0 ? 'deduction' : (
-      p.pointType ?? (p.reason.endsWith('(رصد جماعي للأسرة)') ? 'collective' : 'individual')
+    const t = p.pointType ?? (
+      p.delta < 0 ? 'deduction'
+        : p.reason.endsWith('(رصد جماعي للأسرة)') ? 'collective'
+        : 'individual'
     );
     if (t === 'individual') individual += p.delta;
     else if (t === 'collective') collective += p.delta;
@@ -2682,6 +2690,44 @@ export function scheduleTargetsStage(itemStage: string | null | undefined, stude
   return stages.length === 0 || stages.includes(studentStage);
 }
 
+// Built-in Arabic labels for legacy / system category keys that predate the
+// editable categories (attendance & tasks are assigned automatically).
+const BUILTIN_CATEGORY_LABELS: Record<string, string> = {
+  attendance: 'الحضور', tasks: 'المهام', social: 'اجتماعية', cultural: 'ثقافية',
+  scientific: 'علمية', sports: 'رياضية', media: 'إعلامية', general: 'عام',
+  behavior: 'سلوك', participation: 'مشاركة', excellence: 'تميّز', other: 'أخرى',
+  store: 'متجر', violation: 'مخالفة', competition: 'مسابقة',
+};
+
+/**
+ * Builds a map of category key → Arabic label from the saved editable
+ * categories (student/group, add/deduct) plus the built-in labels, so the
+ * student site never shows a raw key like "cat_ind_..." or an English key.
+ */
+export async function getCategoryLabelMap(): Promise<Record<string, string>> {
+  const keys = [
+    'points_student_add_categories', 'points_student_deduct_categories',
+    'points_group_add_categories', 'points_group_deduct_categories',
+    'points_student_categories', 'points_group_categories',
+  ];
+  const map: Record<string, string> = { ...BUILTIN_CATEGORY_LABELS };
+  const raws = await Promise.all(keys.map(k => getSetting(k)));
+  for (const raw of raws) {
+    if (!raw) continue;
+    try {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) {
+        for (const c of arr) {
+          const key = String(c?.key ?? '').trim();
+          const label = String(c?.label ?? '').trim();
+          if (key && label) map[key] = label;
+        }
+      }
+    } catch { /* ignore malformed setting */ }
+  }
+  return map;
+}
+
 export async function getStudentPoints(registrationId: number): Promise<PointInfo[]> {
   if (hasDatabase) {
     const prisma = getPrisma()!;
@@ -2792,10 +2838,11 @@ export async function getStageLeaderboard(stage: string): Promise<{
     })()
     : await readJsonFile<PointInfo[]>(FILE_POINTS, []);
 
+  // ترتيب الأوائل يعتمد على النقاط الفردية فقط (النقاط الجماعية لا تدخل في الترتيب).
   const ranked = stageStudents.map(student => {
     const pts = allPoints.filter(p => p.registrationId === student.id);
-    const { rankScore, balance } = calcPointSummary(pts);
-    return { registrationId: student.id, studentName: student.studentName, grade: student.grade, rankScore, balance };
+    const { individual, balance } = calcPointSummary(pts);
+    return { registrationId: student.id, studentName: student.studentName, grade: student.grade, rankScore: individual, balance };
   });
 
   ranked.sort((a, b) => b.rankScore - a.rankScore);

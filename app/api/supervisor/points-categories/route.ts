@@ -4,7 +4,10 @@ import { getSetting, saveSetting } from '@/lib/services';
 
 export const dynamic = 'force-dynamic';
 
-type Cat = { key: string; label: string };
+// `fromIndividual` applies only to student (individual) deduction categories:
+// when true, a deduction using this category is subtracted from the student's
+// individual score AND their balance; when false/absent, from the balance only.
+type Cat = { key: string; label: string; fromIndividual?: boolean };
 
 // Defaults are split by operation (add / deduct) and by scope (individual / group).
 const DEFAULT_STUDENT_ADD: Cat[] = [
@@ -44,7 +47,11 @@ function parseCats(raw: string | null): Cat[] | null {
     const arr = JSON.parse(raw);
     if (Array.isArray(arr) && arr.length) {
       return arr
-        .map((c: any) => ({ key: String(c.key ?? '').trim(), label: String(c.label ?? '').trim() }))
+        .map((c: any) => ({
+          key: String(c.key ?? '').trim(),
+          label: String(c.label ?? '').trim(),
+          ...(c.fromIndividual ? { fromIndividual: true } : {}),
+        }))
         .filter(c => c.key && c.label);
     }
   } catch { /* ignore */ }
@@ -98,7 +105,11 @@ export async function POST(req: NextRequest) {
   const clean = (arr: any): Cat[] =>
     Array.isArray(arr)
       ? arr
-          .map((c: any) => ({ key: String(c.key ?? '').trim(), label: String(c.label ?? '').trim() }))
+          .map((c: any) => ({
+            key: String(c.key ?? '').trim(),
+            label: String(c.label ?? '').trim(),
+            ...(c.fromIndividual ? { fromIndividual: true } : {}),
+          }))
           .filter(c => c.key && c.label)
       : [];
 

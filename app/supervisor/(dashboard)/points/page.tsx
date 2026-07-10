@@ -21,15 +21,19 @@ type LogRow = {
   key: string; rec: Point; isGroup: boolean; count: number;
   groupName?: string; batchId?: string | null; createdAt: string;
 };
-type Cat = { key: string; label: string };
+type Cat = { key: string; label: string; fromIndividual?: boolean };
 
 // Editable list of categories (add row / edit label / delete row) used inside
 // the categories-management modal for each of the four buckets.
+// When `withScopeToggle` is set (individual deduction categories only), each row
+// also exposes a "خصم من الفردية" switch controlling whether a deduction using
+// that category lowers the student's individual score as well as their balance.
 function CategoryListEditor({
-  title, tone, items, onChange, placeholder, keyPrefix,
+  title, tone, items, onChange, placeholder, keyPrefix, withScopeToggle,
 }: {
   title: string; tone: 'add' | 'deduct'; items: Cat[];
   onChange: (next: Cat[]) => void; placeholder: string; keyPrefix: string;
+  withScopeToggle?: boolean;
 }) {
   const toneCls = tone === 'add' ? 'text-green-700' : 'text-red-700';
   return (
@@ -44,31 +48,51 @@ function CategoryListEditor({
           <span>➕ إضافة</span>
         </button>
       </div>
-      <div className="space-y-2 border p-2.5 rounded-xl bg-cream-50/20 min-h-[70px] max-h-[200px] overflow-y-auto" style={{ borderColor: 'var(--line)' }}>
+      <div className="space-y-2 border p-2.5 rounded-xl bg-cream-50/20 min-h-[70px] max-h-[240px] overflow-y-auto" style={{ borderColor: 'var(--line)' }}>
         {items.length === 0 ? (
           <p className="text-[11px] text-ink-400 text-center py-3">لا توجد تصنيفات، أضف تصنيفاً جديداً</p>
         ) : (
           items.map((cat, idx) => (
-            <div key={cat.key} className="flex gap-2 items-center">
-              <input
-                type="text"
-                className="field text-xs py-2 px-3 flex-1"
-                placeholder={placeholder}
-                value={cat.label}
-                onChange={e => {
-                  const copy = items.slice();
-                  copy[idx] = { ...copy[idx], label: e.target.value };
-                  onChange(copy);
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => onChange(items.filter((_, i) => i !== idx))}
-                className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                title="حذف"
-              >
-                🗑️
-              </button>
+            <div key={cat.key} className="space-y-1.5 pb-1.5 border-b border-ink-50 last:border-0 last:pb-0">
+              <div className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  className="field text-xs py-2 px-3 flex-1"
+                  placeholder={placeholder}
+                  value={cat.label}
+                  onChange={e => {
+                    const copy = items.slice();
+                    copy[idx] = { ...copy[idx], label: e.target.value };
+                    onChange(copy);
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => onChange(items.filter((_, i) => i !== idx))}
+                  className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                  title="حذف"
+                >
+                  🗑️
+                </button>
+              </div>
+              {withScopeToggle && (
+                <label className="flex items-center gap-2 cursor-pointer select-none pr-1">
+                  <input
+                    type="checkbox"
+                    className="w-3.5 h-3.5 accent-red-600"
+                    checked={!!cat.fromIndividual}
+                    onChange={e => {
+                      const copy = items.slice();
+                      copy[idx] = { ...copy[idx], fromIndividual: e.target.checked };
+                      onChange(copy);
+                    }}
+                  />
+                  <span className="text-[11px] text-ink-600">
+                    الخصم من النقاط الفردية والرصيد
+                    <span className="text-ink-400"> (غير مفعّل: من الرصيد فقط)</span>
+                  </span>
+                </label>
+              )}
             </div>
           ))
         )}
@@ -89,14 +113,18 @@ const ADD_POINTS_ROLES = [
 function calcSummary(pts: Point[]) {
   let individual = 0, collective = 0, deduction = 0;
   for (const p of pts) {
-    const t = p.delta < 0 ? 'deduction' : (
-      p.pointType ?? (p.reason.endsWith('(رصد جماعي للأسرة)') ? 'collective' : 'individual')
+    // The record's pointType is authoritative: a negative 'individual' record is
+    // a scoped deduction that lowers both the individual score and the balance.
+    const t = p.pointType ?? (
+      p.delta < 0 ? 'deduction'
+        : p.reason.endsWith('(رصد جماعي للأسرة)') ? 'collective'
+        : 'individual'
     );
     if (t === 'individual') individual += p.delta;
     else if (t === 'collective') collective += p.delta;
     else deduction += p.delta;
   }
-  const total = individual + collective;           // الاجمالي — basis for ranking
+  const total = individual + collective;           // الاجمالي
   const balance = Math.max(0, total + deduction);  // الرصيد — never below zero
   return { individual, collective, deduction, total, balance };
 }
@@ -122,6 +150,7 @@ export default function PointsBoardPage() {
   const [loading, setLoading] = useState(true);
   const [activeStage, setActiveStage] = useState<StageName>('ابتدائي');
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+  const [ledgerStudentId, setLedgerStudentId] = useState<number | null>(null);
   const [logSearch, setLogSearch] = useState('');
   const [visibleLogsCount, setVisibleLogsCount] = useState(10);
   const [leaderSearch, setLeaderSearch] = useState('');
@@ -244,6 +273,15 @@ export default function PointsBoardPage() {
   const groupMap = useMemo(() => new Map(groups.map(g => [g.id, g.name])), [groups]);
   const studentMap = useMemo(() => new Map(students.map(s => [s.id, s])), [students]);
 
+  // key → Arabic label across all four category buckets, for the log/ledger.
+  const catLabelMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of [...studentAddCats, ...studentDeductCats, ...groupAddCats, ...groupDeductCats]) {
+      if (c.key && c.label) m.set(c.key, c.label);
+    }
+    return m;
+  }, [studentAddCats, studentDeductCats, groupAddCats, groupDeductCats]);
+
   const studentSummaries = useMemo(() => {
     const byStudent = new Map<number, Point[]>();
     for (const p of points) {
@@ -255,7 +293,8 @@ export default function PointsBoardPage() {
       const { individual, collective, deduction, total, balance } = calcSummary(pts);
       return {
         ...s, individual, collective, deduction, total, balance,
-        rankScore: total,
+        // ترتيب الأوائل حسب النقاط الفردية فقط.
+        rankScore: individual,
         groupName: s.groupId ? (groupMap.get(s.groupId) ?? '—') : '—',
       };
     });
@@ -424,9 +463,14 @@ export default function PointsBoardPage() {
                     </thead>
                     <tbody>
                       {leaderboard.map((item, idx) => (
-                        <tr key={item.id}>
+                        <tr
+                          key={item.id}
+                          onClick={() => setLedgerStudentId(item.id)}
+                          className="cursor-pointer hover:bg-cream-50/60 transition-colors"
+                          title="عرض سجل رصيد الطالب"
+                        >
                           <td><RankBadge rank={idx + 1} /></td>
-                          <td className="font-semibold text-ink-900">{item.studentName}</td>
+                          <td className="font-semibold text-ink-900 underline decoration-dotted decoration-ink-300 underline-offset-4">{item.studentName}</td>
                           <td className="font-mono text-ink-400 text-xs">#{item.membershipNo}</td>
                           <td className="text-ink-500 text-sm">{item.groupName}</td>
                           <td><span className="pill pill-green text-xs">{item.individual}</span></td>
@@ -450,13 +494,17 @@ export default function PointsBoardPage() {
                 {/* Mobile */}
                 <ul className="lg:hidden divide-y divide-ink-100">
                   {leaderboard.map((item, idx) => (
-                    <li key={item.id} className="px-4 py-3">
+                    <li
+                      key={item.id}
+                      className="px-4 py-3 cursor-pointer active:bg-cream-50/60"
+                      onClick={() => setLedgerStudentId(item.id)}
+                    >
                       <div className="flex items-center gap-3">
                         <div className="w-7 h-7 flex items-center justify-center shrink-0">
                           <RankBadge rank={idx + 1} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="font-bold text-sm text-ink-900 truncate">{item.studentName}</div>
+                          <div className="font-bold text-sm text-ink-900 truncate underline decoration-dotted decoration-ink-300 underline-offset-4">{item.studentName}</div>
                           <div className="text-[11px] text-ink-400 mt-0.5">#{item.membershipNo} · {item.groupName}</div>
                         </div>
                         <div className="flex gap-3 text-left shrink-0">
@@ -520,7 +568,7 @@ export default function PointsBoardPage() {
                       {visibleLogs.map(row => {
                         const p = row.rec;
                         const st = studentMap.get(p.registrationId);
-                        const typeLabel = p.delta < 0 ? (p.pointType === 'deduction' ? 'خصم متجر' : 'خصم نهائي') : (p.pointType === 'collective' ? 'جماعية' : 'فردية');
+                        const typeLabel = p.delta < 0 ? (p.pointType === 'deduction' ? 'خصم من الرصيد' : 'خصم من الفردية') : (p.pointType === 'collective' ? 'جماعية' : 'فردية');
                         const typeCls = p.delta < 0 ? (p.pointType === 'deduction' ? 'pill-red bg-red-50 text-red-700 border-red-200' : 'pill-red') : (p.pointType === 'collective' ? 'pill-blue' : 'pill-green');
                         return (
                           <tr key={row.key}>
@@ -572,7 +620,7 @@ export default function PointsBoardPage() {
                     const p = row.rec;
                     const st = studentMap.get(p.registrationId);
                     const isExp = expandedIds.has(p.id);
-                    const typeLabel = p.delta < 0 ? (p.pointType === 'deduction' ? 'خصم متجر' : 'خصم نهائي') : (p.pointType === 'collective' ? 'جماعية' : 'فردية');
+                    const typeLabel = p.delta < 0 ? (p.pointType === 'deduction' ? 'خصم من الرصيد' : 'خصم من الفردية') : (p.pointType === 'collective' ? 'جماعية' : 'فردية');
                     return (
                       <li key={row.key} className="py-3 px-4">
                         <button
@@ -728,6 +776,7 @@ export default function PointsBoardPage() {
                   onChange={setDraftStudentDeduct}
                   placeholder="اسم التصنيف (مثال: متجر)"
                   keyPrefix="cat_ind_ded"
+                  withScopeToggle
                 />
               </div>
 
@@ -806,6 +855,84 @@ export default function PointsBoardPage() {
           </div>
         </div>
       )}
+
+      {/* Per-student balance ledger (opened by clicking a name in the leaderboard) */}
+      {ledgerStudentId !== null && (() => {
+        const st = studentMap.get(ledgerStudentId);
+        const recs = points
+          .filter(p => p.registrationId === ledgerStudentId)
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        const sum = calcSummary(recs);
+        return (
+          <div className="modal-backdrop flex items-center justify-center p-4 z-50 animate-fade-in" onClick={() => setLedgerStudentId(null)}>
+            <div className="modal-panel w-full max-w-lg max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between border-b p-4" style={{ borderColor: 'var(--line)' }}>
+                <div className="min-w-0">
+                  <h3 className="font-bold text-base text-ink-900 truncate">سجل رصيد الطالب</h3>
+                  <p className="text-xs text-ink-500 truncate">
+                    {st?.studentName ?? `#${ledgerStudentId}`}
+                    {st?.membershipNo ? <span className="font-mono"> · #{st.membershipNo}</span> : null}
+                    {st?.groupId ? ` · ${groupMap.get(st.groupId) ?? '—'}` : ''}
+                  </p>
+                </div>
+                <button onClick={() => setLedgerStudentId(null)} className="btn btn-ghost p-1 shrink-0" aria-label="إغلاق">✕</button>
+              </div>
+
+              <div className="grid grid-cols-4 gap-2 p-3 border-b" style={{ borderColor: 'var(--line)' }}>
+                {[
+                  { label: 'فردية', val: sum.individual, cls: 'text-green-700' },
+                  { label: 'جماعية', val: sum.collective, cls: 'text-blue-700' },
+                  { label: 'الرصيد', val: sum.balance, cls: 'text-emerald-700' },
+                  { label: 'الاجمالي', val: sum.total, cls: 'text-ink-900' },
+                ].map(x => (
+                  <div key={x.label} className="text-center bg-cream-50/40 rounded-lg py-2">
+                    <div className={`text-lg font-bold tabular-nums ${x.cls}`} dir="ltr">{x.val}</div>
+                    <div className="text-[10px] text-ink-400">{x.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="overflow-y-auto scroll-soft flex-1">
+                {recs.length === 0 ? (
+                  <p className="text-center py-10 text-ink-400 text-sm">لا توجد حركات على رصيد هذا الطالب.</p>
+                ) : (
+                  <ul className="divide-y divide-ink-100">
+                    {recs.map(p => {
+                      const typeLabel = p.delta < 0
+                        ? (p.pointType === 'deduction' ? 'خصم من الرصيد' : 'خصم من الفردية')
+                        : (p.pointType === 'collective' ? 'جماعية' : 'فردية');
+                      const typeCls = p.delta < 0
+                        ? 'pill-red'
+                        : (p.pointType === 'collective' ? 'pill-blue' : 'pill-green');
+                      return (
+                        <li key={p.id} className="flex items-center gap-3 px-4 py-2.5">
+                          <span className={`pill text-xs shrink-0 ${p.delta >= 0 ? 'pill-green' : 'pill-red'}`} dir="ltr">
+                            {p.delta >= 0 ? `+${p.delta}` : p.delta}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-ink-800 truncate">{p.reason.replace(' (رصد جماعي للأسرة)', '')}</p>
+                            <p className="text-[11px] text-ink-400 mt-0.5">
+                              {catLabelMap.get(p.category) || p.category}
+                              {' · '}
+                              <span className="whitespace-nowrap">
+                                {mounted
+                                  ? new Date(p.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+                                  : p.createdAt.split('T')[0]}
+                              </span>
+                              {p.recordedBy ? ` · ${p.recordedBy}` : ''}
+                            </p>
+                          </div>
+                          <span className={`pill text-[10px] shrink-0 ${typeCls}`}>{typeLabel}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
