@@ -77,6 +77,12 @@ export default function StudentLeaderboard() {
         )}
       </header>
 
+      {/* Ranking basis note */}
+      <div className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs" style={{ background: 'rgba(255,159,28,0.08)', color: 'var(--accent-deep)' }}>
+        <span className="text-sm">ℹ️</span>
+        <span>الترتيب يعتمد على <strong>النقاط الفردية</strong> فقط.</span>
+      </div>
+
       {user?.hidePoints && (
         <div className="text-center bg-white p-5 rounded-2xl border border-line shadow-sm w-full flex flex-col items-center justify-center">
           <p className="text-3xl mb-2">🔒</p>
@@ -148,13 +154,13 @@ export default function StudentLeaderboard() {
 
                     <div className="flex-1 min-w-0">
                       <p
-                        className="font-bold text-sm truncate"
+                        className="font-bold text-[13px] leading-snug break-words"
                         style={{ color: isMe ? 'var(--accent-deep)' : 'var(--ink)' }}
                       >
                         {entry.studentName}
-                        {isMe && <span className="text-xs mx-2 opacity-70">(أنت)</span>}
+                        {isMe && <span className="text-[11px] mx-1.5 opacity-70">(أنت)</span>}
                       </p>
-                      <p className="text-xs mt-0.5" style={{ color: 'var(--ink-soft)' }}>{entry.grade}</p>
+                      <p className="text-[11px] mt-0.5" style={{ color: 'var(--ink-soft)' }}>{entry.grade}</p>
                     </div>
 
                     <div className="text-end shrink-0">

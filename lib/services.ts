@@ -2926,7 +2926,8 @@ export async function getStudentFamily(groupId: number): Promise<StudentFamilyRe
         collective: sum.collective,
       };
     })
-    .sort((a, b) => b.rankScore - a.rankScore);
+    // ترتيب أعضاء الأسرة حسب النقاط الفردية (نفس أساس ترتيب الأوائل).
+    .sort((a, b) => b.individual - a.individual);
 
   // Family points = the family's COLLECTIVE points only (what committee supervisors add via
   // "رصد جماعي للأسرة") — NOT the sum of members' individual achievements. Those collective

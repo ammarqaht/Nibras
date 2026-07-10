@@ -187,12 +187,12 @@ export default function StudentFamily() {
                     </p>
                   </div>
 
-                  {/* Points */}
+                  {/* Points — individual only (matches the leaderboard ranking basis) */}
                   <div className="text-end shrink-0">
                     <p className="font-display tabular-nums text-base font-bold" style={{ color: 'var(--accent-deep)' }}>
-                      {m.rankScore}
+                      {m.individual}
                     </p>
-                    <p className="text-[11px]" style={{ color: 'var(--ink-soft)' }}>نقطة</p>
+                    <p className="text-[11px]" style={{ color: 'var(--ink-soft)' }}>فردية</p>
                   </div>
                 </li>
               );

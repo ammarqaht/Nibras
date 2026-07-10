@@ -507,22 +507,16 @@ export default function PointsBoardPage() {
                           <div className="font-bold text-sm text-ink-900 truncate underline decoration-dotted decoration-ink-300 underline-offset-4">{item.studentName}</div>
                           <div className="text-[11px] text-ink-400 mt-0.5">#{item.membershipNo} · {item.groupName}</div>
                         </div>
-                        <div className="flex gap-3 text-left shrink-0">
-                          <div>
-                            <div className={`text-sm font-bold ${item.balance > 0 ? 'text-green-600' : item.balance === 0 ? 'text-ink-400' : 'text-red-600'}`}>
-                              {item.balance}
-                            </div>
-                            <div className="text-[10px] text-ink-400 text-center">رصيد</div>
-                          </div>
-                          <div>
-                            <div className="text-sm font-bold text-green-600">{item.total}</div>
-                            <div className="text-[10px] text-ink-400 text-center">اجمالي</div>
-                          </div>
+                        {/* الترتيب حسب النقاط الفردية، فتكون هي الرقم البارز */}
+                        <div className="text-center shrink-0">
+                          <div className="text-lg font-bold text-green-600 tabular-nums">{item.individual}</div>
+                          <div className="text-[10px] text-ink-400">فردية</div>
                         </div>
                       </div>
                       <div className="flex gap-4 mt-1.5 text-[11px] text-ink-500 pr-10">
-                        <span>فردية: <span className="text-green-600 font-semibold">{item.individual}</span></span>
                         <span>جماعية: <span className="text-blue-700 font-semibold">{item.collective}</span></span>
+                        <span>رصيد: <span className={`font-semibold ${item.balance > 0 ? 'text-green-600' : item.balance === 0 ? 'text-ink-400' : 'text-red-600'}`}>{item.balance}</span></span>
+                        <span>اجمالي: <span className="text-ink-700 font-semibold">{item.total}</span></span>
                       </div>
                     </li>
                   ))}

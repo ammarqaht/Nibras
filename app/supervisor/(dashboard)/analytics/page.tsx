@@ -690,10 +690,10 @@ export default function AnalyticsPage() {
                             <span className="text-xs font-mono text-gray-400">#{s.membershipNo}</span>
                           </div>
                         </div>
-                        <span className="text-base font-bold shrink-0" style={{ color:STAGE_COLOR[ptStage] }}>إجمالي {s.points}</span>
+                        <span className="text-base font-bold shrink-0" style={{ color:STAGE_COLOR[ptStage] }}>فردية {s.individual}</span>
                       </div>
                       <div className="flex gap-1.5 mr-9">
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-semibold">فردية {s.individual}</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-semibold">إجمالي {s.total}</span>
                         <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-50 text-cyan-600 font-semibold">جماعية {s.collective}</span>
                         <span className="text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-600 font-semibold">رصيد {s.balance}</span>
                       </div>

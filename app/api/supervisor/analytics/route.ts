@@ -219,8 +219,12 @@ export async function GET(req: NextRequest) {
     function calcPtDetail(pts: any[]) {
       let ind = 0, col = 0, ded = 0;
       for (const p of pts) {
-        const t = p.delta < 0 ? 'deduction' : (
-          p.pointType ?? (p.reason?.endsWith('(رصد جماعي للأسرة)') ? 'collective' : 'individual')
+        // pointType is authoritative: a negative 'individual' record is a scoped
+        // deduction that lowers the individual score, not just the balance.
+        const t = p.pointType ?? (
+          p.delta < 0 ? 'deduction'
+            : p.reason?.endsWith('(رصد جماعي للأسرة)') ? 'collective'
+            : 'individual'
         );
         if (t === 'individual') ind += p.delta;
         else if (t === 'collective') col += p.delta;
@@ -237,7 +241,8 @@ export async function GET(req: NextRequest) {
           const detail = calcPtDetail(pointsRawByStudent[s.id] || []);
           return { id: s.id, name: s.studentName, grade: s.grade, membershipNo: s.membershipNo, points: detail.total, ...detail };
         })
-        .sort((a: any, b: any) => b.points - a.points).slice(0, 5);
+        // ترتيب الطلاب في الإحصائيات حسب النقاط الفردية.
+        .sort((a: any, b: any) => b.individual - a.individual).slice(0, 5);
     }
 
     // Stage average points
