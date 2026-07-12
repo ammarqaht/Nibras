@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { getStudentSession } from '@/lib/auth';
 import {
   getSubmissions, claimTask, submitClaim, cancelClaim,
@@ -43,20 +43,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error || 'فشل التسليم' }, { status: 400 });
     }
 
-    // Notify assigned supervisors
-    const tasks = await getTasks();
-    const task = tasks.find(t => t.id === taskId);
-    if (task) {
-      const supervisors = await getAllSupervisors();
-      const TASKS_ROLES = ['scientific_supervisor', 'tasks_supervisor', 'admin'];
-      const assignedIds = task.assignedAdmins.length > 0
-        ? task.assignedAdmins.map(Number).filter(n => !isNaN(n))
-        : supervisors
-            .filter(s => s.role.split(',').map(r => r.trim()).some(r => TASKS_ROLES.includes(r)))
-            .map(s => s.id);
+    // Notify assigned supervisors AFTER responding — the student shouldn't wait
+    // on supervisor lookups + N notification inserts to see their submission land.
+    after(async () => {
+      try {
+        const tasks = await getTasks();
+        const task = tasks.find(t => t.id === taskId);
+        if (!task) return;
+        const supervisors = await getAllSupervisors();
+        const TASKS_ROLES = ['scientific_supervisor', 'tasks_supervisor', 'admin'];
+        const assignedIds = task.assignedAdmins.length > 0
+          ? task.assignedAdmins.map(Number).filter(n => !isNaN(n))
+          : supervisors
+              .filter(s => s.role.split(',').map(r => r.trim()).some(r => TASKS_ROLES.includes(r)))
+              .map(s => s.id);
 
-      for (const supId of assignedIds) {
-        await createNotification({
+        await Promise.all(assignedIds.map(supId => createNotification({
           type: 'supervisor_new_submission',
           targetType: 'supervisor',
           targetId: supId,
@@ -64,9 +66,9 @@ export async function POST(req: NextRequest) {
           body: `قدّم ${session.name} تسليمًا للمهمة "${task.title}"`,
           relatedTaskId: taskId,
           relatedSubId: submission.id,
-        });
-      }
-    }
+        })));
+      } catch { /* non-fatal — the submission already succeeded */ }
+    });
 
     return NextResponse.json({ ok: true, submission });
   } catch {

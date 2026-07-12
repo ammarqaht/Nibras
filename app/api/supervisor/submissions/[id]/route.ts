@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { updateSubmission, deleteSubmission, getSubmissionById, getTasks, createNotification, deleteTaskAwardPoints } from '@/lib/services';
+import { updateSubmission, deleteSubmission, getSubmissionById, getTasks, createNotification, deleteTaskAwardPoints, addPointsRecord } from '@/lib/services';
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -65,35 +65,36 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     // re-grade or a reject→approve cycle can't stack points twice (idempotent).
     if (statusChanged && newStatus === 'approved') {
       const grade = patch.grade ?? 0;
-      try { await deleteTaskAwardPoints(updated.registrationId, updated.taskTitle); } catch { /* non-fatal */ }
-      if (grade > 0) {
+      // Award points via a direct DB write (no self HTTP round trip). Clearing
+      // any prior award first keeps it idempotent.
+      try {
+        await deleteTaskAwardPoints(updated.registrationId, updated.taskTitle);
+        if (grade > 0) {
+          await addPointsRecord({
+            registrationId: updated.registrationId,
+            delta: grade,
+            reason: `إنجاز مهمة: ${updated.taskTitle}`,
+            category: 'tasks',
+            pointType: 'individual',
+            recordedBy: session.name,
+          });
+        }
+      } catch { /* non-fatal */ }
+
+      // Notify the student after responding — grading shouldn't wait on it.
+      after(async () => {
         try {
-          await fetch(`${req.nextUrl.origin}/api/supervisor/points`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', cookie: req.headers.get('cookie') || '' },
-            body: JSON.stringify({
-              registrationId: updated.registrationId,
-              delta: grade,
-              reason: `إنجاز مهمة: ${updated.taskTitle}`,
-              category: 'tasks',
-              pointType: 'individual',
-            }),
+          await createNotification({
+            type: 'student_graded',
+            targetType: 'student',
+            targetId: updated.registrationId,
+            title: 'تم قبول مهمتك',
+            body: `تم قبول تسليمك لمهمة "${updated.taskTitle}" وحصلت على ${grade} نقطة.`,
+            relatedTaskId: updated.taskId,
+            relatedSubId: updated.id,
           });
         } catch { /* non-fatal */ }
-      }
-
-      // Notify student about acceptance
-      try {
-        await createNotification({
-          type: 'student_graded',
-          targetType: 'student',
-          targetId: updated.registrationId,
-          title: 'تم قبول مهمتك',
-          body: `تم قبول تسليمك لمهمة "${updated.taskTitle}" وحصلت على ${grade} نقطة.`,
-          relatedTaskId: updated.taskId,
-          relatedSubId: updated.id,
-        });
-      } catch { /* non-fatal */ }
+      });
     }
 
     // Notify student about rejection
@@ -103,18 +104,20 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       if (existing?.status === 'approved') {
         try { await deleteTaskAwardPoints(updated.registrationId, updated.taskTitle); } catch { /* non-fatal */ }
       }
-      try {
-        const note = body.feedback ? ` — ملاحظة: ${body.feedback}` : '';
-        await createNotification({
-          type: 'student_graded',
-          targetType: 'student',
-          targetId: updated.registrationId,
-          title: 'تم رد مهمتك',
-          body: `تم رد تسليمك لمهمة "${updated.taskTitle}"${note}. يمكنك إعادة التسليم.`,
-          relatedTaskId: updated.taskId,
-          relatedSubId: updated.id,
-        });
-      } catch { /* non-fatal */ }
+      after(async () => {
+        try {
+          const note = body.feedback ? ` — ملاحظة: ${body.feedback}` : '';
+          await createNotification({
+            type: 'student_graded',
+            targetType: 'student',
+            targetId: updated.registrationId,
+            title: 'تم رد مهمتك',
+            body: `تم رد تسليمك لمهمة "${updated.taskTitle}"${note}. يمكنك إعادة التسليم.`,
+            relatedTaskId: updated.taskId,
+            relatedSubId: updated.id,
+          });
+        } catch { /* non-fatal */ }
+      });
     }
 
     return NextResponse.json({ success: true, submission: updated });
