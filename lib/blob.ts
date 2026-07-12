@@ -75,6 +75,51 @@ export async function uploadDataUrl(
  * array string (or a comma-separated string). Returns a JSON array string of
  * the resulting URLs, or null when empty.
  */
+/**
+ * Uploads any base64 hidden inside a student submission `fileUrl`, which may be:
+ *   - `text:` / `link:` / `ack://confirmed` / `admin://manual-mark`  → unchanged
+ *   - a single `data:` URL                                          → uploaded
+ *   - a JSON array `["data:", ...]`                                 → each uploaded
+ *   - an object `{"text":..,"files":["data:",..]}`                  → files uploaded
+ * Returns the same shape with Blob URLs in place of base64. Idempotent.
+ */
+export async function uploadSubmissionFileUrl(
+  fileUrl: string | null | undefined,
+  prefix = 'submissions'
+): Promise<string> {
+  if (!fileUrl) return fileUrl ?? '';
+  const trimmed = fileUrl.trim();
+  if (
+    trimmed.startsWith('text:') || trimmed.startsWith('link:') ||
+    trimmed === 'ack://confirmed' || trimmed === 'admin://manual-mark'
+  ) return fileUrl;
+
+  // Combined envelope: { text?, link?, ack?, files?: string[] }
+  if (trimmed.startsWith('{')) {
+    try {
+      const obj = JSON.parse(trimmed);
+      if (Array.isArray(obj.files)) {
+        obj.files = (await Promise.all(obj.files.map((f: string) => uploadDataUrl(f, prefix)))).filter(Boolean);
+      }
+      return JSON.stringify(obj);
+    } catch { return fileUrl; }
+  }
+
+  // Bare JSON array of files
+  if (trimmed.startsWith('[')) {
+    try {
+      const arr = JSON.parse(trimmed);
+      if (Array.isArray(arr)) {
+        const urls = (await Promise.all(arr.map((f: string) => uploadDataUrl(f, prefix)))).filter(Boolean) as string[];
+        return urls.length === 1 ? urls[0] : JSON.stringify(urls);
+      }
+    } catch { return fileUrl; }
+  }
+
+  // Single data URL (or already an https URL — passed through)
+  return (await uploadDataUrl(fileUrl, prefix)) ?? fileUrl;
+}
+
 export async function uploadManyDataUrls(
   value: string | null | undefined,
   prefix: string
