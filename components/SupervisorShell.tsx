@@ -46,6 +46,7 @@ const LINKS: NavLink[] = [
   { id: 'students', href: '/supervisor/students', label: 'الطلاب' },
   { id: 'attendance', href: '/supervisor/attendance', label: 'الحضور' },
   { id: 'points', href: '/supervisor/points', label: 'النقاط', roles: ['social_supervisor', 'cultural_supervisor', 'sports_supervisor', 'scientific_supervisor', 'groups_supervisor', 'families_supervisor', 'stage_supervisor'] },
+  { id: 'store', href: '/supervisor/store', label: 'المتجر', roles: [] },
   { id: 'tasks', href: '/supervisor/tasks', label: 'المهام', roles: ['scientific_supervisor', 'tasks_supervisor'] },
   { id: 'schedule', href: '/supervisor/schedule', label: 'الجدول' },
   { id: 'groups', href: '/supervisor/groups', label: 'المجموعات', roles: ['groups_supervisor', 'families_supervisor', 'general_supervisor', 'stage_supervisor', 'cultural_supervisor', 'social_supervisor', 'scientific_supervisor', 'sports_supervisor', 'attendance_supervisor'] },
@@ -156,6 +157,7 @@ export default function SupervisorShell({ children }: { children: React.ReactNod
     }
     if (l.id === 'settings') return isAdmin; // Settings is strictly for admin
     if (l.id === 'account') return !isAdmin; // own-account page: every supervisor except admins
+    if (l.id === 'store') return isAdmin || !!user?.permissions?.includes('store'); // strictly permission-gated
     // Role-specific tools the manager doesn't need — show only to their dedicated roles (unless they are admin)
     if (l.id === 'tasks' || l.id === 'sports-league') {
       return isAdmin || (l.roles ? l.roles.some((r) => userRoles.includes(r)) : false);

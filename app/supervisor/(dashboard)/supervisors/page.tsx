@@ -14,6 +14,7 @@ const MODULES = [
   { id: 'students', label: 'الطلاب' },
   { id: 'attendance', label: 'الحضور' },
   { id: 'points', label: 'النقاط' },
+  { id: 'store', label: 'المتجر' },
   { id: 'tasks', label: 'المهام' },
   { id: 'schedule', label: 'الجدول' },
   { id: 'groups', label: 'المجموعات' },

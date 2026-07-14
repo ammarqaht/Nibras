@@ -405,11 +405,13 @@ export default function StudentTasks() {
             const sub = item.submission;
             const tc = trackColor(item.task.track);
             const claimable = !sub || sub.status === 'cancelled' || sub.status === 'expired';
+            const deadlinePassed = !!item.task.dueDate && new Date(item.task.dueDate).getTime() < now;
             const dl = sub?.status === 'claimed' ? claimDeadline(item) : null;
 
             let pill: { label: string; cls: string };
             if (claimable) {
-              pill = sub?.status === 'expired' ? { label: 'انتهى الوقت', cls: 'pill-red' }
+              pill = deadlinePassed ? { label: 'انتهى الموعد', cls: 'pill-gray' }
+                   : sub?.status === 'expired' ? { label: 'انتهى الوقت', cls: 'pill-red' }
                    : sub?.status === 'cancelled' ? { label: 'ملغاة', cls: 'pill-gray' }
                    : { label: 'متاحة للطلب', cls: 'pill-blue' };
             }
@@ -520,6 +522,7 @@ export default function StudentTasks() {
                 const s = selected.submission;
                 const cost = selected.task.cost ?? 0;
                 const claimable = !s || s.status === 'cancelled' || s.status === 'expired';
+                const deadlinePassed = !!selected.task.dueDate && new Date(selected.task.dueDate).getTime() < now;
                 const isClaimed = s?.status === 'claimed';
                 const isRejected = s?.status === 'rejected';
                 const isPending = s?.status === 'pending';
@@ -562,7 +565,17 @@ export default function StudentTasks() {
                       </div>
                     )}
 
-                    {claimable && (
+                    {claimable && deadlinePassed && (
+                      <div className="border-t pt-4" style={{ borderColor: 'var(--line)' }}>
+                        <div className="rounded-xl p-4 border" style={{ background: 'var(--bg-soft)', borderColor: 'var(--line)' }}>
+                          <p className="font-bold text-sm" style={{ color: 'var(--ink)' }}>انتهى الموعد النهائي لهذه المهمة</p>
+                          <p className="text-xs mt-1" style={{ color: 'var(--ink-soft)' }}>لم يعد بالإمكان طلب هذه المهمة بعد انقضاء موعدها.</p>
+                        </div>
+                        <button type="button" onClick={() => setSelected(null)} className="btn btn-secondary w-full mt-3">إغلاق</button>
+                      </div>
+                    )}
+
+                    {claimable && !deadlinePassed && (
                       <div className="border-t pt-4 space-y-3" style={{ borderColor: 'var(--line)' }}>
                         <div className="rounded-xl p-4" style={{ background: 'var(--bg-soft)' }}>
                           <p className="text-sm font-bold mb-1" style={{ color: 'var(--ink)' }}>اطلب المهمة للبدء</p>

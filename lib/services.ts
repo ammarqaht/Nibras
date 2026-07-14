@@ -2087,6 +2087,13 @@ export async function claimTask(registrationId: number, taskId: string): Promise
   const task = tasks.find(t => t.id === taskId);
   if (!task || !task.isActive) return { error: 'المهمة غير متاحة' };
 
+  // Once the deadline (الموعد النهائي) has passed, no new claims are allowed.
+  // Students who already claimed before the deadline keep their own claim
+  // window (governed by durationHours) and can still submit.
+  if (task.dueDate && new Date(task.dueDate).getTime() < Date.now()) {
+    return { error: 'انتهى الموعد النهائي لهذه المهمة' };
+  }
+
   const subs = await getSubmissions();
   const mine = subs.filter(s => s.registrationId === registrationId);
   const existing = mine.find(s => s.taskId === taskId);
