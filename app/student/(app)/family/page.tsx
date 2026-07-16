@@ -69,6 +69,13 @@ export default function StudentFamily() {
   }
 
   const { group, supervisor, members, groupTotal, groupRank, groupCount } = data;
+  const hidden = !!user?.hidePoints;
+  // When points are hidden we must not reveal standings at all — a blurred but
+  // still-ranked list lets a student count how many members sit above them. So
+  // we drop the rank order entirely and show members alphabetically instead.
+  const displayMembers = hidden
+    ? [...members].sort((a, b) => a.name.localeCompare(b.name, 'ar'))
+    : members;
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
@@ -86,17 +93,21 @@ export default function StudentFamily() {
               style={{ background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(4px)' }}
             >
               <p className="text-[10px] opacity-80">ترتيب الأسرة</p>
-              <p className="font-display tabular-nums text-xl font-bold">
-                #{groupRank}
-                <span className="text-xs opacity-70"> / {groupCount}</span>
-              </p>
+              {hidden ? (
+                <p className="font-display text-xl font-bold" aria-label="مخفي مؤقتاً">🔒</p>
+              ) : (
+                <p className="font-display tabular-nums text-xl font-bold">
+                  #{groupRank}
+                  <span className="text-xs opacity-70"> / {groupCount}</span>
+                </p>
+              )}
             </div>
           </div>
 
           <div className="relative mt-7 flex items-end justify-between gap-3">
             <div>
               <p className="text-[11px] tracking-widest opacity-70 mb-1">إجمالي نقاط الأسرة</p>
-              <p className="font-display tabular-nums text-3xl font-bold">{groupTotal}</p>
+              <p className="font-display tabular-nums text-3xl font-bold">{hidden ? '🔒' : groupTotal}</p>
             </div>
             <div className="text-end">
               <p className="text-[11px] opacity-70 mb-1">الأعضاء</p>
@@ -123,21 +134,30 @@ export default function StudentFamily() {
         </section>
       )}
 
-      {/* Members ranked */}
+      {/* Hidden-points notice */}
+      {hidden && (
+        <div className="text-center bg-white p-5 rounded-2xl border border-line shadow-sm w-full flex flex-col items-center justify-center">
+          <p className="text-3xl mb-2">🔒</p>
+          <h2 className="font-display text-sm font-bold mb-1" style={{ color: 'var(--ink)' }}>{user?.hidePointsTitle || 'النقاط مخفية مؤقتاً'}</h2>
+          <p className="text-xs leading-relaxed" style={{ color: 'var(--ink-soft)' }}>{user?.hidePointsMessage || 'سيتم الكشف عن الترتيب قريباً — استمر في التميّز! 🌟'}</p>
+        </div>
+      )}
+
+      {/* Members */}
       <section className="card overflow-hidden">
         <div className="p-4 border-b flex items-baseline justify-between" style={{ borderColor: 'var(--line)' }}>
           <h2 className="font-display text-base font-bold" style={{ color: 'var(--ink)' }}>أعضاء الأسرة</h2>
-          <p className="text-xs" style={{ color: 'var(--ink-soft)' }}>مرتّبون حسب النقاط</p>
+          <p className="text-xs" style={{ color: 'var(--ink-soft)' }}>{hidden ? 'بترتيب أبجدي' : 'مرتّبون حسب النقاط'}</p>
         </div>
 
-        {members.length === 0 ? (
+        {displayMembers.length === 0 ? (
           <div className="text-center py-10">
             <p className="text-3xl mb-2">🌱</p>
             <p className="text-sm" style={{ color: 'var(--ink-soft)' }}>لا يوجد أعضاء بعد.</p>
           </div>
         ) : (
           <ul>
-            {members.map((m, i) => {
+            {displayMembers.map((m, i) => {
               const rank = i + 1;
               const isMe = m.id === user?.id;
               const badge = RANK_BADGE[rank];
@@ -150,16 +170,18 @@ export default function StudentFamily() {
                     background: isMe ? 'rgba(255,159,28,0.07)' : undefined,
                   }}
                 >
-                  {/* Rank */}
-                  <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 font-display tabular-nums font-bold"
-                    style={{
-                      background: badge ? badge.bg : 'var(--bg-soft)',
-                      color: badge ? badge.color : 'var(--ink-soft)',
-                    }}
-                  >
-                    {badge ? badge.mark : `#${rank}`}
-                  </div>
+                  {/* Rank — hidden while points are hidden so standings can't be counted */}
+                  {!hidden && (
+                    <div
+                      className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 font-display tabular-nums font-bold"
+                      style={{
+                        background: badge ? badge.bg : 'var(--bg-soft)',
+                        color: badge ? badge.color : 'var(--ink-soft)',
+                      }}
+                    >
+                      {badge ? badge.mark : `#${rank}`}
+                    </div>
+                  )}
 
                   {/* Avatar */}
                   <div
@@ -188,12 +210,14 @@ export default function StudentFamily() {
                   </div>
 
                   {/* Points — individual only (matches the leaderboard ranking basis) */}
-                  <div className="text-end shrink-0">
-                    <p className="font-display tabular-nums text-base font-bold" style={{ color: 'var(--accent-deep)' }}>
-                      {m.individual}
-                    </p>
-                    <p className="text-[11px]" style={{ color: 'var(--ink-soft)' }}>فردية</p>
-                  </div>
+                  {!hidden && (
+                    <div className="text-end shrink-0">
+                      <p className="font-display tabular-nums text-base font-bold" style={{ color: 'var(--accent-deep)' }}>
+                        {m.individual}
+                      </p>
+                      <p className="text-[11px]" style={{ color: 'var(--ink-soft)' }}>فردية</p>
+                    </div>
+                  )}
                 </li>
               );
             })}
