@@ -91,8 +91,12 @@ export default function StudentLeaderboard() {
         </div>
       )}
 
-      <div className="relative">
-        <div style={user?.hidePoints ? { filter: 'blur(10px)', pointerEvents: 'none', userSelect: 'none' } : undefined} className="space-y-5">
+      {/* While points are hidden we render nothing but the notice above — a
+          blurred list still lets a student read the shape of the ranking and
+          count who sits above them. */}
+      {!user?.hidePoints && (
+        <div className="relative">
+          <div className="space-y-5">
           {/* My rank — premium hero */}
           {myRank && (
             <div className="membership-card">
@@ -174,8 +178,9 @@ export default function StudentLeaderboard() {
               })}
             </ul>
           )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
