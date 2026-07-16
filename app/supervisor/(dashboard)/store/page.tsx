@@ -17,6 +17,20 @@ type LogEntry = {
 };
 
 const EMPTY_SUMMARY: Summary = { individual: 0, collective: 0, deduction: 0, balance: 0, rankScore: 0 };
+const QUICK_AMOUNTS = [10, 20, 50, 100];
+
+// Avatar gradients sampled from the Nibras palette — picked deterministically by id.
+const AVATAR_GRADIENTS = [
+  'linear-gradient(135deg,#E68500,#FFB752)',
+  'linear-gradient(135deg,#103F91,#3F6CB8)',
+  'linear-gradient(135deg,#0E92AF,#12B3D5)',
+  'linear-gradient(135deg,#C2231B,#E52E25)',
+  'linear-gradient(135deg,#1B7A43,#2F9E60)',
+];
+function avatarGradient(id: number) { return AVATAR_GRADIENTS[Math.abs(id) % AVATAR_GRADIENTS.length]; }
+function initials(name: string) {
+  return name.trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('');
+}
 
 function formatDate(iso: string) {
   try {
@@ -131,11 +145,13 @@ export default function StorePage() {
 
   const amountNum = parseInt(amount, 10) || 0;
   const insufficient = selected != null && amountNum > 0 && amountNum > summary.balance;
+  const remaining = summary.balance - amountNum;
+  const meterPct = summary.balance > 0 ? Math.max(0, Math.min(100, (remaining / summary.balance) * 100)) : 0;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!selected) return;
-    if (amountNum <= 0) return pushToast('error', 'أدخل مبلغ السحب');
+    if (amountNum <= 0) return pushToast('error', 'أدخل مبلغ الخصم');
     if (!product.trim()) return pushToast('error', 'اكتب اسم المنتج');
     if (insufficient) return pushToast('error', 'الطالب لا يملك رصيداً كافياً');
 
@@ -147,17 +163,17 @@ export default function StorePage() {
     });
     setBusy(false);
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) return pushToast('error', j.error ?? 'فشل تسجيل عملية السحب');
+    if (!r.ok) return pushToast('error', j.error ?? 'فشل تسجيل عملية الخصم');
 
     setSummary(j.summary ?? summary);
     if (j.globalLog) setLog(j.globalLog);
     setAmount('');
     setProduct('');
-    pushToast('success', `تم سحب ${amountNum} نقطة مقابل "${product.trim()}"`);
+    pushToast('success', `تم خصم ${amountNum} نقطة مقابل "${product.trim()}"`);
   }
 
   async function cancel(entry: LogEntry) {
-    if (!window.confirm(`إلغاء عملية سحب "${entry.product}" للطالب ${entry.studentName} واسترجاع ${entry.amount} نقطة للرصيد؟`)) return;
+    if (!window.confirm(`إلغاء عملية خصم "${entry.product}" للطالب ${entry.studentName} واسترجاع ${entry.amount} نقطة للرصيد؟`)) return;
     setCancelingId(entry.id);
     const r = await fetch(`/api/supervisor/store?id=${entry.id}`, { method: 'DELETE' });
     setCancelingId(null);
@@ -183,40 +199,64 @@ export default function StorePage() {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-ink-900 mb-0.5">المتجر</h1>
-        <p className="text-sm text-ink-500">ابحث عن الطالب لعرض رصيده ثم اسحب من رصيده مقابل المنتجات.</p>
+        <p className="text-sm text-ink-500">ابحث عن الطالب لعرض رصيده ثم اخصم من رصيده مقابل المنتجات.</p>
       </div>
 
-      {/* Search */}
-      <div ref={searchRef} className="relative max-w-2xl mb-6">
-        <label className="label">رقم العضوية أو اسم الطالب</label>
+      {/* Search — hero card */}
+      <div
+        ref={searchRef}
+        className="relative max-w-2xl mb-6 rounded-2xl border border-ink-200 bg-white p-5 shadow-soft"
+      >
+        <div className="flex items-center gap-2 mb-3 text-xs font-semibold text-brand-600 tracking-wide">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+            <circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" />
+          </svg>
+          البحث عن طالب
+        </div>
         <div className="relative">
           <input
             type="text"
-            className="field w-full"
-            placeholder="اكتب رقم العضوية أو اسم الطالب..."
+            className="w-full h-14 rounded-2xl border-[1.5px] border-ink-200 bg-cream-100 pr-14 pl-4 text-base text-ink-900 outline-none transition-all placeholder:text-ink-300 focus:border-brand focus:bg-white focus:shadow-[0_0_0_5px_rgba(255,159,28,0.15)]"
+            placeholder="اكتب رقم العضوية أو اسم الطالب…"
             value={query}
             onChange={e => { setQuery(e.target.value); setDropdownOpen(true); }}
             onFocus={() => setDropdownOpen(true)}
+            autoComplete="off"
           />
+          <span className="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-brand-600">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" />
+            </svg>
+          </span>
           {dropdownOpen && (
-            <div className="absolute z-20 w-full mt-1 bg-white border border-ink-200 rounded-lg shadow-lg max-h-72 overflow-y-auto scroll-soft">
+            <div className="absolute z-30 w-full mt-2.5 bg-white border border-ink-200 rounded-2xl shadow-elevated max-h-80 overflow-y-auto scroll-soft">
               {loading ? (
-                <div className="p-3 text-sm text-ink-400 text-center">جارٍ التحميل…</div>
+                <div className="p-4 text-sm text-ink-400 text-center">جارٍ التحميل…</div>
               ) : filtered.length === 0 ? (
-                <div className="p-3 text-sm text-ink-400 text-center">لا يوجد طلاب مطابقون</div>
+                <div className="p-4 text-sm text-ink-400 text-center">لا يوجد طلاب مطابقون</div>
               ) : (
                 filtered.map(s => (
                   <button
                     key={s.id}
                     type="button"
                     onClick={() => selectStudent(s)}
-                    className="w-full text-right px-3 py-2.5 text-sm hover:bg-cream-50 transition-colors flex items-center justify-between gap-2 border-b border-ink-50 last:border-0"
+                    className="w-full text-right flex items-center gap-3.5 px-4 py-3 hover:bg-brand-50 transition-colors border-b border-ink-100 last:border-0"
                   >
-                    <span className="font-medium text-ink-900">{s.studentName}</span>
-                    <span className="text-xs text-ink-400 shrink-0">
-                      <span className="font-mono">#{s.membershipNo}</span>
-                      <span className="mx-1">·</span>
-                      <span>{s.stage} {s.grade}</span>
+                    <span
+                      className="w-11 h-11 shrink-0 rounded-xl2 grid place-items-center text-white font-bold text-base shadow-[0_4px_12px_rgba(230,133,0,0.28)]"
+                      style={{ background: avatarGradient(s.id) }}
+                    >
+                      {initials(s.studentName)}
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block font-semibold text-ink-900 truncate">{s.studentName}</span>
+                      <span className="block text-xs text-ink-400 mt-0.5">
+                        <span className="font-mono">#{s.membershipNo}</span>
+                        <span className="mx-1.5 opacity-50">·</span>
+                        <span>{s.stage} {s.grade}</span>
+                        <span className="mx-1.5 opacity-50">·</span>
+                        <span>{groupName(s.groupId)}</span>
+                      </span>
                     </span>
                   </button>
                 ))
@@ -232,78 +272,149 @@ export default function StorePage() {
         </div>
       ) : (
         <div className="space-y-6">
-          {/* Student + points card */}
-          <div className="card overflow-hidden">
+          {/* Wallet card — balance is the hero */}
+          <div
+            className="relative overflow-hidden rounded-[22px] text-white shadow-[0_18px_44px_rgba(230,133,0,0.32)]"
+            style={{ background: 'linear-gradient(135deg,#E68500 0%,#FF9F1C 55%,#FFB752 100%)' }}
+          >
             <div
-              className="px-6 py-5 flex items-start justify-between gap-4 text-white"
-              style={{ background: 'linear-gradient(135deg, var(--accent-deep), var(--accent))' }}
-            >
-              <div className="min-w-0">
-                <div className="text-xl font-bold truncate">{selected.studentName}</div>
-                <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-white/90">
-                  <span>رقم العضوية: <span className="font-mono font-semibold">#{selected.membershipNo}</span></span>
-                  <span>المرحلة: <span className="font-semibold">{selected.stage} {selected.grade}</span></span>
-                  <span>المجموعة: <span className="font-semibold">{groupName(selected.groupId)}</span></span>
+              className="pointer-events-none absolute inset-0"
+              style={{ background: 'radial-gradient(60% 90% at 12% 120%, rgba(255,255,255,.22), transparent 60%), radial-gradient(40% 70% at 95% -10%, rgba(255,255,255,.18), transparent 60%)' }}
+            />
+            <div className="relative flex items-center gap-3.5 px-6 pt-5">
+              <span className="shrink-0 grid place-items-center rounded-2xl bg-white/20 border border-white/35 backdrop-blur-sm font-display font-bold text-xl" style={{ width: '3.25rem', height: '3.25rem' }}>
+                {initials(selected.studentName)}
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="font-display font-bold text-2xl leading-tight truncate">{selected.studentName}</div>
+                <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-sm text-white/90">
+                  <span>العضوية <b className="font-mono font-bold">#{selected.membershipNo}</b></span>
+                  <span>{selected.stage} {selected.grade}</span>
+                  <span>{groupName(selected.groupId)}</span>
                 </div>
               </div>
               <button
                 onClick={clearSelection}
-                className="shrink-0 text-white/80 hover:text-white p-1"
+                className="shrink-0 w-9 h-9 grid place-items-center rounded-xl border border-white/30 bg-white/10 text-white hover:bg-white/25 transition-colors"
                 title="إلغاء الاختيار"
               >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M18 6 6 18M6 6l12 12" />
                 </svg>
               </button>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-x-reverse divide-ink-100 border-t border-ink-100">
-              <Stat label="النقاط الفردية" value={summary.individual} loading={detailsLoading} />
-              <Stat label="النقاط الجماعية" value={summary.collective} loading={detailsLoading} />
-              <Stat label="الرصيد" value={summary.balance} loading={detailsLoading} highlight />
-              <Stat label="الإجمالي" value={summary.rankScore} loading={detailsLoading} />
+            <div className="relative text-center px-6 pt-3.5 pb-5">
+              <div className="text-xs font-semibold tracking-[0.08em] text-white/85">الرصيد المتاح للخصم</div>
+              <div className="mt-1.5 flex items-baseline justify-center gap-2.5 font-display font-bold leading-none tabular-nums" style={{ fontSize: '3.75rem', textShadow: '0 4px 18px rgba(120,60,0,.25)' }}>
+                {detailsLoading ? '…' : summary.balance}
+                <span className="font-body font-semibold text-lg opacity-90">نقطة</span>
+              </div>
+            </div>
+
+            <div className="relative grid grid-cols-3 gap-px bg-white/20">
+              <WalletStat label="النقاط الفردية" value={summary.individual} loading={detailsLoading} />
+              <WalletStat label="النقاط الجماعية" value={summary.collective} loading={detailsLoading} />
+              <WalletStat label="الإجمالي" value={summary.rankScore} loading={detailsLoading} />
             </div>
           </div>
 
-          {/* Withdrawal form */}
-          <div className="card p-6 max-w-2xl">
-            <h2 className="text-lg font-bold text-ink-900 mb-4">سحب من الرصيد</h2>
-            <form onSubmit={submit} className="space-y-4" autoComplete="off">
-              <div className="grid md:grid-cols-2 gap-3">
-                <div>
-                  <label className="label">مبلغ السحب (نقاط)</label>
-                  <input
-                    className={`field w-full ${insufficient ? 'invalid' : ''}`}
-                    dir="ltr"
-                    inputMode="numeric"
-                    placeholder="0"
-                    value={amount}
-                    onChange={e => setAmount(e.target.value.replace(/\D/g, ''))}
-                  />
-                </div>
-                <div>
-                  <label className="label">المنتج</label>
-                  <input
-                    className="field w-full"
-                    placeholder="مثال: قلم، دفتر، حلوى…"
-                    value={product}
-                    onChange={e => setProduct(e.target.value)}
-                  />
+          {/* Withdrawal — point-of-sale style */}
+          <div className="rounded-2xl border border-ink-200 bg-white shadow-soft overflow-hidden max-w-2xl">
+            <div className="flex items-center gap-3 px-6 py-4 border-b border-ink-100">
+              <span className="w-9 h-9 shrink-0 grid place-items-center rounded-xl bg-nred-50 text-nred-600">
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
+                  <path d="M3 6h18M16 10a4 4 0 0 1-8 0" />
+                </svg>
+              </span>
+              <div>
+                <h2 className="text-lg font-bold text-ink-900">خصم من الرصيد</h2>
+                <p className="text-xs text-ink-500 mt-0.5">اختر المنتج والمبلغ ثم أكّد العملية.</p>
+              </div>
+            </div>
+
+            <form onSubmit={submit} className="p-6 space-y-5" autoComplete="off">
+              <div>
+                <label className="label">المنتج</label>
+                <input
+                  className="field w-full"
+                  placeholder="مثال: قلم، دفتر، حلوى…"
+                  value={product}
+                  onChange={e => setProduct(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="label">مبلغ الخصم (نقاط)</label>
+                <input
+                  className={`field w-full text-center font-display font-bold tabular-nums ${insufficient ? 'invalid' : ''}`}
+                  style={{ fontSize: '2rem', height: '4.25rem' }}
+                  dir="ltr"
+                  inputMode="numeric"
+                  placeholder="0"
+                  value={amount}
+                  onChange={e => setAmount(e.target.value.replace(/\D/g, ''))}
+                />
+                <div className="flex gap-2.5 mt-3">
+                  {QUICK_AMOUNTS.map(v => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setAmount(String(v))}
+                      className={`flex-1 h-11 rounded-xl border-[1.5px] font-bold tabular-nums transition-all ${
+                        amountNum === v
+                          ? 'bg-brand border-brand text-white shadow-[0_5px_14px_rgba(255,159,28,0.32)]'
+                          : 'bg-white border-ink-200 text-ink-900 hover:border-brand-400 hover:text-brand-600'
+                      }`}
+                    >
+                      {v}
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              {insufficient && (
-                <div className="p-3 bg-nred-50 border border-nred-200 rounded-xl text-sm text-nred-600 font-medium">
-                  ⚠️ الطالب لا يملك رصيداً كافياً — الرصيد المتاح {summary.balance} نقطة فقط.
+              {/* Live after-balance */}
+              <div
+                className={`rounded-2xl border p-4 transition-colors ${
+                  amountNum <= 0
+                    ? 'border-ink-200 bg-cream-100'
+                    : insufficient
+                      ? 'border-nred-600/30 bg-nred-50'
+                      : 'border-emerald-600/25 bg-emerald-50'
+                }`}
+              >
+                <div className="flex items-baseline justify-between">
+                  <span className="text-sm font-semibold text-ink-500">الرصيد بعد الخصم</span>
+                  <span className={`font-display font-bold text-2xl tabular-nums ${
+                    amountNum <= 0 ? 'text-ink-900' : insufficient ? 'text-nred-600' : 'text-emerald-700'
+                  }`}>
+                    {detailsLoading ? '…' : remaining}
+                  </span>
                 </div>
-              )}
+                <div className="h-2 rounded-full bg-black/10 mt-3 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-300 ${insufficient ? 'bg-nred' : 'bg-emerald-600'}`}
+                    style={{ width: `${amountNum <= 0 ? 100 : meterPct}%` }}
+                  />
+                </div>
+                <div className={`text-xs font-semibold mt-2.5 ${
+                  amountNum <= 0 ? 'text-ink-400' : insufficient ? 'text-nred-600' : 'text-emerald-700'
+                }`}>
+                  {amountNum <= 0
+                    ? 'لم يُحدَّد مبلغ بعد.'
+                    : insufficient
+                      ? `⚠️ الرصيد غير كافٍ — المتاح ${summary.balance} نقطة فقط.`
+                      : `✓ سيبقى ${remaining} نقطة بعد خصم ${amountNum}.`}
+                </div>
+              </div>
 
               <button
                 type="submit"
                 disabled={busy || detailsLoading || amountNum <= 0 || !product.trim() || insufficient}
-                className="btn btn-primary w-full"
+                className="btn btn-primary w-full py-3.5 rounded-2xl font-bold text-base"
               >
-                {busy ? '…' : 'تأكيد السحب'}
+                {busy ? '…' : 'تأكيد الخصم'}
               </button>
             </form>
           </div>
@@ -311,26 +422,26 @@ export default function StorePage() {
       )}
 
       {/* Store-wide withdrawal log (all students) */}
-      <div className="card p-6 mt-6">
-        <div className="flex items-center justify-between mb-4">
+      <div className="rounded-2xl border border-ink-200 bg-white shadow-soft overflow-hidden mt-6">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-ink-100">
           <div>
-            <h2 className="text-lg font-bold text-ink-900">سجل السحب</h2>
-            <p className="text-xs text-ink-500">جميع عمليات السحب لكل الطلاب.</p>
+            <h2 className="text-lg font-bold text-ink-900">سجل الخصومات</h2>
+            <p className="text-xs text-ink-500 mt-0.5">جميع عمليات الخصم لكل الطلاب.</p>
           </div>
           {log.length > 0 && (
-            <span className="text-xs text-ink-400">{log.length} عملية</span>
+            <span className="text-xs text-ink-400 bg-cream-100 px-3 py-1.5 rounded-full font-semibold">{log.length} عملية</span>
           )}
         </div>
 
         {logLoading ? (
           <div className="py-8 text-center text-ink-400 text-sm">جارٍ التحميل…</div>
         ) : log.length === 0 ? (
-          <div className="py-8 text-center text-ink-400 text-sm">لا توجد عمليات سحب بعد.</div>
+          <div className="py-8 text-center text-ink-400 text-sm">لا توجد عمليات خصم بعد.</div>
         ) : (
-          <div className="divide-y divide-ink-100">
+          <div>
             {log.map(entry => (
-              <div key={entry.id} className="flex items-center gap-3 py-3">
-                <div className="w-9 h-9 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
+              <div key={entry.id} className="flex items-center gap-3 px-6 py-3.5 border-b border-ink-100 last:border-0">
+                <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
                   <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
                     <path d="M3 6h18M16 10a4 4 0 0 1-8 0" />
@@ -349,7 +460,7 @@ export default function StorePage() {
                     {entry.recordedBy ? <> · بواسطة {entry.recordedBy}</> : null}
                   </div>
                 </div>
-                <span className="shrink-0 font-mono font-semibold text-nred-600">−{entry.amount}</span>
+                <span className="shrink-0 font-mono font-bold text-nred-600 tabular-nums">−{entry.amount}</span>
                 <button
                   onClick={() => cancel(entry)}
                   disabled={cancelingId === entry.id}
@@ -373,13 +484,14 @@ export default function StorePage() {
   );
 }
 
-function Stat({ label, value, loading, highlight }: { label: string; value: number; loading?: boolean; highlight?: boolean }) {
+function WalletStat({ label, value, loading }: { label: string; value: number; loading?: boolean }) {
   return (
-    <div className="px-4 py-4 text-center">
-      <div className="text-xs text-ink-400 mb-1">{label}</div>
-      <div className={`text-2xl font-extrabold ${highlight ? 'text-brand-600' : 'text-ink-900'}`}>
-        {loading ? '…' : value}
-      </div>
+    <div
+      className="px-2 py-3.5 text-center backdrop-blur-sm"
+      style={{ background: 'linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.03))' }}
+    >
+      <div className="text-xs text-white/85 mb-1">{label}</div>
+      <div className="font-display font-bold text-2xl tabular-nums">{loading ? '…' : value}</div>
     </div>
   );
 }

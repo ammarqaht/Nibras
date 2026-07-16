@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { site } from '@/content';
 import { useStudent } from './context';
+import { announcementImages, renderAnnouncementBody } from '@/lib/announcementText';
 
 type ScheduleItem = { id: string; title: string; startTime: string; endTime: string; role: string; notes?: string | null };
 type AttendanceItem = { id: number; date: string; status: string };
@@ -29,7 +30,7 @@ function formatTime12(timeStr: string): string {
   return `${String(h).padStart(2, '0')}:${mStr} ${ampm}`;
 }
 type FamilyPeek = { group: { id: number; name: string; stage: string } | null };
-type AnnouncementPeek = { id: number; title: string; body: string; createdAt: string };
+type AnnouncementPeek = { id: number; title: string; body: string; createdAt: string; imageUrl?: string | null; images?: string | null };
 
 const CATEGORY_LABELS: Record<string, string> = {
   attendance: 'الحضور', tasks: 'المهام', social: 'اجتماعية', cultural: 'ثقافية',
@@ -667,8 +668,26 @@ export default function StudentHome() {
             <div className="border-t border-b py-4 my-4 max-h-[50vh] overflow-y-auto scroll-soft text-right" style={{ borderColor: 'var(--line)' }}>
               <h3 className="font-display text-lg font-bold mb-2" style={{ color: 'var(--accent-deep)' }}>{activeAnnouncement.title}</h3>
               <p className="text-sm leading-relaxed whitespace-pre-line" style={{ color: 'var(--ink)' }}>
-                {activeAnnouncement.body}
+                {renderAnnouncementBody(activeAnnouncement.body)}
               </p>
+              {(() => {
+                const imgs = announcementImages(activeAnnouncement.imageUrl, activeAnnouncement.images);
+                if (imgs.length === 0) return null;
+                return (
+                  <div className={`mt-4 grid gap-2 ${imgs.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                    {imgs.slice(0, 4).map((src, i) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        key={i}
+                        src={src}
+                        alt=""
+                        className="w-full rounded-xl object-cover"
+                        style={{ maxHeight: imgs.length === 1 ? '18rem' : '10rem' }}
+                      />
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
             <div className="flex justify-end gap-2">
               <button onClick={closeAnnouncement} className="btn btn-primary w-full py-3 rounded-xl font-bold">

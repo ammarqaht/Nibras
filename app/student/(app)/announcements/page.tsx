@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { announcementImages, renderAnnouncementBody } from '@/lib/announcementText';
 
 type Announcement = {
   id: number;
@@ -11,17 +12,6 @@ type Announcement = {
   images: string | null;
   createdAt: string;
 };
-
-function parseImages(images: string | null): string[] {
-  if (!images) return [];
-  try {
-    const parsed = JSON.parse(images);
-    if (Array.isArray(parsed)) return parsed.filter(x => typeof x === 'string');
-  } catch {
-    // not JSON — assume CSV
-  }
-  return images.split(',').map(s => s.trim()).filter(Boolean);
-}
 
 function formatRelative(dateStr: string): string {
   const date = new Date(dateStr);
@@ -75,7 +65,7 @@ export default function StudentAnnouncements() {
       ) : (
         <div className="space-y-4">
           {items.map((a, i) => {
-            const imgs = a.imageUrl ? [a.imageUrl, ...parseImages(a.images)] : parseImages(a.images);
+            const imgs = announcementImages(a.imageUrl, a.images);
             // Insert a divider whenever the calendar day changes from the previous announcement
             const showDaySep = i > 0 && dayKey(items[i - 1].createdAt) !== dayKey(a.createdAt);
             return (
@@ -96,7 +86,7 @@ export default function StudentAnnouncements() {
                     {formatRelative(a.createdAt)}
                   </p>
                 </header>
-                <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--ink)' }}>{a.body}</p>
+                <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--ink)' }}>{renderAnnouncementBody(a.body)}</p>
 
                 {imgs.length > 0 && (
                   <div className={`mt-4 grid gap-2 ${imgs.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
