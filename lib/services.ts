@@ -1217,7 +1217,15 @@ export async function saveSetting(key: string, value: string): Promise<void> {
 }
 
 export async function getMergedSettings() {
-  const custom = await getSettings();
+  // Settings only override static content. If the DB is unreachable — e.g. a
+  // paused managed Postgres during a Vercel build — fall back to no overrides
+  // rather than throwing, so prerendering never brings the whole deploy down.
+  let custom: Record<string, string> = {};
+  try {
+    custom = await getSettings();
+  } catch {
+    custom = {};
+  }
 
   const site = {
     ...origSite,

@@ -1,13 +1,23 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { getMergedSettings } from '@/lib/services';
+import { site as staticSite } from '@/content';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const { site } = await getMergedSettings();
-  return {
-    title: site.metaTitle,
-    description: site.metaDescription
-  };
+  // The DB may be unreachable at build time (e.g. a paused/managed Postgres).
+  // Metadata must never take the whole deploy down — fall back to static content.
+  try {
+    const { site } = await getMergedSettings();
+    return {
+      title: site.metaTitle,
+      description: site.metaDescription
+    };
+  } catch {
+    return {
+      title: staticSite.metaTitle,
+      description: staticSite.metaDescription
+    };
+  }
 }
 
 export const viewport: Viewport = {
