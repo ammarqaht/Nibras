@@ -34,6 +34,7 @@ export const CATEGORIES = [
   { key: 'prizes', label: 'جوائز وتحفيز' },
   { key: 'transport', label: 'مواصلات' },
   { key: 'printing', label: 'طباعة' },
+  { key: 'abha_trip', label: 'مصروفات رحلة أبها' },
   { key: 'other', label: 'أخرى' }
 ] as const;
 

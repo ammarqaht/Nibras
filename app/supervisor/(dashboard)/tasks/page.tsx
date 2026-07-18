@@ -261,7 +261,7 @@ export default function TasksPage() {
   // what they can see (the API enforces the assignment rule as well).
   const canGrade = useMemo(() => !!user, [user]);
 
-  const [activeTab, setActiveTab] = useState<'manage' | 'submissions' | 'log' | 'stats' | 'add'>('manage');
+  const [activeTab, setActiveTab] = useState<'manage' | 'submissions' | 'log' | 'stats' | 'byStudent' | 'add'>('manage');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -321,6 +321,12 @@ export default function TasksPage() {
   // Statistics tab filters
   const [statsTabSearch, setStatsTabSearch] = useState('');
   const [statsTabTrack, setStatsTabTrack] = useState('');
+
+  // "حسب الطالب" tab: per-student task record (what they submitted + points earned)
+  const [byStudentSearch, setByStudentSearch] = useState('');
+  const [byStudentStage, setByStudentStage] = useState('');
+  const [byStudentSort, setByStudentSort] = useState<'points' | 'submitted' | 'name'>('points');
+  const [studentDetailId, setStudentDetailId] = useState<number | null>(null);
 
   // Add task state
   const addFileRef = useRef<HTMLInputElement>(null);
@@ -793,6 +799,59 @@ export default function TasksPage() {
     return stages.map(st => ({ stage: st, ...map[st] }));
   }, [students, submissions]);
 
+  // ---- "حسب الطالب" tab -------------------------------------------------
+  // One row per active student: which tasks they actually submitted and how
+  // many points each one earned them. Only 'pending' | 'approved' | 'rejected'
+  // count as submitted — 'claimed'/'expired' mean the task was never handed in.
+  // Points are only awarded on 'approved', so that's what the total sums.
+  const studentTaskRecords = useMemo(() => {
+    const activeStudents = students.filter(s => s.registrationStatus === 'approved' || s.paymentStatus === 'exempted');
+    const byStudent = new Map<number, Submission[]>();
+    for (const sub of submissions) {
+      if (!SUBMITTED_STATUSES.includes(sub.status)) continue;
+      const list = byStudent.get(sub.registrationId);
+      if (list) list.push(sub);
+      else byStudent.set(sub.registrationId, [sub]);
+    }
+    return activeStudents.map(student => {
+      const subs = (byStudent.get(student.id) ?? [])
+        .slice()
+        .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
+      const approved = subs.filter(s => s.status === 'approved');
+      return {
+        student,
+        subs,
+        submitted: subs.length,
+        approved: approved.length,
+        pending: subs.filter(s => s.status === 'pending').length,
+        rejected: subs.filter(s => s.status === 'rejected').length,
+        points: approved.reduce((sum, s) => sum + (s.grade ?? 0), 0),
+        maxPoints: approved.reduce((sum, s) => sum + (s.taskMaxPoints ?? 0), 0),
+      };
+    });
+  }, [students, submissions]);
+
+  const studentTaskRows = useMemo(() => {
+    const q = byStudentSearch.trim().toLowerCase();
+    const filtered = studentTaskRecords.filter(r => {
+      const matchQ = !q
+        || r.student.studentName.toLowerCase().includes(q)
+        || String(r.student.membershipNo).includes(q);
+      const matchStage = !byStudentStage || r.student.stage === byStudentStage;
+      return matchQ && matchStage;
+    });
+    return filtered.sort((a, b) => {
+      if (byStudentSort === 'name') return a.student.studentName.localeCompare(b.student.studentName, 'ar');
+      if (byStudentSort === 'submitted') return b.submitted - a.submitted || b.points - a.points;
+      return b.points - a.points || b.submitted - a.submitted;
+    });
+  }, [studentTaskRecords, byStudentSearch, byStudentStage, byStudentSort]);
+
+  const studentDetail = useMemo(
+    () => (studentDetailId === null ? null : studentTaskRecords.find(r => r.student.id === studentDetailId) ?? null),
+    [studentDetailId, studentTaskRecords]
+  );
+
   async function handleImagePick(e: React.ChangeEvent<HTMLInputElement>, isEdit = false) {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -863,6 +922,14 @@ export default function TasksPage() {
           }`}
         >
           <span>الإحصائيات</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('byStudent')}
+          className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-2 py-3 px-5 rounded-xl text-sm font-bold transition-all shrink-0 ${
+            activeTab === 'byStudent' ? 'bg-brand text-white shadow-brand' : 'text-ink-600 hover:bg-cream-100 hover:text-ink-900'
+          }`}
+        >
+          <span>حسب الطالب</span>
         </button>
         {isScientific && (
           <button
@@ -1401,6 +1468,127 @@ export default function TasksPage() {
                   </>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* TAB 5: BY STUDENT — per-student task record */}
+          {activeTab === 'byStudent' && (
+            <div className="space-y-6 fade-in">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-full bg-nblue-50 flex items-center justify-center text-nblue-600 text-2xl border border-nblue-100 shadow-sm">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                </div>
+                <div>
+                  <h1 className="text-[1.75rem] font-bold text-ink-900">المهام حسب الطالب</h1>
+                  <p className="text-[0.9rem] text-ink-500 mt-1">كم مهمة سلّم كل طالب، وما هي، وكم نقطة أخذ عليها. اضغط على الطالب لعرض التفاصيل.</p>
+                </div>
+              </div>
+
+              {/* Filters */}
+              <div className="bg-white rounded-2xl p-4 flex flex-col md:flex-row items-center gap-3 border border-ink-150 shadow-sm">
+                <div className="relative flex-1 w-full">
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-ink-400">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                  </span>
+                  <input type="text" placeholder="ابحث باسم الطالب أو رقم العضوية..." className="field pl-4 pr-11 py-2.5 text-[0.9rem] w-full rounded-xl bg-ink-50/30 border-transparent focus:bg-white" value={byStudentSearch} onChange={e => setByStudentSearch(e.target.value)} />
+                </div>
+                <select className="field py-2.5 px-3 text-[0.9rem] flex-1 md:w-40 rounded-xl bg-ink-50/30 border-transparent focus:bg-white" value={byStudentStage} onChange={e => setByStudentStage(e.target.value)}>
+                  <option value="">كل المراحل</option>
+                  <option value="ابتدائي">ابتدائي</option>
+                  <option value="متوسط">متوسط</option>
+                  <option value="ثانوي">ثانوي</option>
+                </select>
+                <select className="field py-2.5 px-3 text-[0.9rem] flex-1 md:w-44 rounded-xl bg-ink-50/30 border-transparent focus:bg-white" value={byStudentSort} onChange={e => setByStudentSort(e.target.value as any)}>
+                  <option value="points">الأعلى نقاطاً</option>
+                  <option value="submitted">الأكثر تسليماً</option>
+                  <option value="name">حسب الاسم</option>
+                </select>
+              </div>
+
+              {studentTaskRows.length === 0 ? (
+                <div className="card p-12 text-center text-ink-400 border border-ink-150 shadow-soft">لا يوجد طلاب مطابقون.</div>
+              ) : (
+                <>
+                  {/* Desktop: table */}
+                  <div className="hidden md:block overflow-x-auto rounded-2xl border border-ink-150 shadow-soft bg-white">
+                    <table className="w-full text-[0.82rem]">
+                      <thead>
+                        <tr className="bg-ink-50/60 text-ink-500 text-[0.72rem]">
+                          <th className="text-right font-bold py-3 px-4">الطالب</th>
+                          <th className="text-center font-bold py-3 px-2">المرحلة</th>
+                          <th className="text-center font-bold py-3 px-2">سلّم</th>
+                          <th className="text-center font-bold py-3 px-2">معتمدة</th>
+                          <th className="text-center font-bold py-3 px-2">بالانتظار</th>
+                          <th className="text-center font-bold py-3 px-2">مردودة</th>
+                          <th className="text-center font-bold py-3 px-2">النقاط</th>
+                          <th className="py-3 px-2"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-ink-100">
+                        {studentTaskRows.map(row => (
+                          <tr
+                            key={row.student.id}
+                            className="hover:bg-cream-100/40 transition-colors cursor-pointer"
+                            onClick={() => setStudentDetailId(row.student.id)}
+                          >
+                            <td className="py-3 px-4">
+                              <div className="font-bold text-ink-900 truncate max-w-[220px]">{row.student.studentName}</div>
+                              <div className="text-[0.68rem] text-ink-400 font-mono mt-0.5" dir="ltr">#{row.student.membershipNo}</div>
+                            </td>
+                            <td className="text-center py-3 px-2 text-ink-500 text-[0.72rem]">{row.student.stage} - {row.student.grade}</td>
+                            <td className="text-center py-3 px-2 font-extrabold text-ink-800">{row.submitted}</td>
+                            <td className="text-center py-3 px-2 font-extrabold text-emerald-600">{row.approved}</td>
+                            <td className="text-center py-3 px-2 font-extrabold text-brand-600">{row.pending}</td>
+                            <td className="text-center py-3 px-2 font-extrabold text-nred-600">{row.rejected}</td>
+                            <td className="text-center py-3 px-2 font-extrabold text-nblue-700 tabular-nums">{row.points}</td>
+                            <td className="text-center py-3 px-2">
+                              <span className="border border-nblue-400/30 text-nblue-700 bg-nblue-50/60 px-3 py-1.5 rounded-lg text-[0.7rem] font-bold whitespace-nowrap">التفاصيل</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile: clickable cards */}
+                  <div className="md:hidden space-y-3">
+                    {studentTaskRows.map(row => (
+                      <button
+                        key={row.student.id}
+                        type="button"
+                        onClick={() => setStudentDetailId(row.student.id)}
+                        className="w-full text-right card p-3.5 border border-ink-150 shadow-soft active:bg-cream-100/50 transition-colors"
+                      >
+                        <div className="flex items-center justify-between gap-2 mb-2.5">
+                          <h4 className="font-bold text-ink-900 text-[0.9rem] truncate flex-1">{row.student.studentName}</h4>
+                          <span className="text-ink-300">›</span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                          <span className="px-2 py-0.5 rounded-full text-[0.62rem] font-bold bg-ink-100 text-ink-600">🏷️ {row.student.stage} - {row.student.grade}</span>
+                        </div>
+                        <div className="grid grid-cols-4 gap-1.5 text-center">
+                          <div className="bg-ink-50 rounded-lg py-1.5 border border-ink-150">
+                            <div className="text-base font-extrabold text-ink-800">{row.submitted}</div>
+                            <div className="text-[0.58rem] text-ink-500 font-bold">سلّم</div>
+                          </div>
+                          <div className="bg-emerald-50 rounded-lg py-1.5 border border-emerald-100">
+                            <div className="text-base font-extrabold text-emerald-600">{row.approved}</div>
+                            <div className="text-[0.58rem] text-emerald-700 font-bold">معتمدة</div>
+                          </div>
+                          <div className="bg-brand-50 rounded-lg py-1.5 border border-brand-100">
+                            <div className="text-base font-extrabold text-brand-600">{row.pending}</div>
+                            <div className="text-[0.58rem] text-brand-700 font-bold">بالانتظار</div>
+                          </div>
+                          <div className="bg-nblue-50 rounded-lg py-1.5 border border-nblue-100">
+                            <div className="text-base font-extrabold text-nblue-700">{row.points}</div>
+                            <div className="text-[0.58rem] text-nblue-700 font-bold">النقاط</div>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -2027,6 +2215,82 @@ export default function TasksPage() {
             </div>
             <div className="flex justify-end p-4 sm:p-5 border-t border-ink-150 bg-ink-50/50 rounded-b-2xl shrink-0">
               <button onClick={() => setStatsTask(null)} className="btn bg-brand-500 hover:bg-brand-600 text-white text-[0.95rem] font-bold rounded-xl py-3 px-8 shadow-brand">إغلاق</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4C: PER-STUDENT TASK RECORD (from the "حسب الطالب" tab) */}
+      {studentDetail && (
+        <div className="modal-backdrop flex items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto" onClick={() => setStudentDetailId(null)}>
+          <div className="modal-panel w-[92vw] sm:w-full sm:max-w-lg rounded-2xl max-h-[78vh] flex flex-col shadow-elevated" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-3.5 sm:p-4 border-b border-ink-150 bg-ink-50/50 rounded-t-2xl shrink-0">
+              <div>
+                <h3 className="text-base sm:text-lg font-extrabold text-ink-900">{studentDetail.student.studentName}</h3>
+                <div className="text-[0.8rem] font-bold text-ink-500 mt-0.5">
+                  {studentDetail.student.stage} - {studentDetail.student.grade}
+                  <span className="font-mono text-ink-400 mr-2" dir="ltr">#{studentDetail.student.membershipNo}</span>
+                </div>
+              </div>
+              <button className="text-3xl text-ink-400 hover:text-ink-900 transition-colors leading-none" onClick={() => setStudentDetailId(null)}>×</button>
+            </div>
+            <div className="p-3.5 sm:p-4 space-y-3.5 flex-1 overflow-y-auto scroll-soft">
+              {/* Summary strip */}
+              <div className="grid grid-cols-4 gap-2 text-center">
+                <div className="bg-ink-50 p-2.5 rounded-xl border border-ink-150 shadow-sm">
+                  <div className="text-xl font-extrabold text-ink-800">{studentDetail.submitted}</div>
+                  <div className="text-[0.66rem] text-ink-500 font-bold mt-0.5">مهمة سلّمها</div>
+                </div>
+                <div className="bg-emerald-50 p-2.5 rounded-xl border border-emerald-100 shadow-sm">
+                  <div className="text-xl font-extrabold text-emerald-600">{studentDetail.approved}</div>
+                  <div className="text-[0.66rem] text-emerald-700 font-bold mt-0.5">معتمدة</div>
+                </div>
+                <div className="bg-brand-50 p-2.5 rounded-xl border border-brand-100 shadow-sm">
+                  <div className="text-xl font-extrabold text-brand-600">{studentDetail.pending}</div>
+                  <div className="text-[0.66rem] text-brand-700 font-bold mt-0.5">بانتظار التصحيح</div>
+                </div>
+                <div className="bg-nblue-50 p-2.5 rounded-xl border border-nblue-100 shadow-sm">
+                  <div className="text-xl font-extrabold text-nblue-700 tabular-nums">{studentDetail.points}</div>
+                  <div className="text-[0.66rem] text-nblue-700 font-bold mt-0.5">
+                    مجموع النقاط{studentDetail.maxPoints > 0 ? ` / ${studentDetail.maxPoints}` : ''}
+                  </div>
+                </div>
+              </div>
+
+              {/* The tasks themselves */}
+              <div className="border border-ink-150 rounded-xl bg-white shadow-sm overflow-hidden">
+                {studentDetail.subs.length === 0 ? (
+                  <div className="text-center py-12 text-ink-400 font-medium text-[0.9rem]">لم يسلّم هذا الطالب أي مهمة بعد.</div>
+                ) : (
+                  <ul className="divide-y divide-ink-100">
+                    {studentDetail.subs.map(sub => (
+                      <li key={sub.id} className="flex items-center gap-3 p-3 hover:bg-cream-100/50 transition-colors">
+                        <span className={`w-3 h-3 rounded-full shrink-0 ${statusDotClass(sub.status)}`} title={statusText(sub.status)} />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-ink-900 text-[0.85rem] truncate">{sub.taskTitle}</p>
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <span className={`px-2 py-0.5 rounded-full text-[0.6rem] font-bold ${getTrackPillClass(sub.taskTrack)}`}>{sub.taskTrack || 'عام'}</span>
+                            {sub.wasLate && <span className="px-2 py-0.5 rounded-full text-[0.6rem] font-bold bg-amber-50 text-amber-700 border border-amber-200/60">متأخر</span>}
+                          </div>
+                          <p className="text-[0.65rem] text-ink-400 font-mono mt-0.5">{sub.submittedAt.split('T')[0]}</p>
+                        </div>
+                        <div className="shrink-0 text-left">
+                          {sub.status === 'approved' ? (
+                            <span className="font-extrabold text-emerald-600 text-[0.95rem] whitespace-nowrap tabular-nums">
+                              {sub.grade ?? 0} / {sub.taskMaxPoints} 🎯
+                            </span>
+                          ) : (
+                            <span className={`text-[0.66rem] font-bold whitespace-nowrap px-2 py-0.5 rounded-full ${statusBadgeClass(sub.status)}`}>{statusText(sub.status)}</span>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+            <div className="flex justify-end p-4 sm:p-5 border-t border-ink-150 bg-ink-50/50 rounded-b-2xl shrink-0">
+              <button onClick={() => setStudentDetailId(null)} className="btn bg-brand-500 hover:bg-brand-600 text-white text-[0.95rem] font-bold rounded-xl py-3 px-8 shadow-brand">إغلاق</button>
             </div>
           </div>
         </div>
