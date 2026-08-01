@@ -1,4 +1,17 @@
-export async function compressImage(file: File, maxSizeKB: number = 100): Promise<string> {
+export type CompressOptions = {
+  /** Longest-edge cap in pixels before quality reduction kicks in. */
+  maxDimension?: number;
+  /** Never drop JPEG quality below this (0-1) while shrinking to the size budget. */
+  minQuality?: number;
+};
+
+export async function compressImage(
+  file: File,
+  maxSizeKB: number = 100,
+  opts: CompressOptions = {},
+): Promise<string> {
+  const maxDimension = opts.maxDimension ?? 1920;
+  const minQuality = opts.minQuality ?? 0.1;
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -10,8 +23,8 @@ export async function compressImage(file: File, maxSizeKB: number = 100): Promis
         let { width, height } = img;
 
         // Max dimensions to maintain quality but reduce size initially
-        const MAX_WIDTH = 1920;
-        const MAX_HEIGHT = 1920;
+        const MAX_WIDTH = maxDimension;
+        const MAX_HEIGHT = maxDimension;
 
         if (width > height) {
           if (width > MAX_WIDTH) {
@@ -44,7 +57,7 @@ export async function compressImage(file: File, maxSizeKB: number = 100): Promis
         let sizeKB = (dataUrl.length * 0.75) / 1024;
 
         // Iteratively reduce quality and/or dimensions to hit the target size
-        while (sizeKB > maxSizeKB && quality > 0.1) {
+        while (sizeKB > maxSizeKB && quality > minQuality) {
           quality -= 0.1;
           dataUrl = canvas.toDataURL('image/jpeg', quality);
           sizeKB = (dataUrl.length * 0.75) / 1024;

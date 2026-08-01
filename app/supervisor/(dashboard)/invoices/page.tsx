@@ -230,7 +230,10 @@ function AddInvoiceModal({
     setEntryMode('photo');
     let dataUrl = '';
     try {
-      dataUrl = await compressImage(file);
+      // Keep invoice photos high-resolution — they are read by finance and
+      // exported to PDF/ZIP, so store them large and lightly compressed rather
+      // than crushing them to 100KB. (Images live in Blob now, not Postgres.)
+      dataUrl = await compressImage(file, 1200, { maxDimension: 2500, minQuality: 0.82 });
     } catch {
       pushToast('error', 'تعذّر تجهيز الصورة');
       return;

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { pushToast } from '@/components/Toast';
 import { useSupervisor } from '@/components/SupervisorShell';
 import { DEPARTMENTS, departmentLabel, categoryLabel, statusLabel } from '@/lib/finance';
+import { openInvoicesPdf, downloadInvoicesZip } from '@/lib/invoiceExport';
 
 type Item = { name: string; qty: number; price: number };
 type Invoice = {
@@ -132,6 +133,31 @@ export default function FinancePage() {
       return true;
     });
   }, [invoices, tab, fDept]);
+
+  const exportableCount = useMemo(() => filtered.filter((i) => i.imageData && i.imageData.trim()).length, [filtered]);
+  const [zipBusy, setZipBusy] = useState(false);
+  const [zipPct, setZipPct] = useState(0);
+
+  function onExportPdf() {
+    const n = openInvoicesPdf(filtered);
+    if (n === 0) return pushToast('error', 'لا توجد فواتير فيها صور في العرض الحالي');
+    if (n === -1) return pushToast('error', 'المتصفّح منع النافذة — اسمح بالنوافذ المنبثقة ثم أعد المحاولة');
+    pushToast('success', `تم تجهيز ${n} فاتورة — اختر «حفظ كـ PDF» من نافذة الطباعة`);
+  }
+
+  async function onExportZip() {
+    if (exportableCount === 0) return pushToast('error', 'لا توجد فواتير فيها صور في العرض الحالي');
+    setZipBusy(true);
+    setZipPct(0);
+    try {
+      const n = await downloadInvoicesZip(filtered, (p) => setZipPct(p));
+      pushToast('success', `تم تنزيل ${n} صورة في ملف ZIP`);
+    } catch {
+      pushToast('error', 'تعذّر إنشاء ملف ZIP');
+    } finally {
+      setZipBusy(false);
+    }
+  }
 
   async function act(inv: Invoice, patch: Record<string, unknown>, okMsg: string) {
     const r = await fetch('/api/supervisor/invoices', {
@@ -298,6 +324,33 @@ export default function FinancePage() {
                 <option value="">كل الأقسام</option>
                 {DEPARTMENTS.map((d) => <option key={d.key} value={d.key}>{d.label}</option>)}
               </select>
+            </div>
+
+            {/* Export toolbar — acts on the currently filtered invoices, highest available quality */}
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+              <button
+                className="btn btn-secondary text-sm"
+                onClick={onExportPdf}
+                disabled={exportableCount === 0}
+                title="تجميع صور الفواتير في ملف PDF (فاتورة لكل صفحة)"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /><path d="M12 18v-6M9 15h6" />
+                </svg>
+                تحميل PDF{exportableCount > 0 ? ` (${exportableCount})` : ''}
+              </button>
+              <button
+                className="btn btn-secondary text-sm"
+                onClick={onExportZip}
+                disabled={zipBusy || exportableCount === 0}
+                title="تنزيل صور الفواتير بالحجم الأصلي داخل ملف مضغوط"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M7 10l5 5 5-5" /><path d="M12 15V3" />
+                </svg>
+                {zipBusy ? `جارٍ التجهيز… ${zipPct}%` : `تحميل الصور ZIP${exportableCount > 0 ? ` (${exportableCount})` : ''}`}
+              </button>
+              <span className="text-xs text-ink-400">بأعلى دقة متاحة · حسب الفلتر الحالي</span>
             </div>
 
             <div className="card p-0 overflow-hidden">
