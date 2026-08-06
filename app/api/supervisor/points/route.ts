@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { randomUUID } from 'crypto';
 import { getPoints, addPointsRecord, deletePointRecord, deletePointBatch, getSupervisorByEmail, getSetting, GROUP_POINTS_ROLES } from '@/lib/services';
+import { READ_CACHE_HEADERS } from '@/lib/httpCache';
 
 export async function GET(req: NextRequest) {
   try {
@@ -32,7 +33,7 @@ export async function GET(req: NextRequest) {
       points = points.filter(p => p.registrationId === sId);
     }
 
-    return NextResponse.json({ points });
+    return NextResponse.json({ points }, { headers: READ_CACHE_HEADERS });
   } catch (error) {
     console.error('points GET error', error);
     return NextResponse.json({ error: 'حدث خطأ في جلب سجل النقاط' }, { status: 500 });

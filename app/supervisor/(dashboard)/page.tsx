@@ -679,9 +679,9 @@ export default function DashboardHome() {
   async function loadData() {
     try {
       const [statsRes, studentsRes, submissionsRes] = await Promise.all([
-        fetch('/api/supervisor/dashboard/stats', { cache: 'no-store' }),
-        fetch('/api/supervisor/students?scope=all', { cache: 'no-store' }),
-        fetch('/api/supervisor/submissions', { cache: 'no-store' }).catch(() => null)
+        fetch('/api/supervisor/dashboard/stats', { cache: 'default' }),
+        fetch('/api/supervisor/students?scope=all', { cache: 'default' }),
+        fetch('/api/supervisor/submissions', { cache: 'default' }).catch(() => null)
       ]);
       
       const statsJson = await statsRes.json();

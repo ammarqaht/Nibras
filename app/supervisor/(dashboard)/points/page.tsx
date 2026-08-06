@@ -245,9 +245,9 @@ export default function PointsBoardPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/supervisor/students?scope=all', { cache: 'no-store' }),
+      fetch('/api/supervisor/students?scope=all', { cache: 'default' }),
       fetch('/api/supervisor/groups', { cache: 'no-store' }),
-      fetch('/api/supervisor/points', { cache: 'no-store' }),
+      fetch('/api/supervisor/points', { cache: 'default' }),
       fetch('/api/supervisor/points-categories', { cache: 'no-store' }),
     ]).then(async ([sr, gr, pr, cr]) => {
       const srj = await sr.json().catch(() => ({ students: [] }));

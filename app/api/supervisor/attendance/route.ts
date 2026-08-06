@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
+import { READ_CACHE_HEADERS } from '@/lib/httpCache';
 import {
   getAttendance, logAttendance, deleteAttendance, getStudents,
   getSettings, deleteAttendancePointsByDate, addPointsRecord,
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
       records = records.filter(r => studentIdsInGroup.has(r.registrationId));
     }
 
-    return NextResponse.json({ attendance: records });
+    return NextResponse.json({ attendance: records }, { headers: READ_CACHE_HEADERS });
   } catch (error) {
     console.error('attendance GET error', error);
     return NextResponse.json({ error: 'حدث خطأ في جلب بيانات التحضير' }, { status: 500 });

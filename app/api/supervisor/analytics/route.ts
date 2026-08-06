@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
+import { READ_CACHE_HEADERS } from '@/lib/httpCache';
 import {
   getStudents, getAttendance, getPoints, getTasks, getSubmissions,
   getGroups, getSupervisorByEmail, getInvoices, getGeneralExpenses,
@@ -384,7 +385,7 @@ export async function GET(req: NextRequest) {
         top5Submitters, taskStats,
       },
       schedule: { total: totalSchedules, thisWeek: thisWeekCount, byCommittee: committeeStats, byWeek: weeklyStats },
-    });
+    }, { headers: READ_CACHE_HEADERS });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ error: 'Server Error' }, { status: 500 });

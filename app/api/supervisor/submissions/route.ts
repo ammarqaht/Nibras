@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { getSubmissions, upsertSubmission, getTasks } from '@/lib/services';
+import { READ_CACHE_HEADERS } from '@/lib/httpCache';
 
 export async function GET(req: NextRequest) {
   try {
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
       list = list.filter(s => myTaskIds.has(s.taskId));
     }
 
-    return NextResponse.json({ submissions: list });
+    return NextResponse.json({ submissions: list }, { headers: READ_CACHE_HEADERS });
   } catch (error) {
     console.error('submissions GET error', error);
     return NextResponse.json({ error: 'حدث خطأ أثناء تحميل التسليمات' }, { status: 500 });

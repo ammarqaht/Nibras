@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { getStudents, updateStudent, getSupervisorByEmail, createStudentManually, deleteStudent, getGroups, getAccessibleGroupIds, FULL_STUDENT_DATA_ROLES, GLOBAL_ROLES } from '@/lib/services';
+import { READ_CACHE_HEADERS } from '@/lib/httpCache';
 import { uploadDataUrl } from '@/lib/blob';
 
 export async function GET(req: NextRequest) {
@@ -101,7 +102,7 @@ export async function GET(req: NextRequest) {
       students = students.filter(s => s.groupId === gId);
     }
 
-    return NextResponse.json({ students });
+    return NextResponse.json({ students }, { headers: READ_CACHE_HEADERS });
   } catch (error) {
     console.error('students GET error', error);
     return NextResponse.json({ error: 'حدث خطأ أثناء تحميل البيانات' }, { status: 500 });

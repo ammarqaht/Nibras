@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
+import { READ_CACHE_HEADERS } from '@/lib/httpCache';
 import {
   getStudents,
   getAttendance,
@@ -324,7 +325,7 @@ export async function GET(req: NextRequest) {
         groupStats,
         stageStats
       }
-    });
+    }, { headers: READ_CACHE_HEADERS });
 
   } catch (error) {
     console.error(error);
