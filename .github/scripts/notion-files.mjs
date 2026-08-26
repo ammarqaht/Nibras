@@ -1,19 +1,16 @@
-// يبني فهرس كل ملفات المستودع داخل قاعدة "ملفات المشاريع" في نوشن.
-// يقارن ملفات المستودع بالموجود في نوشن: يضيف الجديد، ويؤرشف المحذوف، ولا يلمس الباقي.
+// يبني شجرة مجلدات المستودع داخل صفحة نوشن — كل ملف داخل مجلده، واسمه رابط مباشر لقيت هاب.
 import { execSync } from "node:child_process";
 
-const TOKEN   = process.env.NOTION_TOKEN;
-const DB      = process.env.NOTION_FILES_DB;
-const PROJECT = process.env.NOTION_PROJECT_PAGE;
-const REPO    = process.env.GITHUB_REPOSITORY;
-const BRANCH  = process.env.GITHUB_REF_NAME || "main";
+const TOKEN  = process.env.NOTION_TOKEN;
+const PAGE   = process.env.NOTION_FILES_PAGE;
+const REPO   = process.env.GITHUB_REPOSITORY;
+const BRANCH = process.env.GITHUB_REF_NAME || "main";
 
-if (!TOKEN || !DB || !PROJECT) {
-  console.error("ناقص NOTION_TOKEN أو NOTION_FILES_DB أو NOTION_PROJECT_PAGE");
+if (!TOKEN || !PAGE) {
+  console.error("ناقص NOTION_TOKEN أو NOTION_FILES_PAGE");
   process.exit(1);
 }
 
-const MAX_FILES = 1500;
 const SKIP_DIR  = /^(node_modules|\.next|dist|build|out|coverage|\.turbo|\.vercel)\//;
 const SKIP_FILE = /(^|\/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock|\.DS_Store)$/;
 
@@ -38,63 +35,95 @@ const api = async (path, method, body) => {
   throw new Error("فشل الاتصال بنوشن بعد عدة محاولات");
 };
 
-// ملفات المستودع المتتبَّعة
-const tracked = execSync("git ls-files", { maxBuffer: 1 << 28 })
-  .toString().split("\n")
-  .filter(Boolean)
+const files = execSync("git ls-files", { maxBuffer: 1 << 28 })
+  .toString().split("\n").filter(Boolean)
   .filter((p) => !SKIP_DIR.test(p) && !SKIP_FILE.test(p));
 
-if (tracked.length > MAX_FILES) {
-  console.error(`عدد الملفات ${tracked.length} أكبر من الحد ${MAX_FILES} — عدّل MAX_FILES أو وسّع قائمة التجاهل.`);
-  process.exit(1);
-}
-
-// الصفوف الموجودة حالياً في نوشن لهذا المشروع
-const existing = new Map();
-let cursor;
-do {
-  const page = await api(`databases/${DB}/query`, "POST", {
-    filter: { property: "المشروع", relation: { contains: PROJECT } },
-    page_size: 100,
-    start_cursor: cursor,
-  });
-  for (const row of page.results) {
-    const path = row.properties["المسار"]?.title?.[0]?.plain_text;
-    if (path) existing.set(path, row.id);
+// بناء الشجرة من المسارات
+const root = { dirs: new Map(), files: [] };
+for (const p of files) {
+  const parts = p.split("/");
+  let node = root;
+  for (let i = 0; i < parts.length - 1; i++) {
+    if (!node.dirs.has(parts[i])) node.dirs.set(parts[i], { dirs: new Map(), files: [] });
+    node = node.dirs.get(parts[i]);
   }
-  cursor = page.has_more ? page.next_cursor : undefined;
-} while (cursor);
-
-const current  = new Set(tracked);
-const toCreate = tracked.filter((p) => !existing.has(p));
-const toArchive = [...existing.keys()].filter((p) => !current.has(p));
+  node.files.push({ name: parts[parts.length - 1], path: p });
+}
 
 const linkFor = (p) =>
   `https://github.com/${REPO}/blob/${BRANCH}/` + p.split("/").map(encodeURIComponent).join("/");
 
-for (const p of toCreate) {
-  const slash = p.lastIndexOf("/");
-  const name  = slash === -1 ? p : p.slice(slash + 1);
-  const dir   = slash === -1 ? "/" : p.slice(0, slash);
-  const dot   = name.lastIndexOf(".");
-  const ext   = dot > 0 ? name.slice(dot + 1) : "—";
-  await api("pages", "POST", {
-    parent: { database_id: DB },
-    properties: {
-      "المسار":  { title: [{ text: { content: p.slice(0, 200) } }] },
-      "الملف":   { rich_text: [{ text: { content: name.slice(0, 200) } }] },
-      "المجلد":  { rich_text: [{ text: { content: dir.slice(0, 200) } }] },
-      "النوع":   { rich_text: [{ text: { content: ext } }] },
-      "الرابط":  { url: linkFor(p) },
-      "المشروع": { relation: [{ id: PROJECT }] },
+const countFiles = (n) =>
+  n.files.length + [...n.dirs.values()].reduce((s, d) => s + countFiles(d), 0);
+
+const folderBlock = (name, node) => ({
+  object: "block",
+  type: "toggle",
+  toggle: {
+    rich_text: [
+      { type: "text", text: { content: `${name}/` }, annotations: { bold: true } },
+      { type: "text", text: { content: `   ${countFiles(node)}` }, annotations: { color: "gray" } },
+    ],
+  },
+});
+
+const fileBlock = (f) => ({
+  object: "block",
+  type: "bulleted_list_item",
+  bulleted_list_item: {
+    rich_text: [{ type: "text", text: { content: f.name, link: { url: linkFor(f.path) } } }],
+  },
+});
+
+async function writeNode(parentId, node) {
+  const dirs = [...node.dirs.entries()].sort((a, b) => a[0].localeCompare(b[0], "en"));
+  const fls  = [...node.files].sort((a, b) => a.name.localeCompare(b.name, "en"));
+  const children = [...dirs.map(([n, d]) => folderBlock(n, d)), ...fls.map(fileBlock)];
+  if (!children.length) return;
+
+  const created = [];
+  for (let i = 0; i < children.length; i += 90) {
+    const res = await api(`blocks/${parentId}/children`, "PATCH", { children: children.slice(i, i + 90) });
+    created.push(...res.results);
+    await sleep(340);
+  }
+  for (let i = 0; i < dirs.length; i++) {
+    await writeNode(created[i].id, dirs[i][1]);
+  }
+}
+
+// امسح محتوى الصفحة القديم
+const old = [];
+let cursor;
+do {
+  const q = `blocks/${PAGE}/children?page_size=100` + (cursor ? `&start_cursor=${cursor}` : "");
+  const res = await api(q, "GET");
+  old.push(...res.results.map((b) => b.id));
+  cursor = res.has_more ? res.next_cursor : undefined;
+} while (cursor);
+
+for (const id of old) {
+  await api(`blocks/${id}`, "DELETE");
+  await sleep(340);
+}
+
+// رأس الصفحة
+await api(`blocks/${PAGE}/children`, "PATCH", {
+  children: [{
+    object: "block",
+    type: "callout",
+    callout: {
+      icon: { type: "emoji", emoji: "🗂" },
+      color: "gray_background",
+      rich_text: [
+        { type: "text", text: { content: `${REPO}`, link: { url: `https://github.com/${REPO}` } }, annotations: { bold: true } },
+        { type: "text", text: { content: `  ·  فرع ${BRANCH}  ·  ${files.length} ملف  ·  آخر تحديث ${new Date().toISOString().slice(0, 10)}` }, annotations: { color: "gray" } },
+      ],
     },
-  });
-  await sleep(340);
-}
+  }],
+});
+await sleep(340);
 
-for (const p of toArchive) {
-  await api(`pages/${existing.get(p)}`, "PATCH", { archived: true });
-  await sleep(340);
-}
-
-console.log(`الفرع: ${BRANCH} | المتتبَّع: ${tracked.length} | أُضيف: ${toCreate.length} | أُرشف: ${toArchive.length}`);
+await writeNode(PAGE, root);
+console.log(`تمت كتابة شجرة فيها ${files.length} ملف.`);

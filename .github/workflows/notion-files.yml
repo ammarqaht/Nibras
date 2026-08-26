@@ -1,11 +1,11 @@
-name: فهرس الملفات في نوشن
+name: شجرة الملفات في نوشن
 
 on:
   push:
   workflow_dispatch:
 
 jobs:
-  index:
+  tree:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,5 +15,4 @@ jobs:
       - run: node .github/scripts/notion-files.mjs
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
-          NOTION_FILES_DB: 8cd6f9f32a6a4d0e91e21a92cdac02e9
-          NOTION_PROJECT_PAGE: 3c800fc1-57cf-81ad-a9a1-c0de8c056baf
+          NOTION_FILES_PAGE: 3c800fc1-57cf-8168-86ae-f82ab7e96622
