@@ -1,0 +1,19 @@
+name: مزامنة نوشن
+
+on:
+  issues:
+    types: [opened, edited, reopened, closed]
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node .github/scripts/notion-sync.mjs
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_TASKS_DB: 87bce4728c134638bcb1fed45f878e08
+          NOTION_PROJECT_PAGE: 3c800fc1-57cf-81ad-a9a1-c0de8c056baf
